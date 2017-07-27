@@ -1,0 +1,25 @@
+# @LICENSE(NICTA)
+
+menuconfig LIB_MUSL_C
+    bool "Build musl C library"
+    default y
+    select HAVE_LIBC
+    help
+        Build Musl C standard library.
+
+config LIB_MUSL_C_USE_PREBUILT
+    bool "libmuslc use precompiled archive"
+    default y
+    depends on LIB_MUSL_C
+    help
+        If available, use the precompiled archive to improve project compile time.
+        This option was introduced because it takes a significant amount of time to 
+        compile this library and this library is not likely to change.
+
+config HAVE_LIBC
+    bool
+    default y
+    depends on LIB_SEL4_C || LIB_MUSL_C
+
+config BREAK
+    bool

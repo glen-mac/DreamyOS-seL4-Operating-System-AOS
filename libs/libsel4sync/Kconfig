@@ -1,0 +1,8 @@
+config LIB_SEL4_SYNC
+    bool "Build sel4sync"
+    select LIB_SEL4 
+    select LIB_SEL4_C
+    select HAVE_SEL4_LIBS
+    default y
+    help
+        "Synchronization library for seL4"

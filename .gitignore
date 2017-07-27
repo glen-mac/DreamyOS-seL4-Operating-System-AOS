@@ -1,0 +1,8 @@
+cscope.out
+/build/
+/include/
+/stage/
+/images/
+/null.s
+/null.i
+

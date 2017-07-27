@@ -1,0 +1,8 @@
+/* @LICENSE(MUSLC_MIT) */
+
+#include <math.h>
+
+long long llroundl(long double x)
+{
+	return roundl(x);
+}

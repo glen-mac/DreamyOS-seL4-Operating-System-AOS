@@ -1,0 +1,8 @@
+/* @LICENSE(MUSLC_MIT) */
+
+#include "libm.h"
+
+float complex cpowf(float complex z, float complex c)
+{
+	return cexpf(c * clogf(z));
+}
