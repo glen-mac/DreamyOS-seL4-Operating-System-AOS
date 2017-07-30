@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h> // For debugging
 
 #include "ttyout.h"
 
@@ -42,7 +43,28 @@ static size_t sos_debug_print(const void *vData, size_t count) {
 
 size_t sos_write(void *vData, size_t count) {
     //implement this to use your syscall
-    return sos_debug_print(vData, count);
+    // Why does this cause a vm_fault? `printf("DEBUG: in sos_write\n"); 
+    char *message = "Debug: in sos_write\n";
+    sos_debug_print(message, strlen(message));
+
+    seL4_MessageInfo_t tag;
+    int num_arguments = 2;
+
+    char *string = vData;
+
+    for (int i = 0; i < count; i++) {
+        /* Syscall 1 SOS_WRITE for every character*/
+        tag = seL4_MessageInfo_new(0, 0, 0, num_arguments);
+        seL4_SetTag(tag);
+        seL4_SetMR(0, 1);
+        seL4_SetMR(1, string[i]);
+        seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
+    }
+
+    char *message2 = "Debug: after call\n";
+    sos_debug_print(message2, strlen(message2));
+
+    return 0;
 }
 
 size_t sos_read(void *vData, size_t count) {

@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <sel4/sel4.h>
 
@@ -34,7 +35,7 @@ static void
 thread_block(void){
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
     seL4_SetTag(tag);
-    seL4_SetMR(0, 1);
+    seL4_SetMR(0, 2);
     seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
 }
 
@@ -43,7 +44,8 @@ int main(void){
     ttyout_init();
 
     do {
-        printf("task:\tHello world, I'm\ttty_test!\n");
+        char *message = "task:\tHello world, I'm\ttty_test!\n";
+        sos_write(message, strlen(message));
         thread_block();
         // sleep(1);	// Implement this as a syscall
     } while(1);

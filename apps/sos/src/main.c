@@ -76,6 +76,7 @@ struct {
  * A dummy starting syscall
  */
 #define SOS_SYSCALL0 0
+#define SOS_WRITE 1
 
 seL4_CPtr _sos_ipc_ep_cap;
 seL4_CPtr _sos_interrupt_ep_cap;
@@ -84,6 +85,9 @@ seL4_CPtr _sos_interrupt_ep_cap;
  * NFS mount point
  */
 extern fhandle_t mnt_point;
+
+/* Port for sending data to serial */
+struct serial *serial_port;
 
 
 void handle_syscall(seL4_Word badge, int num_args) {
@@ -108,6 +112,21 @@ void handle_syscall(seL4_Word badge, int num_args) {
 
         break;
 
+    case SOS_WRITE:
+        dprintf(0, "syscall: thread made sos_write\n");
+
+        dprintf(0, "num arguments is %d\n", num_args);
+        
+        seL4_Word character = seL4_GetMR(1);
+        dprintf(0, "Character is %c\n", character);
+        size_t nbytes = serial_send(serial_port, &character, 1);
+
+        /* Reply with how many bytes were sent */
+        reply = seL4_MessageInfo_new(0, 0, 0, 1);
+        seL4_SetMR(0, nbytes);
+        seL4_Send(reply_cap, reply);
+
+        break;
     default:
         printf("%s:%d (%s) Unknown syscall %d\n",
                    __FILE__, __LINE__, __func__, syscall_number);
@@ -416,6 +435,9 @@ int main(void) {
     /* Initialise the network hardware */
     network_init(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_NETWORK));
 
+    /* Must happen after network initialisation */
+    serial_port = serial_init();
+    
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
 
