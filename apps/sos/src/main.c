@@ -76,7 +76,7 @@ struct {
  * A dummy starting syscall
  */
 #define SOS_SYSCALL0 0
-#define SOS_WRITE 1
+#define SOS_SYSCALL_WRITE 1
 
 seL4_CPtr _sos_ipc_ep_cap;
 seL4_CPtr _sos_interrupt_ep_cap;
@@ -94,8 +94,9 @@ void handle_syscall(seL4_Word badge, int num_args) {
     seL4_Word syscall_number;
     seL4_CPtr reply_cap;
 
-
+    /* num_args is the number of elements in the message array */
     syscall_number = seL4_GetMR(0);
+    void *message = seL4_GetIPCBuffer()->msg + sizeof(syscall_number);
 
     /* Save the caller */
     reply_cap = cspace_save_reply_cap(cur_cspace);
@@ -112,14 +113,20 @@ void handle_syscall(seL4_Word badge, int num_args) {
 
         break;
 
-    case SOS_WRITE:
+    case SOS_SYSCALL_WRITE:
         dprintf(0, "syscall: thread made sos_write\n");
-
         dprintf(0, "num arguments is %d\n", num_args);
-        
-        seL4_Word character = seL4_GetMR(1);
-        dprintf(0, "Character is %c\n", character);
-        size_t nbytes = serial_send(serial_port, &character, 1);
+
+        /* Byte string of characters, 4 characters in one word */
+        char *buffer = (char *)message;
+        // TODO: dont need this line once debug is removed
+
+        // Debug
+        // for (int i = 0; i < num_args; ++i)
+        //     dprintf(0, "char = %c\n", buffer[i]);
+        // dprintf(0, "\n");
+
+        size_t nbytes = serial_send(serial_port, buffer, num_args);
 
         /* Reply with how many bytes were sent */
         reply = seL4_MessageInfo_new(0, 0, 0, 1);

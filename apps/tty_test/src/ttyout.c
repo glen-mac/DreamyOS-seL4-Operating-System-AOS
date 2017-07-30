@@ -42,29 +42,44 @@ static size_t sos_debug_print(const void *vData, size_t count) {
 }
 
 size_t sos_write(void *vData, size_t count) {
-    //implement this to use your syscall
-    // Why does this cause a vm_fault? `printf("DEBUG: in sos_write\n"); 
-    char *message = "Debug: in sos_write\n";
-    sos_debug_print(message, strlen(message));
+    // Why does this cause a vm_fault? printf("DEBUG: in sos_write\n"); 
 
     seL4_MessageInfo_t tag;
-    int num_arguments = 2;
+    char *message = vData;
+    size_t buffer_size = 1 << 6; /* Measured in words or is it bytes now? confusing */
 
-    char *string = vData;
+    /* Because count can be larger than message buffer size,
+     * we need to break up the message into several messages.
+     */
+    char str[80];
+    sprintf(str, "count: %d\n", count);
+    sos_debug_print(str, 80);
 
-    for (int i = 0; i < count; i++) {
-        /* Syscall 1 SOS_WRITE for every character*/
-        tag = seL4_MessageInfo_new(0, 0, 0, num_arguments);
+    sprintf(str, "buffersize: %d\n", buffer_size);
+    sos_debug_print(str, 80);
+
+    sprintf(str, "n_messages: %d\n", (count / buffer_size) + 1);
+    sos_debug_print(str, 80);
+
+    size_t bytes_left = count;
+    size_t bytes_sent = 0;
+
+    for (size_t message_id = 0; message_id < (count / buffer_size) + 1; ++message_id) {
+        size_t nbytes = bytes_left > buffer_size ? buffer_size: bytes_left;
+
+        tag = seL4_MessageInfo_new(0, 0, 0, 1 + nbytes);
         seL4_SetTag(tag);
-        seL4_SetMR(0, 1);
-        seL4_SetMR(1, string[i]);
+        seL4_SetMR(0, 1); // Syscall number
+
+        memcpy(seL4_GetIPCBuffer()->msg + sizeof(seL4_Word), message + bytes_sent, nbytes);
+
         seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
+
+        bytes_left -= nbytes;
+        bytes_sent += (size_t)seL4_GetMR(0); /* Receive back number of bytes sent */
     }
 
-    char *message2 = "Debug: after call\n";
-    sos_debug_print(message2, strlen(message2));
-
-    return 0;
+    return bytes_sent;
 }
 
 size_t sos_read(void *vData, size_t count) {

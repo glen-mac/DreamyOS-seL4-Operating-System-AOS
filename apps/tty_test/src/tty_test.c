@@ -44,8 +44,14 @@ int main(void){
     ttyout_init();
 
     do {
-        char *message = "task:\tHello world, I'm\ttty_test!\n";
-        sos_write(message, strlen(message));
+        // TODO: Turn this back on for demonstration
+        // char *message = "task:\tHello world, I'm\ttty_test!\n";
+        // sos_write(message, strlen(message));
+
+        char *message2 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabcdefghijklmnopqrstuvwxyz";
+        size_t bytes_sent = sos_write(message2, strlen(message2));
+        assert(bytes_sent == strlen(message2));
+
         thread_block();
         // sleep(1);	// Implement this as a syscall
     } while(1);
