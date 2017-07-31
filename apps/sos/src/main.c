@@ -114,28 +114,19 @@ void handle_syscall(seL4_Word badge, size_t nwords) {
 
     case SOS_SYSCALL_WRITE:
         dprintf(0, "syscall: thread made sos_write\n");
-        dprintf(0, "nwords is %d\n", nwords);
 
+        size_t max_msg_size = (seL4_MsgMaxLength - 2) * sizeof(seL4_Word);
         size_t nbytes = seL4_GetMR(1);
-        dprintf(0, "nbytes %d\n", nbytes);
 
-        if (nbytes > seL4_MsgMaxLength)
-            nbytes = seL4_MsgMaxLength;
+        if (nbytes > max_msg_size)
+            nbytes = max_msg_size;
 
         /* Byte string of characters, 4 characters in one word */
         /* Skip over the nbytes field */
         char *buffer = (char *)(message + sizeof(seL4_Word));
 
-        // TODO: dont need this line once debug is removed
-
-        // Debug
-        // for (int i = 0; i < nbytes; ++i)
-        //     dprintf(0, "char = %c\n", buffer[i]);
-        // dprintf(0, "\n");
-
+        /* Send to serial and reply with how many bytes were sent */
         nbytes = serial_send(serial_port, buffer, nbytes);
-
-        /* Reply with how many bytes were sent */
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
         seL4_SetMR(0, nbytes);
         seL4_Send(reply_cap, reply);

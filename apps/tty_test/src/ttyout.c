@@ -23,7 +23,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h> // For debugging
 
 #include "ttyout.h"
 
@@ -41,58 +40,53 @@ static size_t sos_debug_print(const void *vData, size_t count) {
     return count;
 }
 
-size_t sos_write(void *vData, size_t count) {
-    // Why does this cause a vm_fault?
-    // printf("DEBUG: in sos_write\n"); 
-
+/*
+ * write count bytes of data to serial port
+ *
+ */
+size_t sos_write(void *data, size_t count) {
     seL4_MessageInfo_t tag;
-    char *message = vData;
+    size_t nbytes, nwords;
 
-    size_t buffer_size = seL4_MsgMaxLength; /* Measured in bytes */
+    char *message = data;
 
-    // Debug
-    // char str[80];
-    // sprintf(str, "count: %d\n", count);
-    // sos_debug_print(str, 80);
-
-    // sprintf(str, "buffersize: %d\n", buffer_size);
-    // sos_debug_print(str, 80);
-
-    // sprintf(str, "n_messages: %d\n", (count / buffer_size) + 1);
-    // sos_debug_print(str, 80);
-
-    // sprintf(str, "nwords: %d\n", (count + sizeof(seL4_Word) - 1) / sizeof(seL4_Word));
-    // sos_debug_print(str, 80);
-
-    size_t bytes_left = count;
+    /* 
+     * Measured in bytes.
+     * subtracted by 2 words for syscall and nbytes fields.
+     */
+    size_t msg_size = (seL4_MsgMaxLength - 2) * sizeof(seL4_Word);
+    size_t bytes_remaining = count;
     size_t bytes_sent = 0;
 
     /*
      * Because count can be larger than message buffer size,
      * we need to break up the message into several messages.
      */
-    for (size_t message_id = 0; message_id < (count / buffer_size) + 1; ++message_id) {
-        size_t nbytes = bytes_left > buffer_size ? buffer_size: bytes_left;
+    for (size_t message_id = 0; message_id < (count / msg_size) + 1; ++message_id) {
+        /* Work out how many bytes to send in this message */
+        nbytes = bytes_remaining > msg_size ? msg_size: bytes_remaining;
 
-        /* 2 comes from the syscall and nbytes fields */
-        size_t nwords = 2 + (nbytes + sizeof(seL4_Word) - 1) / sizeof(seL4_Word);
+        /* 2 comes from the syscall and nbytes fields. A bit of maths to round up to nearest word from nbytes */
+        nwords = 2 + (nbytes + sizeof(seL4_Word) - 1) / sizeof(seL4_Word);
         tag = seL4_MessageInfo_new(0, 0, 0, nwords);
         seL4_SetTag(tag);
         seL4_SetMR(0, 1); /* Syscall number */
         seL4_SetMR(1, nbytes); /* Number of bytes in the message */
 
+        /* Copy the message into the IPC buffer past the syscall and nbytes fields */
         memcpy(seL4_GetIPCBuffer()->msg + 2, message + bytes_sent, nbytes);
 
         seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
 
-        bytes_left -= nbytes;
+        /* Even if the bytes didnt get sent correctly, we dont resend them */
+        bytes_remaining -= nbytes;
         bytes_sent += (size_t)seL4_GetMR(0); /* Receive back number of bytes sent */
     }
 
     return bytes_sent;
 }
 
-size_t sos_read(void *vData, size_t count) {
+size_t sos_read(void *data, size_t count) {
     //implement this to use your syscall
     return 0;
 }

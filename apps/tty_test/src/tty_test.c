@@ -32,38 +32,40 @@
 // Block a thread forever
 // we do this by making an unimplemented system call.
 static void
-thread_block(void){
+thread_block(void) {
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
     seL4_SetTag(tag);
     seL4_SetMR(0, 2);
     seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
 }
 
-int main(void){
+int main(void) {
     /* initialise communication */
     ttyout_init();
 
     do {
+        size_t max_msg_size = (seL4_MsgMaxLength - 2) * sizeof(seL4_Word);
+
+        /* Send a simple message */
         char *message = "123456\n";
         size_t bytes_sent = sos_write(message, strlen(message));
         assert(bytes_sent == strlen(message));
 
-        char *message2 = "reeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeaaaaaaaaaaaaallllllllllllllllllllllyyyyyyyyyyyyyyyyyyyyyyyyyyllllllllllllllllllllllloooooooooooonnnnnnnnnnnnnnngggggggggggbbbbbbuuuuufffeeerrrbcdefghijklmnopqrstuvwxyz\n";
+        /* Send a long message that is split into 2 packets */
+        /* One packet of 472 A's, the next with 7 B's and a newline */
+        char *message2 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBB\n";
         bytes_sent = sos_write(message2, strlen(message2));
         assert(bytes_sent == strlen(message2));
 
-        /* Checking that main only accepts max seL4_MsgMaxLength for buffer size */
-        seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 50);
+        /* Checking that SOS validates nbytes sent and clamps the value to max_msg_size */
+        /* Hence, all that should be printed out is all A's, nothing past the end of the buffer */
+        seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, seL4_MsgMaxLength);
         seL4_SetTag(tag);
         seL4_SetMR(0, 1); /* Syscall number */
         seL4_SetMR(1, 99999); /* Number of bytes in the message */
-
-        char message3[seL4_MsgMaxLength] = "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ";
-        memcpy(seL4_GetIPCBuffer()->msg + 2, message3, seL4_MsgMaxLength);
-
+        memcpy(seL4_GetIPCBuffer()->msg + 2, message2, max_msg_size);
         seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
-
-        assert((size_t)seL4_GetMR(0) == seL4_MsgMaxLength);
+        assert((size_t)seL4_GetMR(0) == max_msg_size);
 
         thread_block();
         // sleep(1);	// Implement this as a syscall
