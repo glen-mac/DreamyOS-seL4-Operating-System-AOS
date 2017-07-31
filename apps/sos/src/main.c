@@ -442,7 +442,7 @@ int main(void) {
 
     /* Must happen after network initialisation */
     serial_port = serial_init();
-    
+
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
 

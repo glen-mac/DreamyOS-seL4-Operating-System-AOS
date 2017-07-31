@@ -50,7 +50,7 @@ size_t sos_write(void *data, size_t count) {
 
     char *message = data;
 
-    /* 
+    /*
      * Measured in bytes.
      * subtracted by 2 words for syscall and nbytes fields.
      */
