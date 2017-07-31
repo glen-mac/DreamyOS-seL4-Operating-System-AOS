@@ -76,6 +76,7 @@ struct {
  * A dummy starting syscall
  */
 #define SOS_SYSCALL0 0
+#define SOS_SYSCALL_WRITE 1
 
 seL4_CPtr _sos_ipc_ep_cap;
 seL4_CPtr _sos_interrupt_ep_cap;
@@ -85,13 +86,16 @@ seL4_CPtr _sos_interrupt_ep_cap;
  */
 extern fhandle_t mnt_point;
 
+/* Port for sending data to serial */
+struct serial *serial_port;
 
-void handle_syscall(seL4_Word badge, int num_args) {
+
+void handle_syscall(seL4_Word badge, size_t nwords) {
     seL4_Word syscall_number;
     seL4_CPtr reply_cap;
 
-
     syscall_number = seL4_GetMR(0);
+    void *message = seL4_GetIPCBuffer()->msg + 1; /* skip over syscall word */
 
     /* Save the caller */
     reply_cap = cspace_save_reply_cap(cur_cspace);
@@ -108,6 +112,26 @@ void handle_syscall(seL4_Word badge, int num_args) {
 
         break;
 
+    case SOS_SYSCALL_WRITE:
+        dprintf(0, "syscall: thread made sos_write\n");
+
+        size_t max_msg_size = (seL4_MsgMaxLength - 2) * sizeof(seL4_Word);
+        size_t nbytes = seL4_GetMR(1);
+
+        if (nbytes > max_msg_size)
+            nbytes = max_msg_size;
+
+        /* Byte string of characters, 4 characters in one word */
+        /* Skip over the nbytes field */
+        char *buffer = (char *)(message + sizeof(seL4_Word));
+
+        /* Send to serial and reply with how many bytes were sent */
+        nbytes = serial_send(serial_port, buffer, nbytes);
+        reply = seL4_MessageInfo_new(0, 0, 0, 1);
+        seL4_SetMR(0, nbytes);
+        seL4_Send(reply_cap, reply);
+
+        break;
     default:
         printf("%s:%d (%s) Unknown syscall %d\n",
                    __FILE__, __LINE__, __func__, syscall_number);
@@ -416,6 +440,9 @@ int main(void) {
     /* Initialise the network hardware */
     network_init(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_NETWORK));
 
+    /* Must happen after network initialisation */
+    serial_port = serial_init();
+    
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
 
