@@ -11,6 +11,7 @@
 #ifndef _CLOCK_H_
 #define _CLOCK_H_
 
+#include <stdint.h>
 #include <sel4/sel4.h>
 
 /*

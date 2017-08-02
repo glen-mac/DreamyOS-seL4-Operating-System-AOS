@@ -19,6 +19,7 @@
 #include <nfs/nfs.h>
 #include <elf/elf.h>
 #include <serial/serial.h>
+#include <clock/clock.h>
 
 #include "network.h"
 #include "elf.h"
@@ -44,6 +45,7 @@
 /* All badged IRQs set high bet, then we use uniq bits to
  * distinguish interrupt sources */
 #define IRQ_BADGE_NETWORK (1 << 0)
+#define IRQ_BADGE_TIMER (1 << 1)
 
 #define TTY_NAME             CONFIG_SOS_STARTUP_APP
 #define TTY_PRIORITY         (0)
@@ -152,24 +154,26 @@ void syscall_loop(seL4_CPtr ep) {
 
         message = seL4_Wait(ep, &badge);
         label = seL4_MessageInfo_get_label(message);
-        if(badge & IRQ_EP_BADGE){
+        if (badge & IRQ_EP_BADGE) {
             /* Interrupt */
-            if (badge & IRQ_BADGE_NETWORK) {
+            if (badge & IRQ_BADGE_NETWORK)
                 network_irq();
-            }
 
-        }else if(label == seL4_VMFault){
+            /* IF or ELSE IT???? */
+            else if (badge & IRQ_BADGE_TIMER)
+                timer_interrupt();
+
+        } else if (label == seL4_VMFault) {
             /* Page fault */
             dprintf(0, "vm fault at 0x%08x, pc = 0x%08x, %s\n", seL4_GetMR(1),
                     seL4_GetMR(0),
                     seL4_GetMR(2) ? "Instruction Fault" : "Data fault");
 
             assert(!"Unable to handle vm faults");
-        }else if(label == seL4_NoFault) {
+        } else if (label == seL4_NoFault) {
             /* System call */
             handle_syscall(badge, seL4_MessageInfo_get_length(message) - 1);
-
-        }else{
+        } else {
             printf("Rootserver got an unknown message\n");
         }
     }
@@ -428,6 +432,7 @@ static inline seL4_CPtr badge_irq_ep(seL4_CPtr ep, seL4_Word badge) {
  * Main entry point - called by crt.
  */
 int main(void) {
+    int err;
 
 #ifdef SEL4_DEBUG_KERNEL
     seL4_DebugNameThread(seL4_CapInitThreadTCB, "SOS:root");
@@ -442,6 +447,11 @@ int main(void) {
 
     /* Must happen after network initialisation */
     serial_port = serial_init();
+
+    /* Initialise timer with badged capability */
+    /* TODO: WHAT HAPPENS IF THIS DOESNT RETURN OKAY?? */
+    err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
+    conditional_panic(err, "Failed to start the timer\n");
 
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
