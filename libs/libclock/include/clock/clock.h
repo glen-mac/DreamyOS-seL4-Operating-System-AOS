@@ -14,6 +14,8 @@
 #include <stdint.h>
 #include <sel4/sel4.h>
 
+#define CLOCK_EPIT1 0x20D0000
+
 /*
  * Return codes for driver functions
  */
@@ -25,6 +27,10 @@
 typedef int64_t timestamp_t;
 typedef void (*timer_callback_t)(uint32_t id, void *data);
 
+/* 
+ * Set the virtual address for the memory mapped timer 
+ */
+void init_timer(void *vaddr);
 
 /*
  * Initialise driver. Performs implicit stop_timer() if already initialised.

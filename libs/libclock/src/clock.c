@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <cspace/cspace.h>
 
+
 #define GPT_IRQ 87
 #define EPIT1_IRQ 88
 #define EPIT2_IRQ 89
@@ -27,6 +28,7 @@
 #define EPIT2_CMPR 0x20D400C /* Compare register; 32 bits */
 #define EPIT2_CNR 0x20D4010 /* Counter Register; 32 bits */
 
+void *epit1_virtual; /* Global var for the start of EPIT */
 
 /* DEBUG */
 #define dprintf(...) do { \
@@ -52,6 +54,11 @@ int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler) {
     return 0;
 }
 
+void init_timer(void *vaddr) {
+    epit1_virtual = vaddr;
+}
+
+
 /*
  * Initialise driver. Performs implicit stop_timer() if already initialised.
  *    interrupt_ep:       A (possibly badged) async endpoint that the driver
@@ -65,12 +72,25 @@ int start_timer(seL4_CPtr interrupt_ep) {
     stop_timer();
 
     /* Set the timer registers for settings */
-    // TODO
+
+    /* Map the device frame into virtual memory */
+    seL4_Word *control_register_ptr = (seL4_Word *)epit1_virtual;
+    seL4_Word *load_register_ptr = (seL4_Word *)(epit1_virtual + 8);
+    seL4_Word *compare_register_ptr = (seL4_Word *)(epit1_virtual + 12);
+
 
     /* Set timer interupts to be sent to interrupt_ep, and creates an interrupt capability */
     seL4_CPtr cap;
-    if (enable_irq(EPIT1_IRQ, interrupt_ep, &cap) != 0);
+    if (enable_irq(EPIT1_IRQ, interrupt_ep, &cap) != 0)
         return CLOCK_R_UINT;
+
+    *control_register_ptr |= 1 << 24; /* Use Peripheral clock */
+    *control_register_ptr |= 1 << 2; /* Output compare interrupt enable */
+    *control_register_ptr |= 1 << 1; /* EPIT Enable mode */
+    *control_register_ptr |= 1 << 0; /* Enable EPIT */
+
+    *load_register_ptr = 2;
+    *compare_register_ptr = 2; /* The value to count down from */
 
     return CLOCK_R_OK;
 }

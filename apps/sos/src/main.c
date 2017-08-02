@@ -160,8 +160,10 @@ void syscall_loop(seL4_CPtr ep) {
                 network_irq();
 
             /* IF or ELSE IT???? */
-            else if (badge & IRQ_BADGE_TIMER)
+            else if (badge & IRQ_BADGE_TIMER) {
+                dprintf(0, "OMG HERE\n");
                 timer_interrupt();
+            }
 
         } else if (label == seL4_VMFault) {
             /* Page fault */
@@ -447,11 +449,17 @@ int main(void) {
 
     /* Must happen after network initialisation */
     serial_port = serial_init();
+   
+    /* Map in the EPIT1 into virtual memory and provide that address to the timer library */
+    init_timer(map_device(CLOCK_EPIT1, sizeof(seL4_Word)*4));
 
+    /* TODO: WHAT HAPPENS IF THIS DOESNT RETURN OKAY?? JUST PANIC?*/
     /* Initialise timer with badged capability */
-    /* TODO: WHAT HAPPENS IF THIS DOESNT RETURN OKAY?? */
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
+
+    // DEBUG
+    dprintf(0, "Timer has started\n");
 
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
