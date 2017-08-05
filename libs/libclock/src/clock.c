@@ -148,12 +148,12 @@ int timer_interrupt(void) {
     if (seL4_IRQHandler_Ack(irq_handler) != 0)
         return CLOCK_R_UINT;
 
+    /* SET THE NEXT COMPARE VALUE GIVEN THE FRONT OF THE PQ */
+    (void) pq_time_peek(pq);
+
     /* run the callback event */
     event *curEvent = pq_pop(pq);
     curEvent->callback(curEvent->uid, curEvent->data);
-
-    /* SET THE NEXT COMPARE VALUE GIVEN THE FRONT OF THE PQ */
-    (void) pq_time_peek(pq);
 
     return CLOCK_R_OK;
 }
