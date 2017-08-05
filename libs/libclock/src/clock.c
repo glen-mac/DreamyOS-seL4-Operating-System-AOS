@@ -121,18 +121,18 @@ int start_timer(seL4_CPtr interrupt_ep) {
 uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data) {
     
     uint64_t time = time_stamp() + delay;
-    printf("time: %lld\n", time);    
-    pq_push(pq, time, callback, data);
+    //printf("time: %lld\n", time);    
+    int id = pq_push(pq, time, callback, data);
 
     /* set the next interrupt to be when the next event has to occur */
     seL4_Word *compare_register_ptr = (seL4_Word *)(gpt_virtual + GPT_COMPARE1REG);
 
     // more  hack
     time = pq_time_peek(pq);
-    printf("time: %lld\n", time);
+    //printf("time: %lld\n", time);
     *compare_register_ptr = time;
 
-    return CLOCK_R_OK;
+    return id;
 }
 
 /*
@@ -156,10 +156,12 @@ int timer_interrupt(void) {
     // TODO: Deal with counter register overflow
 
     /* run the callback event */
-    event *curEvent = pq_pop(pq);
-    curEvent->callback(curEvent->uid, curEvent->data);
+    do {
+        event *curEvent = pq_pop(pq);
+        curEvent->callback(curEvent->uid, curEvent->data);
+    } while (pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
 
-     /* SET THE NEXT COMPARE VALUE GIVEN THE FRONT OF THE PQ */
+    /* SET THE NEXT COMPARE VALUE GIVEN THE FRONT OF THE PQ */
     seL4_Word *compare_register_ptr = (seL4_Word *)(gpt_virtual + GPT_COMPARE1REG);
     *compare_register_ptr = pq_time_peek(pq);
 

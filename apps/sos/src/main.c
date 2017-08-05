@@ -60,7 +60,7 @@ const seL4_BootInfo* _boot_info;
 
 // DEBUG
 void callback(uint32_t id, void *data);
-
+void callback2(uint32_t id, void *data);
 
 struct {
 
@@ -524,8 +524,9 @@ int main(void) {
     dprintf(0, "Timestamp after proc started: %lld\n", time_stamp());
     printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
 
-    dprintf(0, "id: %d\n", register_timer(2000000, callback, NULL));
-
+    dprintf(0, "id: %d\n", register_timer(2000000, callback, NULL));    
+    dprintf(0, "id: %d\n", register_timer(2000000, callback2, NULL));
+    
     dprintf(0, "Timestamp after register: %lld\n", time_stamp());
     printf("compare: %d\n", *(gpt_virtual + 4));
 
@@ -536,6 +537,10 @@ int main(void) {
 }
 
 void callback(uint32_t id, void *data) {
-    dprintf(0, "%lld\n", time_stamp());
+    dprintf(0, "Callback 1, id:%d, time: %lld\n", id, time_stamp());
     dprintf(0, "id: %d\n", register_timer(1000000, callback, NULL));
+}
+void callback2(uint32_t id, void *data) {
+    dprintf(0, "Callback 2, id:%d, time: %lld\n", id, time_stamp());
+    dprintf(0, "id: %d\n", register_timer(500000, callback2, NULL));
 }
