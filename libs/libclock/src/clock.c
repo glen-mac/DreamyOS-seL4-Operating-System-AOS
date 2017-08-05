@@ -17,23 +17,23 @@
 #define EPIT2_IRQ 89
 
 /* EPIT1 Register offsets */
-#define EPIT1_CONTROLREG 0      /* Control register; 32 bits */
-#define EPIT1_STATUSREG 4       /* Status register; 32 bits */
-#define EPIT1_LOADREG 8         /* Load register; 32 bits */
-#define EPIT1_COMPAREREG 12     /* Compare register; 32 bits */
-#define EPIT1_COUNTERREG 16     /* Counter Register; 32 bits */
+#define EPIT1_CONTROLREG 0 /* Control register; 32 bits */
+#define EPIT1_STATUSREG 4 /* Status register; 32 bits */
+#define EPIT1_LOADREG 8 /* Load register; 32 bits */
+#define EPIT1_COMPAREREG 12 /* Compare register; 32 bits */
+#define EPIT1_COUNTERREG 16 /* Counter Register; 32 bits */
 
 /* GPT Register offsets */
-#define GPT_CONTROLREG 0x0      /* Control register; 32 bits */
-#define GPT_PRESCALEREG 0x4     /* Status register; 32 bits */
-#define GPT_STATUSREG 0x8       /* Load register; 32 bits */
-#define GPT_INTERRUPTREG 0xC    /* Compare register; 32 bits */
-#define GPT_COMPARE1REG 0x10    /* Compare register; 32 bits */
+#define GPT_CONTROLREG 0x0 /* Control register; 32 bits */
+#define GPT_PRESCALEREG 0x4 /* Status register; 32 bits */
+#define GPT_STATUSREG 0x8 /* Load register; 32 bits */
+#define GPT_INTERRUPTREG 0xC /* Compare register; 32 bits */
+#define GPT_COMPARE1REG 0x10 /* Compare register; 32 bits */
+#define GPT_CNT 0x24 /* Compare register; 32 bits */
 
-/* handlers */
-void *gpt_virtual;              /* Global var for the start of EPIT */
-seL4_CPtr irq_handler;          /* Global IRQ handler */
-priority_queue *pq;             /* timer event pq handler */
+void *gpt_virtual; /* Global var for the start of EPIT */
+seL4_CPtr irq_handler; /* Global IRQ handler */
+priority_queue *pq; /* timer event pq handler */
 
 /* This is copied from network.c (and modified), we should abstract this out into a "interrupt.h" or something */
 int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr) {
@@ -89,6 +89,7 @@ int start_timer(seL4_CPtr interrupt_ep) {
     *status_register_ptr = 0x00000000;
     *interrupt_register_ptr = 0x00000000;
 
+    *control_register_ptr |= 1 << 9; /* Free-Run mode */
     *control_register_ptr |= 1 << 6; /* peripheral clock */
     *control_register_ptr |= 1 << 5; /* stop mode */
     *control_register_ptr |= 1 << 4; /* doze mode */
@@ -139,6 +140,8 @@ int remove_timer(uint32_t id) {
 int timer_interrupt(void) {
     /* TODO work out which call back to run? */
 
+    // TODO: Deal with counter register overflow
+18217
     seL4_Word *status_register_ptr = (seL4_Word *)(gpt_virtual + GPT_STATUSREG);
     *status_register_ptr |= 1 << 0; /* Acknowledge a compare event occured */
 
@@ -162,7 +165,10 @@ int timer_interrupt(void) {
  * Returns a negative value if failure.
  */
 timestamp_t time_stamp(void) {
-    return CLOCK_R_UINT;
+    // TODO: What would fail here? Driver not initialised I guess.
+
+    seL4_Word *counter_register = (seL4_Word *)(gpt_virtual + GPT_CNT);
+    return (timestamp_t)(*counter_register);
 }
 
 /*
