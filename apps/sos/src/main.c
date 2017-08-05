@@ -451,12 +451,56 @@ int main(void) {
     serial_port = serial_init();
    
     /* Map in the EPIT1 into virtual memory and provide that address to the timer library */
-    init_timer(map_device(CLOCK_GPT, sizeof(seL4_Word)*5));
+    seL4_Word *gpt_virtual = map_device(CLOCK_GPT, sizeof(seL4_Word)*5);
+    init_timer(gpt_virtual);
 
     /* TODO: WHAT HAPPENS IF THIS DOESNT RETURN OKAY?? JUST PANIC?*/
     /* Initialise timer with badged capability */
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
+
+
+    #define WORD_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c"
+    #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+
+    #define WORD_TO_BINARY(byte)  \
+      (byte & 0x80000000 ? '1' : '0'), \
+      (byte & 0x40000000 ? '1' : '0'), \
+      (byte & 0x20000000 ? '1' : '0'), \
+      (byte & 0x10000000 ? '1' : '0'), \
+      (byte & 0x8000000 ? '1' : '0'), \
+      (byte & 0x4000000 ? '1' : '0'), \
+      (byte & 0x2000000 ? '1' : '0'), \
+      (byte & 0x1000000 ? '1' : '0'), \
+      (byte & 0x800000 ? '1' : '0'), \
+      (byte & 0x400000 ? '1' : '0'), \
+      (byte & 0x200000 ? '1' : '0'), \
+      (byte & 0x100000 ? '1' : '0'), \
+      (byte & 0x80000 ? '1' : '0'), \
+      (byte & 0x40000 ? '1' : '0'), \
+      (byte & 0x20000 ? '1' : '0'), \
+      (byte & 0x10000 ? '1' : '0'), \
+      (byte & 0x8000 ? '1' : '0'), \
+      (byte & 0x4000 ? '1' : '0'), \
+      (byte & 0x2000 ? '1' : '0'), \
+      (byte & 0x1000 ? '1' : '0'), \
+      (byte & 0x800 ? '1' : '0'), \
+      (byte & 0x400 ? '1' : '0'), \
+      (byte & 0x200 ? '1' : '0'), \
+      (byte & 0x100 ? '1' : '0'), \
+      (byte & 0x80 ? '1' : '0'), \
+      (byte & 0x40 ? '1' : '0'), \
+      (byte & 0x20 ? '1' : '0'), \
+      (byte & 0x10 ? '1' : '0'), \
+      (byte & 0x08 ? '1' : '0'), \
+      (byte & 0x04 ? '1' : '0'), \
+      (byte & 0x02 ? '1' : '0'), \
+      (byte & 0x01 ? '1' : '0') 
+
+    printf("control: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*gpt_virtual));
+    printf("prescale: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 1)));
+    printf("status: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 2)));   
+    printf("interrupt: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 3)));
 
     // DEBUG
     dprintf(0, "Timer has started\n");

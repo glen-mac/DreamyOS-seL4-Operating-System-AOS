@@ -72,49 +72,35 @@ int start_timer(seL4_CPtr interrupt_ep) {
     /* Map the device frame into virtual memory */
     seL4_Word *control_register_ptr = (seL4_Word *)(gpt_virtual + GPT_CONTROLREG);
     seL4_Word *prescale_register_ptr = (seL4_Word *)(gpt_virtual + GPT_PRESCALEREG);
-    // seL4_Word *load_register_ptr = (seL4_Word *)(gpt_virtual + EPIT1_LOADREG);
-    // seL4_Word *compare_register_ptr = (seL4_Word *)(gpt_virtual + EPIT1_COMPAREREG);
     seL4_Word *interrupt_register_ptr = (seL4_Word *)(gpt_virtual + GPT_INTERRUPTREG);
+    seL4_Word *status_register_ptr = (seL4_Word *)(gpt_virtual + GPT_STATUSREG);
     seL4_Word *compare_register_ptr = (seL4_Word *)(gpt_virtual + GPT_COMPARE1REG);
 
     /* Set timer interupts to be sent to interrupt_ep, and creates an interrupt capability */
     if (enable_irq(GPT_IRQ, interrupt_ep, &irq_handler) != 0)
         return CLOCK_R_UINT;
 
-    *control_register_ptr |= 0 << 9; /* free run mode */
-    *control_register_ptr |= 1 << 8; /* peripheral clock */
-    
+    /* Reset the registers  which we do not completely overwrite*/
+    *control_register_ptr = 0x00000000;
+    *prescale_register_ptr = 0x00000000;
+    *status_register_ptr = 0x00000000;
+    *interrupt_register_ptr = 0x00000000;
+
+    *control_register_ptr |= 1 << 6; /* peripheral clock */
     *control_register_ptr |= 1 << 5; /* stop mode */
-    *control_register_ptr |= 1 << 3; /* doze mode */
+    *control_register_ptr |= 1 << 4; /* doze mode */
     *control_register_ptr |= 1 << 3; /* wait mode */
     *control_register_ptr |= 1 << 2; /* debug mode */
     *control_register_ptr &= ~(1 << 1); /*  ENMOD retain value */
 
     *interrupt_register_ptr |= 1 << 5; /* Roll over enabled */
-
-    *interrupt_register_ptr |= 1 << 2; /* Output compare channel 1 enabled */
-    *interrupt_register_ptr |= 1 << 1; /* Output compare channel 1 enabled */
     *interrupt_register_ptr |= 1 << 0; /* Output compare channel 1 enabled */
 
-    *prescale_register_ptr = 32;
-    *compare_register_ptr = 1000; /* Compare value */
+    *prescale_register_ptr = 66;
 
-    
-    *control_register_ptr |= 1 << 0; /* enabled */
+    *compare_register_ptr = 1000000; /* 1 million microseconds value */
 
-    // *control_register_ptr &= ~(1 << 0); /* Disable EPIT */
-
-
-    // *control_register_ptr |= 1 << 24; /* Use Peripheral clock */
-    // *control_register_ptr |= 1 << 2; /* Output compare interrupt enable */
-    // *control_register_ptr |= 1 << 1; /* EPIT Enable mode */
-
-    // *control_register_ptr |= 1 << 0; /* Enable EPIT */
-
-
-
-    //*load_register_ptr = 0;
-    //*compare_register_ptr = 0; /* The value to generate an interrupt on*/
+    *control_register_ptr |= 1 << 0; /* clock started */
 
     return CLOCK_R_OK;
 }
