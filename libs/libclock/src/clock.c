@@ -88,7 +88,7 @@ int start_timer(seL4_CPtr interrupt_ep) {
     *prescale_register_ptr = 0x00000000;
     *status_register_ptr = 0x00000000;
     *interrupt_register_ptr = 0x00000000;
-    *compare_register_ptr = 0x00000000;
+    *compare_register_ptr = 0xFFFFFFFF;
 
     *control_register_ptr |= 1 << 9; /* Free-Run mode */
     *control_register_ptr |= 1 << 6; /* peripheral clock */
@@ -103,7 +103,7 @@ int start_timer(seL4_CPtr interrupt_ep) {
 
     *prescale_register_ptr = 66;
 
-   //*compare_register_ptr = 1000000; /* 1 million microseconds value */
+    //*compare_register_ptr = 1000000; /* 1 million microseconds value */
 
     *control_register_ptr |= 1 << 0; /* clock started */
 
