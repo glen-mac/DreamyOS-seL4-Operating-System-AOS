@@ -451,7 +451,7 @@ int main(void) {
     serial_port = serial_init();
    
     /* Map in the EPIT1 into virtual memory and provide that address to the timer library */
-    seL4_Word *gpt_virtual = map_device(CLOCK_GPT, sizeof(seL4_Word)*5);
+    seL4_Word *gpt_virtual = map_device(CLOCK_GPT, sizeof(seL4_Word)*10);
     init_timer(gpt_virtual);
 
     /* TODO: WHAT HAPPENS IF THIS DOESNT RETURN OKAY?? JUST PANIC?*/
@@ -460,6 +460,7 @@ int main(void) {
     conditional_panic(err, "Failed to start the timer\n");
 
 
+    // DEBUG
     #define WORD_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c"
     #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 
@@ -497,6 +498,7 @@ int main(void) {
       (byte & 0x02 ? '1' : '0'), \
       (byte & 0x01 ? '1' : '0') 
 
+    // DEBUG
     printf("control: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*gpt_virtual));
     printf("prescale: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 1)));
     printf("status: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 2)));   
@@ -505,11 +507,21 @@ int main(void) {
     // DEBUG
     dprintf(0, "Timer has started\n");
 
+    // DEBUG
+    dprintf(0, "Timestamp before proc started: %lld\n", time_stamp());
+    printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
+
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
 
     /* Wait on synchronous endpoint for IPC */
     dprintf(0, "\nSOS entering syscall loop\n");
+
+    // DEBUG
+    dprintf(0, "Timestamp after proc started: %lld\n", time_stamp());
+    printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
+
+
     syscall_loop(_sos_ipc_ep_cap);
 
     /* Not reached */
