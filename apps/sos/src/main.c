@@ -161,7 +161,7 @@ void syscall_loop(seL4_CPtr ep) {
 
             /* IF or ELSE IT???? */
             else if (badge & IRQ_BADGE_TIMER) {
-                dprintf(0, "OMG HERE\n");
+                dprintf(0, "Timer interrupt\n");
                 timer_interrupt();
             }
 
@@ -451,7 +451,7 @@ int main(void) {
     serial_port = serial_init();
    
     /* Map in the EPIT1 into virtual memory and provide that address to the timer library */
-    init_timer(map_device(CLOCK_EPIT1, sizeof(seL4_Word)*4));
+    init_timer(map_device(CLOCK_GPT, sizeof(seL4_Word)*5));
 
     /* TODO: WHAT HAPPENS IF THIS DOESNT RETURN OKAY?? JUST PANIC?*/
     /* Initialise timer with badged capability */

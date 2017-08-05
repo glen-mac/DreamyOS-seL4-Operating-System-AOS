@@ -15,48 +15,43 @@
 #define EPIT1_IRQ 88
 #define EPIT2_IRQ 89
 
-/* EPIT1 Register locations */
-#define EPIT1_CR 0x20D0000 /* Control register; 32 bits */
-#define EPIT1_SR 0x20D0004 /* Status register; 32 bits */
-#define EPIT1_LR 0x20D0008 /* Load register; 32 bits */
-#define EPIT1_CMPR 0x20D000C /* Compare register; 32 bits */
-#define EPIT1_CNR 0x20D0010 /* Counter Register; 32 bits */
+/* EPIT1 Register offsets */
+#define EPIT1_CONTROLREG 0 /* Control register; 32 bits */
+#define EPIT1_STATUSREG 4 /* Status register; 32 bits */
+#define EPIT1_LOADREG 8 /* Load register; 32 bits */
+#define EPIT1_COMPAREREG 12 /* Compare register; 32 bits */
+#define EPIT1_COUNTERREG 16 /* Counter Register; 32 bits */
 
-/* EPIT2 Register locations */
-#define EPIT2_CR 0x20D4000 /* Control register; 32 bits */
-#define EPIT2_SR 0x20D4004 /* Status register; 32 bits */
-#define EPIT2_LR 0x20D4008 /* Load register; 32 bits */
-#define EPIT2_CMPR 0x20D400C /* Compare register; 32 bits */
-#define EPIT2_CNR 0x20D4010 /* Counter Register; 32 bits */
 
-void *epit1_virtual; /* Global var for the start of EPIT */
+#define GPT_CONTROLREG 0x0 /* Control register; 32 bits */
+#define GPT_PRESCALEREG 0x4 /* Status register; 32 bits */
+#define GPT_STATUSREG 0x8 /* Load register; 32 bits */
+#define GPT_INTERRUPTREG 0xC /* Compare register; 32 bits */
+#define GPT_COMPARE1REG 0x10 /* Compare register; 32 bits */
 
-/* DEBUG */
-#define dprintf(...) do { \
-        printf("%s %s %d: ", __FILE__, __func__, __LINE__); \
-        printf(__VA_ARGS__); \
-    }while(0)
+void *gpt_virtual; /* Global var for the start of EPIT */
+seL4_CPtr irq_handler; /* Global IRQ handler */
 
 
 /* This is copied from network.c (and modified), we should abstract this out into a "interrupt.h" or something */
-int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler) {
+int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr) {
     /* Create an IRQ handler */
-    if (!(*irq_handler = cspace_irq_control_get_cap(cur_cspace, seL4_CapIRQControl, irq)))
+    if (!(*irq_handler_ptr = cspace_irq_control_get_cap(cur_cspace, seL4_CapIRQControl, irq)))
         return -1;
     
     /* Assign to an end point */
-    if (seL4_IRQHandler_SetEndpoint(*irq_handler, aep) != 0)
+    if (seL4_IRQHandler_SetEndpoint(*irq_handler_ptr, aep) != 0)
         return -1;
 
     /* Ack the handler before continuing */
-    if (seL4_IRQHandler_Ack(*irq_handler) != 0)
+    if (seL4_IRQHandler_Ack(*irq_handler_ptr) != 0)
         return -1;
 
     return 0;
 }
 
 void init_timer(void *vaddr) {
-    epit1_virtual = vaddr;
+    gpt_virtual = vaddr;
 }
 
 
@@ -75,23 +70,51 @@ int start_timer(seL4_CPtr interrupt_ep) {
     /* Set the timer registers for settings */
 
     /* Map the device frame into virtual memory */
-    seL4_Word *control_register_ptr = (seL4_Word *)epit1_virtual;
-    seL4_Word *load_register_ptr = (seL4_Word *)(epit1_virtual + 8);
-    seL4_Word *compare_register_ptr = (seL4_Word *)(epit1_virtual + 12);
-
+    seL4_Word *control_register_ptr = (seL4_Word *)(gpt_virtual + GPT_CONTROLREG);
+    seL4_Word *prescale_register_ptr = (seL4_Word *)(gpt_virtual + GPT_PRESCALEREG);
+    // seL4_Word *load_register_ptr = (seL4_Word *)(gpt_virtual + EPIT1_LOADREG);
+    // seL4_Word *compare_register_ptr = (seL4_Word *)(gpt_virtual + EPIT1_COMPAREREG);
+    seL4_Word *interrupt_register_ptr = (seL4_Word *)(gpt_virtual + GPT_INTERRUPTREG);
+    seL4_Word *compare_register_ptr = (seL4_Word *)(gpt_virtual + GPT_COMPARE1REG);
 
     /* Set timer interupts to be sent to interrupt_ep, and creates an interrupt capability */
-    seL4_CPtr cap;
-    if (enable_irq(EPIT1_IRQ, interrupt_ep, &cap) != 0)
+    if (enable_irq(GPT_IRQ, interrupt_ep, &irq_handler) != 0)
         return CLOCK_R_UINT;
 
-    *control_register_ptr |= 1 << 24; /* Use Peripheral clock */
-    *control_register_ptr |= 1 << 2; /* Output compare interrupt enable */
-    *control_register_ptr |= 1 << 1; /* EPIT Enable mode */
-    *control_register_ptr |= 1 << 0; /* Enable EPIT */
+    *control_register_ptr |= 0 << 9; /* free run mode */
+    *control_register_ptr |= 1 << 8; /* peripheral clock */
+    
+    *control_register_ptr |= 1 << 5; /* stop mode */
+    *control_register_ptr |= 1 << 3; /* doze mode */
+    *control_register_ptr |= 1 << 3; /* wait mode */
+    *control_register_ptr |= 1 << 2; /* debug mode */
+    *control_register_ptr &= ~(1 << 1); /*  ENMOD retain value */
 
-    *load_register_ptr = 2;
-    *compare_register_ptr = 2; /* The value to count down from */
+    *interrupt_register_ptr |= 1 << 5; /* Roll over enabled */
+
+    *interrupt_register_ptr |= 1 << 2; /* Output compare channel 1 enabled */
+    *interrupt_register_ptr |= 1 << 1; /* Output compare channel 1 enabled */
+    *interrupt_register_ptr |= 1 << 0; /* Output compare channel 1 enabled */
+
+    *prescale_register_ptr = 32;
+    *compare_register_ptr = 1000; /* Compare value */
+
+    
+    *control_register_ptr |= 1 << 0; /* enabled */
+
+    // *control_register_ptr &= ~(1 << 0); /* Disable EPIT */
+
+
+    // *control_register_ptr |= 1 << 24; /* Use Peripheral clock */
+    // *control_register_ptr |= 1 << 2; /* Output compare interrupt enable */
+    // *control_register_ptr |= 1 << 1; /* EPIT Enable mode */
+
+    // *control_register_ptr |= 1 << 0; /* Enable EPIT */
+
+
+
+    //*load_register_ptr = 0;
+    //*compare_register_ptr = 0; /* The value to generate an interrupt on*/
 
     return CLOCK_R_OK;
 }
@@ -123,9 +146,14 @@ int remove_timer(uint32_t id) {
  * Returns CLOCK_R_OK iff successful
  */
 int timer_interrupt(void) {
-    dprintf("Timer interrupt occured\n");
-
     /* TODO work out which call back to run? */
+
+    seL4_Word *status_register_ptr = (seL4_Word *)(gpt_virtual + GPT_STATUSREG);
+    *status_register_ptr |= 1 << 0; /* Acknowledge a compare event occured */
+
+    /* Acknowledge the interrupt so more can happen */
+    if (seL4_IRQHandler_Ack(irq_handler) != 0)
+        return CLOCK_R_UINT;
 
     return CLOCK_R_OK;
 }

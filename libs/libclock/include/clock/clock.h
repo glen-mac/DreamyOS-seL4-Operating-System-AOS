@@ -15,6 +15,7 @@
 #include <sel4/sel4.h>
 
 #define CLOCK_EPIT1 0x20D0000
+#define CLOCK_GPT 0x2098000
 
 /*
  * Return codes for driver functions
