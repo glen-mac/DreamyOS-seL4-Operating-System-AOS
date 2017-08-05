@@ -80,6 +80,6 @@ int pq_remove(priority_queue *pq, uint32_t id) {
 
 /* get the timestamp value of the first child of the head event of the pq */
 uint64_t pq_time_peek(priority_queue *pq) {
-    return pq->events[2].priority;
+    return pq->events[1].priority;
 }
 

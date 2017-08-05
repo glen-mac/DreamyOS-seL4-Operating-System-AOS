@@ -58,6 +58,10 @@ extern char _cpio_archive[];
 const seL4_BootInfo* _boot_info;
 
 
+// DEBUG
+void callback(uint32_t id, void *data);
+
+
 struct {
 
     seL4_Word tcb_addr;
@@ -451,7 +455,7 @@ int main(void) {
     serial_port = serial_init();
    
     /* Map in the EPIT1 into virtual memory and provide that address to the timer library */
-    seL4_Word *gpt_virtual = map_device(CLOCK_GPT, sizeof(seL4_Word)*10);
+    seL4_Word *gpt_virtual = map_device((void *)CLOCK_GPT, sizeof(seL4_Word)*10);
     init_timer(gpt_virtual);
 
     /* TODO: WHAT HAPPENS IF THIS DOESNT RETURN OKAY?? JUST PANIC?*/
@@ -520,6 +524,10 @@ int main(void) {
     dprintf(0, "Timestamp after proc started: %lld\n", time_stamp());
     printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
 
+    dprintf(0, "id: %d\n", register_timer(2000000, callback, NULL));
+
+    dprintf(0, "Timestamp after register: %lld\n", time_stamp());
+    printf("compare: %d\n", *(gpt_virtual + 4));
 
     syscall_loop(_sos_ipc_ep_cap);
 
@@ -527,4 +535,7 @@ int main(void) {
     return 0;
 }
 
-
+void callback(uint32_t id, void *data) {
+    dprintf(0, "%lld\n", time_stamp());
+    dprintf(0, "id: %d\n", register_timer(1000000, callback, NULL));
+}

@@ -88,6 +88,7 @@ int start_timer(seL4_CPtr interrupt_ep) {
     *prescale_register_ptr = 0x00000000;
     *status_register_ptr = 0x00000000;
     *interrupt_register_ptr = 0x00000000;
+    *compare_register_ptr = 0x00000000;
 
     *control_register_ptr |= 1 << 9; /* Free-Run mode */
     *control_register_ptr |= 1 << 6; /* peripheral clock */
@@ -102,7 +103,7 @@ int start_timer(seL4_CPtr interrupt_ep) {
 
     *prescale_register_ptr = 66;
 
-    *compare_register_ptr = 1000000; /* 1 million microseconds value */
+   //*compare_register_ptr = 1000000; /* 1 million microseconds value */
 
     *control_register_ptr |= 1 << 0; /* clock started */
 
@@ -118,7 +119,20 @@ int start_timer(seL4_CPtr interrupt_ep) {
  * Returns 0 on failure, otherwise an unique ID for this timeout
  */
 uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data) {
-    return pq_push(pq, time_stamp()+delay, callback, data);
+    
+    uint64_t time = time_stamp() + delay;
+    printf("time: %lld\n", time);    
+    pq_push(pq, time, callback, data);
+
+    /* set the next interrupt to be when the next event has to occur */
+    seL4_Word *compare_register_ptr = (seL4_Word *)(gpt_virtual + GPT_COMPARE1REG);
+
+    // more  hack
+    time = pq_time_peek(pq);
+    printf("time: %lld\n", time);
+    *compare_register_ptr = time;
+
+    return CLOCK_R_OK;
 }
 
 /*
@@ -129,6 +143,7 @@ uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data) {
 int remove_timer(uint32_t id) {
     if (!pq_remove(pq, id))
         return CLOCK_R_UINT;
+
     return CLOCK_R_OK;
 }
 
@@ -138,22 +153,22 @@ int remove_timer(uint32_t id) {
  * Returns CLOCK_R_OK iff successful
  */
 int timer_interrupt(void) {
-    /* TODO work out which call back to run? */
-
     // TODO: Deal with counter register overflow
+
+    /* run the callback event */
+    event *curEvent = pq_pop(pq);
+    curEvent->callback(curEvent->uid, curEvent->data);
+
+     /* SET THE NEXT COMPARE VALUE GIVEN THE FRONT OF THE PQ */
+    seL4_Word *compare_register_ptr = (seL4_Word *)(gpt_virtual + GPT_COMPARE1REG);
+    *compare_register_ptr = pq_time_peek(pq);
+
     seL4_Word *status_register_ptr = (seL4_Word *)(gpt_virtual + GPT_STATUSREG);
     *status_register_ptr |= 1 << 0; /* Acknowledge a compare event occured */
 
     /* Acknowledge the interrupt so more can happen */
     if (seL4_IRQHandler_Ack(irq_handler) != 0)
         return CLOCK_R_UINT;
-
-    /* SET THE NEXT COMPARE VALUE GIVEN THE FRONT OF THE PQ */
-    (void) pq_time_peek(pq);
-
-    /* run the callback event */
-    event *curEvent = pq_pop(pq);
-    curEvent->callback(curEvent->uid, curEvent->data);
 
     return CLOCK_R_OK;
 }
