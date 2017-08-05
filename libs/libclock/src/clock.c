@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <cspace/cspace.h>
 
+#include <utils/pq.h>
 
 #define GPT_IRQ 87
 #define EPIT1_IRQ 88
