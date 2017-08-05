@@ -141,7 +141,6 @@ int timer_interrupt(void) {
     /* TODO work out which call back to run? */
 
     // TODO: Deal with counter register overflow
-18217
     seL4_Word *status_register_ptr = (seL4_Word *)(gpt_virtual + GPT_STATUSREG);
     *status_register_ptr |= 1 << 0; /* Acknowledge a compare event occured */
 
