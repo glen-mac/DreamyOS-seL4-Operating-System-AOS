@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <cspace/cspace.h>
 
-#include <utils/pq.h>
+#include <clock/pq.h>
 
 /* irq ids */
 #define GPT_IRQ 87
@@ -33,6 +33,7 @@
 /* handlers */
 void *gpt_virtual;              /* Global var for the start of EPIT */
 seL4_CPtr irq_handler;          /* Global IRQ handler */
+priority_queue *pq;             /* timer event pq handler */
 
 /* This is copied from network.c (and modified), we should abstract this out into a "interrupt.h" or something */
 int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr) {
@@ -54,6 +55,7 @@ int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr) {
 /* Initialise the GPT handler */
 void init_timer(void *vaddr) {
     gpt_virtual = vaddr;
+    pq = init_pq(); 
 }
 
 /*
@@ -115,7 +117,7 @@ int start_timer(seL4_CPtr interrupt_ep) {
  * Returns 0 on failure, otherwise an unique ID for this timeout
  */
 uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data) {
-    return 0;
+    return pq_push(pq, time_stamp()+delay, callback, data);
 }
 
 /*
@@ -124,7 +126,9 @@ uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data) {
  * Returns CLOCK_R_OK iff successful.
  */
 int remove_timer(uint32_t id) {
-    return CLOCK_R_UINT;
+    if (!pq_remove(pq, id))
+        return CLOCK_R_UINT;
+    return CLOCK_R_OK;
 }
 
 /*
@@ -141,6 +145,13 @@ int timer_interrupt(void) {
     /* Acknowledge the interrupt so more can happen */
     if (seL4_IRQHandler_Ack(irq_handler) != 0)
         return CLOCK_R_UINT;
+
+    /* run the callback event */
+    event *curEvent = pq_pop(pq);
+    curEvent->callback(curEvent->uid, curEvent->data);
+
+    /* SET THE NEXT COMPARE VALUE GIVEN THE FRONT OF THE PQ */
+    (void) pq_time_peek(pq);
 
     return CLOCK_R_OK;
 }
