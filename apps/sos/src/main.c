@@ -450,7 +450,7 @@ int main(void) {
     /* Must happen after network initialisation */
     serial_port = serial_init();
    
-    /* Map in the EPIT1 into virtual memory and provide that address to the timer library */
+    /* Map in the GPT into virtual memory and provide that address to the timer library */
     seL4_Word *gpt_virtual = map_device(CLOCK_GPT, sizeof(seL4_Word)*5);
     init_timer(gpt_virtual);
 
@@ -458,7 +458,6 @@ int main(void) {
     /* Initialise timer with badged capability */
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
-
 
     #define WORD_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c"
     #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"

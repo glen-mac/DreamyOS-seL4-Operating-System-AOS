@@ -11,27 +11,28 @@
 
 #include <utils/pq.h>
 
+/* irq ids */
 #define GPT_IRQ 87
 #define EPIT1_IRQ 88
 #define EPIT2_IRQ 89
 
 /* EPIT1 Register offsets */
-#define EPIT1_CONTROLREG 0 /* Control register; 32 bits */
-#define EPIT1_STATUSREG 4 /* Status register; 32 bits */
-#define EPIT1_LOADREG 8 /* Load register; 32 bits */
-#define EPIT1_COMPAREREG 12 /* Compare register; 32 bits */
-#define EPIT1_COUNTERREG 16 /* Counter Register; 32 bits */
+#define EPIT1_CONTROLREG 0      /* Control register; 32 bits */
+#define EPIT1_STATUSREG 4       /* Status register; 32 bits */
+#define EPIT1_LOADREG 8         /* Load register; 32 bits */
+#define EPIT1_COMPAREREG 12     /* Compare register; 32 bits */
+#define EPIT1_COUNTERREG 16     /* Counter Register; 32 bits */
 
+/* GPT Register offsets */
+#define GPT_CONTROLREG 0x0      /* Control register; 32 bits */
+#define GPT_PRESCALEREG 0x4     /* Status register; 32 bits */
+#define GPT_STATUSREG 0x8       /* Load register; 32 bits */
+#define GPT_INTERRUPTREG 0xC    /* Compare register; 32 bits */
+#define GPT_COMPARE1REG 0x10    /* Compare register; 32 bits */
 
-#define GPT_CONTROLREG 0x0 /* Control register; 32 bits */
-#define GPT_PRESCALEREG 0x4 /* Status register; 32 bits */
-#define GPT_STATUSREG 0x8 /* Load register; 32 bits */
-#define GPT_INTERRUPTREG 0xC /* Compare register; 32 bits */
-#define GPT_COMPARE1REG 0x10 /* Compare register; 32 bits */
-
-void *gpt_virtual; /* Global var for the start of EPIT */
-seL4_CPtr irq_handler; /* Global IRQ handler */
-
+/* handlers */
+void *gpt_virtual;              /* Global var for the start of EPIT */
+seL4_CPtr irq_handler;          /* Global IRQ handler */
 
 /* This is copied from network.c (and modified), we should abstract this out into a "interrupt.h" or something */
 int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr) {
@@ -50,10 +51,10 @@ int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr) {
     return 0;
 }
 
+/* Initialise the GPT handler */
 void init_timer(void *vaddr) {
     gpt_virtual = vaddr;
 }
-
 
 /*
  * Initialise driver. Performs implicit stop_timer() if already initialised.
@@ -64,7 +65,7 @@ void init_timer(void *vaddr) {
  */
 int start_timer(seL4_CPtr interrupt_ep) {
 
-    /* Stop timer, doesnt matter if it hasnt already started */
+    /* Stop timer, doesn't matter if it hasn't already started */
     stop_timer();
 
     /* Set the timer registers for settings */
@@ -80,7 +81,7 @@ int start_timer(seL4_CPtr interrupt_ep) {
     if (enable_irq(GPT_IRQ, interrupt_ep, &irq_handler) != 0)
         return CLOCK_R_UINT;
 
-    /* Reset the registers  which we do not completely overwrite*/
+    /* Reset the registers which we do not completely overwrite*/
     *control_register_ptr = 0x00000000;
     *prescale_register_ptr = 0x00000000;
     *status_register_ptr = 0x00000000;
