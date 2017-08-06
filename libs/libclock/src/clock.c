@@ -189,9 +189,10 @@ timer_interrupt(void)
     /* Because multiple interrupts can bascially happen at the same time, so we need to account for that */
     do {
         event *curEvent = pq_pop(pq);
+        if (!curEvent)
+            return CLOCK_R_FAIL;
         curEvent->callback(curEvent->uid, curEvent->data);
-        // TODO: I THINK WE'RE LEAKING MEMORY HERE? DO WE NEED TO FREE?
-
+        free(curEvent);
     } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
     // TOOD: IM NOT SURE THAT A 1ms BUFFER IS A GOOD IDEA
 

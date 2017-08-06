@@ -13,10 +13,10 @@ typedef struct {
 
 /* pq heap structure */
 typedef struct {
-    event *events;		/* ptr to an array of events */
-    int len;			/* the size of the pq being used */
-    int size;			/* the size of the actual pq */
-    int counter;        /* unique id counter */
+    event *events;              /* ptr to an array of events */
+    uint32_t len;               /* the size of the pq being used */
+    uint32_t size;              /* the size of the actual pq */
+    uint32_t counter;           /* unique id counter */
 } priority_queue;
 
 /* init the priority queue */

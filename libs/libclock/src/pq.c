@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <clock/pq.h>
 
-void remove_element(priority_queue *pq, int id);
+/* remove an element by its linear position */
+void remove_element(priority_queue *pq, uint32_t id);
 
 /* Initialised the priority queue */
 priority_queue *
@@ -22,16 +23,22 @@ init_pq()
 int
 pq_push(priority_queue *pq, uint64_t priority, timer_callback_t cb, void *data)
 {
+    /* sanity checks */
     if (pq == NULL)
         return -1;
 
+    /* resize the heap DS if we need more room */
     if (pq->len + 1 >= pq->size) {
         pq->size = pq->size ? pq->size * 2 : PQ_STARTING_SIZE;
         pq->events = (event *)realloc(pq->events, pq->size * sizeof(event));
+        if (!pq->events)
+            return -1;
     }
-    int i = pq->len + 1;
-    int j = i / 2;
 
+    uint32_t i = pq->len + 1;
+    uint32_t j = i / 2;
+
+    /* do some shifting to make room for the new event */
     while (i > 1 && pq->events[j].priority > priority) {
         pq->events[i] = pq->events[j];
         i = j;
@@ -54,7 +61,8 @@ pq_push(priority_queue *pq, uint64_t priority, timer_callback_t cb, void *data)
  *
  * @note You must free() the event when finished
  */
-event *pq_pop(priority_queue *pq)
+event *
+pq_pop(priority_queue *pq)
 {
     /* sanity checks */
     if (pq == NULL)
@@ -64,6 +72,9 @@ event *pq_pop(priority_queue *pq)
         return NULL;
 
     event *front_event = malloc(sizeof(event)); 
+    if (!front_event)
+        return NULL;
+    
     *front_event = pq->events[1];
     remove_element(pq, 1);
     return front_event;
@@ -77,9 +88,9 @@ event *pq_pop(priority_queue *pq)
  * 
  */
 void
-remove_element(priority_queue *pq, int id)
+remove_element(priority_queue *pq, uint32_t id)
 {
-    int i, j, k;
+    uint32_t i, j, k;
     pq->events[id] = pq->events[pq->len];
     pq->len--;
     i = id;
@@ -112,7 +123,7 @@ remove_element(priority_queue *pq, int id)
 int
 pq_remove(priority_queue *pq, uint32_t id)
 {
-    for (unsigned int i = 1; i <= pq->len; i++) {
+    for (uint32_t i = 1; i <= pq->len; i++) {
         if (pq->events[i].uid == id) {
             remove_element(pq, i);
             return 1;           
@@ -128,7 +139,7 @@ pq_remove(priority_queue *pq, uint32_t id)
 void
 pq_purge(priority_queue *pq)
 {
-    for (unsigned int i = 1; i <= pq->len; i++)
+    for (uint32_t i = 1; i <= pq->len; i++)
         remove_element(pq, i);
 }
 
