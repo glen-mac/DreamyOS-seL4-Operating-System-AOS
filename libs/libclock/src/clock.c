@@ -169,11 +169,17 @@ int timer_interrupt(void) {
     do {
         event *curEvent = pq_pop(pq);
         curEvent->callback(curEvent->uid, curEvent->data);
-    } while (pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
+    } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
     // TOOD: IM NOT SURE THAT A 1ms BUFFER IS A GOOD IDEA
 
-    /* Set the next compare value to the event at the front of the priority queue */
-    *compare_register_ptr = pq_time_peek(pq);
+    if (pq_is_empty(pq)) {
+        // TODO: Is turning off the compare register interrupt a better idea? 
+        // And then we can turn it back on in register_timer when pq_is_empty?
+        *compare_register_ptr = 0xFFFFFFFF;
+    } else {
+        /* Set the next compare value to the event at the front of the priority queue */
+        *compare_register_ptr = pq_time_peek(pq);
+    }
 
     // TODO: THIS WONT ACKNOWLEDGE A ROLL OVER EVENT
 
