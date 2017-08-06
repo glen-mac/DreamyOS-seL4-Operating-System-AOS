@@ -525,12 +525,12 @@ int main(void) {
     /* Timer Demonstration */
 
     /* 100ms periodic callback to print out timestamp */
-    //register_timer(100000, callback1, NULL);
+    register_timer(100000, callback1, NULL);
 
     /* 1 Second periodic callback to print out timestamp */
-    //register_timer(1000000, callback2, NULL);
+    register_timer(1000000, callback2, NULL);
 
-    /* Several one time timers */
+    /* Several non repeating timers */
     register_timer(1000000, callback3, NULL);
     register_timer(2000000, callback3, NULL);
     register_timer(3000000, callback3, NULL);
@@ -552,5 +552,5 @@ void callback2(uint32_t id, void *data) {
 }
 
 void callback3(uint32_t id, void *data) {
-    dprintf(0, "id:%d, time: %lld\n", id, time_stamp());
+    dprintf(0, "Non-periodic callback id:%d, time: %lld\n", id, time_stamp());
 }

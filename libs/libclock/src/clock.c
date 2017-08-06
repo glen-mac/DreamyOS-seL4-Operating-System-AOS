@@ -154,6 +154,9 @@ int remove_timer(uint32_t id) {
     if (!pq_remove(pq, id))
         return CLOCK_R_FAIL; /* Operation failed for other reason (invalid id) */
 
+    /* The timer we just removed could have been the next event so we need to update the compare reg */
+    *compare_register_ptr = pq_time_peek(pq);
+
     return CLOCK_R_OK;
 }
 

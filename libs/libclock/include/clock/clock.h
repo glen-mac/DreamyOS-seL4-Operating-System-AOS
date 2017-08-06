@@ -17,7 +17,7 @@
 /* Physical address of the memory mapped timer */
 #define CLOCK_GPT 0x2098000
 #define CLOCK_GPT_NUM_REGS 10
-#define CLOCK_GPT_SIZE 32 * CLOCK_GPT_NUM_REGS
+#define CLOCK_GPT_SIZE 4 * CLOCK_GPT_NUM_REGS /* In bytes */
 
 /*
  * Return codes for driver functions
