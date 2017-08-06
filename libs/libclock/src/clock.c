@@ -10,6 +10,7 @@
 #include <cspace/cspace.h>
 
 #include <stdio.h> // DEBUG
+#include <assert.h> // FOR EXTRA SANITY
 
 /* Interrupt Request ID */
 #define GPT_IRQ 87
@@ -39,11 +40,15 @@ seL4_Word *counter_register_ptr;
 seL4_CPtr irq_handler; /* Global IRQ handler */
 priority_queue *pq; /* timer event pq handler */
 
-int timer_is_initialised(void);
+unsigned int timer_started = 0;
+
+static int timer_is_started(void);
 
 
 /* This is copied from network.c (and modified), we should abstract this out into a "interrupt.h" or something */
-int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr) {
+static int
+enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr)
+{
     /* Create an IRQ handler */
     if (!(*irq_handler_ptr = cspace_irq_control_get_cap(cur_cspace, seL4_CapIRQControl, irq)))
         return -1;
@@ -60,7 +65,9 @@ int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr) {
 }
 
 /* Initialise the GPT handler */
-void init_timer(void *vaddr) {
+void
+init_timer(void *vaddr)
+{
     gpt_virtual = vaddr;
 
     control_register_ptr = (seL4_Word *)(gpt_virtual + GPT_CR);
@@ -80,9 +87,11 @@ void init_timer(void *vaddr) {
  *
  * Returns CLOCK_R_OK iff successful.
  */
-int start_timer(seL4_CPtr interrupt_ep) {
+int
+start_timer(seL4_CPtr interrupt_ep)
+{
     /* Stop timer if initialised */
-    if (timer_is_initialised())
+    if (timer_is_started())
         stop_timer();
 
     /* Set timer interupts to be sent to interrupt_ep, and creates an interrupt capability */
@@ -114,6 +123,7 @@ int start_timer(seL4_CPtr interrupt_ep) {
 
     /* Start the clock */
     *control_register_ptr |= 1 << 0;
+    timer_started = 1;
 
     return CLOCK_R_OK;
 }
@@ -126,13 +136,16 @@ int start_timer(seL4_CPtr interrupt_ep) {
  *
  * Returns 0 on failure, otherwise an unique ID for this timeout
  */
-uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data) {
-    if (!timer_is_initialised())
+uint32_t
+register_timer(uint64_t delay, timer_callback_t callback, void *data)
+{
+    if (!timer_is_started())
         return CLOCK_R_OK; /* Return 0 on failure */
 
     uint64_t time = time_stamp() + delay;
     //printf("time: %lld\n", time);    
     int id = pq_push(pq, time, callback, data);
+    assert(id != -1); /* This should never happen, here for sanity */
 
     // more  hack
     time = pq_time_peek(pq);
@@ -147,8 +160,10 @@ uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data) {
  *    id: Unique ID returned by register_time
  * Returns CLOCK_R_OK iff successful.
  */
-int remove_timer(uint32_t id) {
-    if (!timer_is_initialised())
+int
+remove_timer(uint32_t id)
+{
+    if (!timer_is_started())
         return CLOCK_R_UINT; /* Driver not initialised */
 
     if (!pq_remove(pq, id))
@@ -165,16 +180,22 @@ int remove_timer(uint32_t id) {
  *
  * Returns CLOCK_R_OK iff successful
  */
-int timer_interrupt(void) {
+int
+timer_interrupt(void)
+{
     // TODO: Deal with counter register overflow, we can check the status register to see if that interrupt has occured
 
-    /* run the callback event */
+    /* Run all callback events that should have already happened */
+    /* Because multiple interrupts can bascially happen at the same time, so we need to account for that */
     do {
         event *curEvent = pq_pop(pq);
         curEvent->callback(curEvent->uid, curEvent->data);
+        // TODO: I THINK WE'RE LEAKING MEMORY HERE? DO WE NEED TO FREE?
+
     } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
     // TOOD: IM NOT SURE THAT A 1ms BUFFER IS A GOOD IDEA
 
+    // TODO: If we stick with this method we can turn this into a ternary statement
     if (pq_is_empty(pq)) {
         // TODO: Is turning off the compare register interrupt a better idea? 
         // And then we can turn it back on in register_timer when pq_is_empty?
@@ -200,8 +221,10 @@ int timer_interrupt(void) {
  *
  * Returns a negative value if failure.
  */
-timestamp_t time_stamp(void) {
-    if (!timer_is_initialised())
+timestamp_t
+time_stamp(void)
+{
+    if (!timer_is_started())
         return CLOCK_R_UINT; /* Driver not initialised */
 
     // TODO: DO 64 BIT TIMESTAMPS
@@ -214,18 +237,29 @@ timestamp_t time_stamp(void) {
  *
  * Returns CLOCK_R_OK iff successful.
  */
-int stop_timer(void) {
+int
+stop_timer(void)
+{
     // TODO: Turn off receiving interrupts
 
-    // TODO: Turn off the timer
+    /* Stop the clock */
+    *control_register_ptr &= ~(1 << 0);
 
-    // TODO: Remove all events from the priority queue
+    /* Remove all upcoming events from the queue */
+    pq_purge(pq);
 
-    return CLOCK_R_UINT;
+    timer_started = 0;
+    
+    return CLOCK_R_OK;
 }
 
-
-/* Checks if the timer has been initialised, If gpt_virtual is NULL then init_timer hasnt been called */
-int timer_is_initialised(void) {
-    return gpt_virtual == NULL? 0: 1;
+/* 
+ * Checks if the timer has been initialised,
+ * If gpt_virtual is NULL then init_timer hasnt been called.
+ * @Returns 1 if initialised, else 0
+ */
+static inline int
+timer_is_started(void)
+{
+    return timer_started;
 }

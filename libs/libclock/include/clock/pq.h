@@ -25,7 +25,7 @@ priority_queue *init_pq();
 /* push a value onto the pq 
  * returns a unique id on success, and 0 on failure  
  */
-int pq_push (priority_queue *pq, uint64_t priority, timer_callback_t cb, void *data);
+int pq_push(priority_queue *pq, uint64_t priority, timer_callback_t cb, void *data);
 
 /* pop the front of the pq off */
 event *pq_pop(priority_queue *pq);
