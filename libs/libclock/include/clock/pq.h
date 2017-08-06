@@ -33,5 +33,12 @@ event *pq_pop(priority_queue *pq);
 /* remove an event by its unique id */
 int pq_remove(priority_queue *pq, uint32_t id);
 
+/* purge the entire pq */
+void pq_purge(priority_queue *pq);
+
+/* check if the pq is empty or not
+ * return 1 on empty, 0 othwerise */
+int pq_is_empty(priority_queue *pq);
+
 /* get the timestamp value of the current head of the pq */
 uint64_t pq_time_peek(priority_queue *pq);

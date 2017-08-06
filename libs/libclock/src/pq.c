@@ -22,11 +22,12 @@ int pq_push (priority_queue *pq, uint64_t priority, timer_callback_t cb, void *d
         i = j;
         j = j / 2;
     }
+    pq->events[i].uid = pq->counter++;
     pq->events[i].priority = priority;
     pq->events[i].callback = cb;
     pq->events[i].data = data;
     pq->len++;
-    return ++pq->counter;
+    return pq->events[i].uid;
 }
 
 /* pop the front of the pq off */
@@ -78,8 +79,19 @@ int pq_remove(priority_queue *pq, uint32_t id) {
     return 0;
 }
 
+/* purge the entire pq */
+void pq_purge(priority_queue *pq) {
+    for(int i = 1; i <= pq->len; i++) {
+        remove_element(pq, i);
+    }
+}
+
 /* get the timestamp value of the first child of the head event of the pq */
 uint64_t pq_time_peek(priority_queue *pq) {
     return pq->events[1].priority;
 }
 
+/* check if the pq is empty or not */
+int pq_is_empty(priority_queue *pq) {
+    return pq->len ? 0 : 1;
+}
