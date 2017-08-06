@@ -10,7 +10,7 @@ priority_queue *init_pq() {
 }
 
 /* push an event onto the PQ */
-int pq_push (priority_queue *pq, uint64_t priority, timer_callback_t cb, void *data) {
+int pq_push(priority_queue *pq, uint64_t priority, timer_callback_t cb, void *data) {
     if (pq->len + 1 >= pq->size) {
         pq->size = pq->size ? pq->size * 2 : PQ_STARTING_SIZE;
         pq->events = (event *)realloc(pq->events, pq->size * sizeof (event));
@@ -82,4 +82,3 @@ int pq_remove(priority_queue *pq, uint32_t id) {
 uint64_t pq_time_peek(priority_queue *pq) {
     return pq->events[1].priority;
 }
-

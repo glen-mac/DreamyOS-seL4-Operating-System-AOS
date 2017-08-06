@@ -57,10 +57,10 @@ extern char _cpio_archive[];
 
 const seL4_BootInfo* _boot_info;
 
-
-// DEBUG
-void callback(uint32_t id, void *data);
+/* For demonstration */
+void callback1(uint32_t id, void *data);
 void callback2(uint32_t id, void *data);
+void callback3(uint32_t id, void *data);
 
 struct {
 
@@ -454,65 +454,63 @@ int main(void) {
     /* Must happen after network initialisation */
     serial_port = serial_init();
    
-    /* Map in the EPIT1 into virtual memory and provide that address to the timer library */
-    seL4_Word *gpt_virtual = map_device((void *)CLOCK_GPT, sizeof(seL4_Word)*10);
-    init_timer(gpt_virtual);
+    /* Map in the GPT into virtual memory and provide that address to the timer library */
+    init_timer(map_device((void *)CLOCK_GPT, CLOCK_GPT_SIZE));
 
-    /* TODO: WHAT HAPPENS IF THIS DOESNT RETURN OKAY?? JUST PANIC?*/
     /* Initialise timer with badged capability */
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
 
     // DEBUG
-    #define WORD_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c"
-    #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+    // #define WORD_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c"
+    // #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 
-    #define WORD_TO_BINARY(byte)  \
-      (byte & 0x80000000 ? '1' : '0'), \
-      (byte & 0x40000000 ? '1' : '0'), \
-      (byte & 0x20000000 ? '1' : '0'), \
-      (byte & 0x10000000 ? '1' : '0'), \
-      (byte & 0x8000000 ? '1' : '0'), \
-      (byte & 0x4000000 ? '1' : '0'), \
-      (byte & 0x2000000 ? '1' : '0'), \
-      (byte & 0x1000000 ? '1' : '0'), \
-      (byte & 0x800000 ? '1' : '0'), \
-      (byte & 0x400000 ? '1' : '0'), \
-      (byte & 0x200000 ? '1' : '0'), \
-      (byte & 0x100000 ? '1' : '0'), \
-      (byte & 0x80000 ? '1' : '0'), \
-      (byte & 0x40000 ? '1' : '0'), \
-      (byte & 0x20000 ? '1' : '0'), \
-      (byte & 0x10000 ? '1' : '0'), \
-      (byte & 0x8000 ? '1' : '0'), \
-      (byte & 0x4000 ? '1' : '0'), \
-      (byte & 0x2000 ? '1' : '0'), \
-      (byte & 0x1000 ? '1' : '0'), \
-      (byte & 0x800 ? '1' : '0'), \
-      (byte & 0x400 ? '1' : '0'), \
-      (byte & 0x200 ? '1' : '0'), \
-      (byte & 0x100 ? '1' : '0'), \
-      (byte & 0x80 ? '1' : '0'), \
-      (byte & 0x40 ? '1' : '0'), \
-      (byte & 0x20 ? '1' : '0'), \
-      (byte & 0x10 ? '1' : '0'), \
-      (byte & 0x08 ? '1' : '0'), \
-      (byte & 0x04 ? '1' : '0'), \
-      (byte & 0x02 ? '1' : '0'), \
-      (byte & 0x01 ? '1' : '0') 
+    // #define WORD_TO_BINARY(byte)  \
+    //   (byte & 0x80000000 ? '1' : '0'), \
+    //   (byte & 0x40000000 ? '1' : '0'), \
+    //   (byte & 0x20000000 ? '1' : '0'), \
+    //   (byte & 0x10000000 ? '1' : '0'), \
+    //   (byte & 0x8000000 ? '1' : '0'), \
+    //   (byte & 0x4000000 ? '1' : '0'), \
+    //   (byte & 0x2000000 ? '1' : '0'), \
+    //   (byte & 0x1000000 ? '1' : '0'), \
+    //   (byte & 0x800000 ? '1' : '0'), \
+    //   (byte & 0x400000 ? '1' : '0'), \
+    //   (byte & 0x200000 ? '1' : '0'), \
+    //   (byte & 0x100000 ? '1' : '0'), \
+    //   (byte & 0x80000 ? '1' : '0'), \
+    //   (byte & 0x40000 ? '1' : '0'), \
+    //   (byte & 0x20000 ? '1' : '0'), \
+    //   (byte & 0x10000 ? '1' : '0'), \
+    //   (byte & 0x8000 ? '1' : '0'), \
+    //   (byte & 0x4000 ? '1' : '0'), \
+    //   (byte & 0x2000 ? '1' : '0'), \
+    //   (byte & 0x1000 ? '1' : '0'), \
+    //   (byte & 0x800 ? '1' : '0'), \
+    //   (byte & 0x400 ? '1' : '0'), \
+    //   (byte & 0x200 ? '1' : '0'), \
+    //   (byte & 0x100 ? '1' : '0'), \
+    //   (byte & 0x80 ? '1' : '0'), \
+    //   (byte & 0x40 ? '1' : '0'), \
+    //   (byte & 0x20 ? '1' : '0'), \
+    //   (byte & 0x10 ? '1' : '0'), \
+    //   (byte & 0x08 ? '1' : '0'), \
+    //   (byte & 0x04 ? '1' : '0'), \
+    //   (byte & 0x02 ? '1' : '0'), \
+    //   (byte & 0x01 ? '1' : '0') 
 
-    // DEBUG
-    printf("control: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*gpt_virtual));
-    printf("prescale: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 1)));
-    printf("status: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 2)));   
-    printf("interrupt: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 3)));
+    // // DEBUG
+    // printf("control: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*gpt_virtual));
+    // printf("prescale: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 1)));
+    // printf("status: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 2)));   
+    // printf("interrupt: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 3)));
 
-    // DEBUG
-    dprintf(0, "Timer has started\n");
+    // // DEBUG
+    // dprintf(0, "Timer has started\n");
 
-    // DEBUG
-    dprintf(0, "Timestamp before proc started: %lld\n", time_stamp());
-    printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
+    // // DEBUG
+    // dprintf(0, "Timestamp before proc started: %lld\n", time_stamp());
+    // printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
 
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
@@ -521,14 +519,21 @@ int main(void) {
     dprintf(0, "\nSOS entering syscall loop\n");
 
     // DEBUG
-    dprintf(0, "Timestamp after proc started: %lld\n", time_stamp());
-    printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
+    // dprintf(0, "Timestamp after proc started: %lld\n", time_stamp());
+    // printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
 
-    dprintf(0, "id: %d\n", register_timer(2000000, callback, NULL));    
-    dprintf(0, "id: %d\n", register_timer(2000000, callback2, NULL));
-    
-    dprintf(0, "Timestamp after register: %lld\n", time_stamp());
-    printf("compare: %d\n", *(gpt_virtual + 4));
+    /* Timer Demonstration */
+
+    /* 100ms periodic callback to print out timestamp */
+    //register_timer(100000, callback1, NULL);
+
+    /* 1 Second periodic callback to print out timestamp */
+    //register_timer(1000000, callback2, NULL);
+
+    /* Several one time timers */
+    register_timer(1000000, callback3, NULL);
+    register_timer(2000000, callback3, NULL);
+    register_timer(3000000, callback3, NULL);
 
     syscall_loop(_sos_ipc_ep_cap);
 
@@ -536,11 +541,16 @@ int main(void) {
     return 0;
 }
 
-void callback(uint32_t id, void *data) {
-    dprintf(0, "Callback 1, id:%d, time: %lld\n", id, time_stamp());
-    dprintf(0, "id: %d\n", register_timer(1000000, callback, NULL));
+void callback1(uint32_t id, void *data) {
+    dprintf(0, "100ms Callback, id:%d, time: %lld\n", id, time_stamp());
+    dprintf(0, "registered callback: %d\n", register_timer(100000, callback1, NULL));
 }
+
 void callback2(uint32_t id, void *data) {
-    dprintf(0, "Callback 2, id:%d, time: %lld\n", id, time_stamp());
-    dprintf(0, "id: %d\n", register_timer(500000, callback2, NULL));
+    dprintf(0, "1 second Callback, id:%d, time: %lld\n", id, time_stamp());
+    dprintf(0, "registered callback: %d\n", register_timer(1000000, callback2, NULL));
+}
+
+void callback3(uint32_t id, void *data) {
+    dprintf(0, "id:%d, time: %lld\n", id, time_stamp());
 }

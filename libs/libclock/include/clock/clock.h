@@ -14,8 +14,10 @@
 #include <stdint.h>
 #include <sel4/sel4.h>
 
-#define CLOCK_EPIT1 0x20D0000
+/* Physical address of the memory mapped timer */
 #define CLOCK_GPT 0x2098000
+#define CLOCK_GPT_NUM_REGS 10
+#define CLOCK_GPT_SIZE 32 * CLOCK_GPT_NUM_REGS
 
 /*
  * Return codes for driver functions
