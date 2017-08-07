@@ -61,6 +61,7 @@ const seL4_BootInfo* _boot_info;
 void callback1(uint32_t id, void *data);
 void callback2(uint32_t id, void *data);
 void callback3(uint32_t id, void *data);
+void callback4(uint32_t id, void *data);
 
 struct {
 
@@ -525,15 +526,24 @@ int main(void) {
     /* Timer Demonstration */
 
     /* 100ms periodic callback to print out timestamp */
-    register_timer(100000, callback1, NULL);
+    //register_timer(100000, callback1, NULL);
 
     /* 1 Second periodic callback to print out timestamp */
-    register_timer(1000000, callback2, NULL);
+    //register_timer(1000000, callback2, NULL);
 
     /* Several non repeating timers */
-    register_timer(1000000, callback3, NULL);
-    register_timer(2000000, callback3, NULL);
-    register_timer(3000000, callback3, NULL);
+    // register_timer(1000000, callback3, NULL); // 0
+    // register_timer(2000000, callback3, NULL); // 1
+    // register_timer(3000000, callback3, NULL); // 2
+    // register_timer(3000000, callback3, NULL); // 3
+    // register_timer(2000000, callback3, NULL); // 4
+    // register_timer(1000000, callback3, NULL); // 5
+
+    // remove_timer(1);
+    // remove_timer(4);
+
+    register_timer(1000000, callback4, NULL); // 0
+    register_timer(2000000, callback4, NULL); // 0
 
 
     /* Timer demonstration with overflow! Prescalar in driver needs to be set to 1 */
@@ -566,4 +576,9 @@ void callback2(uint32_t id, void *data) {
 
 void callback3(uint32_t id, void *data) {
     dprintf(0, "Non-periodic callback id:%d, time: %lld\n", id, time_stamp());
+}
+
+void callback4(uint32_t id, void *data) {
+    dprintf(0, "Callback 4 id:%d, time: %lld\n", id, time_stamp());
+    dprintf(0, "registered callback: %d\n", register_timer(0, NULL, NULL));
 }

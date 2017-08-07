@@ -207,12 +207,18 @@ timer_interrupt(void)
         /* Run all callback events that should have already happened */
         /* Because multiple interrupts can bascially happen at the same time, so we need to account for that */
         do {
-            event *curEvent = pq_pop(pq);
-            if (!curEvent)
-                return CLOCK_R_FAIL; /* This should only happen if malloc returned NULL */
+            event *curr_event = pq_pop(pq);
+            /* Check if pop returns null, shouldnt happen*/
+            if (!curr_event) {
+                free(curr_event);
+                return CLOCK_R_FAIL; 
+                // NO MORE INTERRUPTS WILL OCCUR IF THIS HAPPENS
+            }
 
-            curEvent->callback(curEvent->uid, curEvent->data);
-            free(curEvent);
+            if (curr_event->callback)
+                curr_event->callback(curr_event->uid, curr_event->data);
+
+            free(curr_event);
         } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
         // TOOD: IM NOT SURE THAT A 1ms BUFFER IS A GOOD IDEA
 
@@ -248,6 +254,8 @@ time_stamp(void)
         return CLOCK_R_UINT; /* Driver not initialised */
 
     return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
+
+    // CHECK IF TICKED OVER, THEN GRAB TIMESTAMP AGAIN
 }
 
 /*
