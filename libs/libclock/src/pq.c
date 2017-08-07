@@ -11,6 +11,8 @@ priority_queue *
 init_pq(void)
 {
     priority_queue *pq = (priority_queue *)calloc(1, sizeof(priority_queue));
+    if (!pq)
+        return NULL;
     pq->counter = 1;
     return pq;
 }
@@ -28,7 +30,7 @@ int
 pq_push(priority_queue *pq, uint64_t priority, uint32_t delay, timer_callback_t cb, void *data, uint8_t repeat, uint32_t uid)
 {
     /* Sanity checks */
-    if (pq == NULL)
+    if (!pq)
         return -1;
 
     /* Resize the heap DS if we need more room */
@@ -71,10 +73,7 @@ event *
 pq_pop(priority_queue *pq)
 {
     /* Sanity checks */
-    if (pq == NULL)
-        return NULL;
-
-    if (!pq->len)
+    if (!pq || !pq->len)
         return NULL;
 
     event *front_event = malloc(sizeof(event)); 
@@ -129,6 +128,8 @@ remove_element(priority_queue *pq, uint32_t id)
 int
 pq_remove(priority_queue *pq, uint32_t id)
 {
+    if (!pq || !pq->len)
+        return 0;
     for (uint32_t i = 1; i <= pq->len; i++) {
         if (pq->events[i].uid == id) {
             remove_element(pq, i);
@@ -145,6 +146,8 @@ pq_remove(priority_queue *pq, uint32_t id)
 void
 pq_purge(priority_queue *pq)
 {
+    if (!pq || !pq->len)
+        return;
     for (uint32_t i = 1; i <= pq->len; i++)
         remove_element(pq, i);
 }
@@ -157,7 +160,9 @@ pq_purge(priority_queue *pq)
 uint64_t
 pq_time_peek(priority_queue *pq)
 {
-    return pq->events[1].priority;
+    if (pq && pq->len)
+        return pq->events[1].priority;
+    return 0;
 }
 
 /*
@@ -168,5 +173,7 @@ pq_time_peek(priority_queue *pq)
 int
 pq_is_empty(priority_queue *pq)
 {
-    return pq->len ? 0 : 1;
+    if (pq)
+        return pq->len ? 0 : 1;
+    return 1;
 }
