@@ -22,9 +22,10 @@
 #define GPT_SR 0x8 /* Status Register */
 #define GPT_IR 0xC /* Interrupt register */
 #define GPT_OCR1 0x10 /* Output Compare Register 1 */
+#define GPT_OCR2 0x14 /* Output Compare Register 2 */
 #define GPT_CNT 0x24 /* Counter Register */
 
-#define PERIPHERAL_FREQUENCY 66; /* 66 Mhz */
+#define PERIPHERAL_FREQUENCY 66; /* Mhz */
 
 /* Global var for the start of GPT */
 void *gpt_virtual = NULL;
@@ -35,6 +36,7 @@ seL4_Word *prescale_register_ptr;
 seL4_Word *interrupt_register_ptr;
 seL4_Word *status_register_ptr;
 seL4_Word *compare_register_ptr;
+seL4_Word *upper_timestamp_register_ptr;
 seL4_Word *counter_register_ptr;
 
 seL4_CPtr irq_handler; /* Global IRQ handler */
@@ -43,6 +45,7 @@ priority_queue *pq; /* timer event pq handler */
 unsigned int timer_started = 0;
 
 static int timer_is_started(void);
+static uint64_t join32to64(uint32_t x1, uint32_t x2);
 
 
 /* This is copied from network.c (and modified), we should abstract this out into a "interrupt.h" or something */
@@ -75,6 +78,7 @@ init_timer(void *vaddr)
     interrupt_register_ptr = (seL4_Word *)(gpt_virtual + GPT_IR);
     status_register_ptr = (seL4_Word *)(gpt_virtual + GPT_SR);
     compare_register_ptr = (seL4_Word *)(gpt_virtual + GPT_OCR1);
+    upper_timestamp_register_ptr = (seL4_Word *)(gpt_virtual + GPT_OCR2); /* Use OCR2 for upper 32 bits of timestamp */
     counter_register_ptr = (seL4_Word *)(gpt_virtual + GPT_CNT);
 
     pq = init_pq(); 
@@ -104,6 +108,7 @@ start_timer(seL4_CPtr interrupt_ep)
     *status_register_ptr = 0x00000000;
     *interrupt_register_ptr = 0x00000000;
     *compare_register_ptr = 0xFFFFFFFF;
+    *upper_timestamp_register_ptr = 0x00000000;
 
     /* Set the timer registers for settings */
     *control_register_ptr |= 1 << 9; /* Free-Run mode */
@@ -141,6 +146,10 @@ register_timer(uint64_t delay, timer_callback_t callback, void *data)
 {
     if (!timer_is_started())
         return CLOCK_R_OK; /* Return 0 on failure */
+
+    /* Turn interrupts back on, there will be a non empty PQ */
+    if (pq_is_empty(pq))
+        *interrupt_register_ptr |= 1 << 0; /* Output compare channel 1 enabled */
 
     uint64_t time = time_stamp() + delay;
     //printf("time: %lld\n", time);    
@@ -183,38 +192,45 @@ remove_timer(uint32_t id)
 int
 timer_interrupt(void)
 {
-    // TODO: Deal with counter register overflow, we can check the status register to see if that interrupt has occured
-
-    /* Run all callback events that should have already happened */
-    /* Because multiple interrupts can bascially happen at the same time, so we need to account for that */
-    do {
-        event *curEvent = pq_pop(pq);
-        if (!curEvent)
-            return CLOCK_R_FAIL;
-        curEvent->callback(curEvent->uid, curEvent->data);
-        free(curEvent);
-    } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
-    // TOOD: IM NOT SURE THAT A 1ms BUFFER IS A GOOD IDEA
-
-    // TODO: If we stick with this method we can turn this into a ternary statement
-    if (pq_is_empty(pq)) {
-        // TODO: Is turning off the compare register interrupt a better idea? 
-        // And then we can turn it back on in register_timer when pq_is_empty?
-        *compare_register_ptr = 0xFFFFFFFF;
-    } else {
-        /* Set the next compare value to the event at the front of the priority queue */
-        *compare_register_ptr = pq_time_peek(pq);
+    /* If this interrupt was a roll over interrupt */
+    if (*status_register_ptr & (1 << 5)) {
+        *upper_timestamp_register_ptr += 1; /* Do not handle roll over of the upper bits */
+        printf("ROLL OVER INTERRUPT\n");
+        *status_register_ptr |= 1 << 5; /* Acknowledge a roll over event occured */
     }
 
-    // TODO: THIS WONT ACKNOWLEDGE A ROLL OVER EVENT
+    /* If this interrupt was a compare event */
+    if (*status_register_ptr & (1 << 0)) {
+        /* Run all callback events that should have already happened */
+        /* Because multiple interrupts can bascially happen at the same time, so we need to account for that */
+        do {
+            event *curEvent = pq_pop(pq);
+            if (!curEvent)
+                return CLOCK_R_FAIL; /* This should only happen if malloc returned NULL */
 
-    *status_register_ptr |= 1 << 0; /* Acknowledge a compare event occured */
+            curEvent->callback(curEvent->uid, curEvent->data);
+            free(curEvent);
+        } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
+        // TOOD: IM NOT SURE THAT A 1ms BUFFER IS A GOOD IDEA
+
+        // TODO: If we stick with this method we can turn this into a ternary statement
+        if (pq_is_empty(pq)) {
+            /* We disable compare interrupts because theres no more events */
+            *interrupt_register_ptr &= ~(1 << 0); /* Output compare channel 1 disabled */
+            *compare_register_ptr = 0xFFFFFFFF;
+        } else {
+            /* Set the next compare value to the event at the front of the priority queue */
+            *compare_register_ptr = pq_time_peek(pq);
+        }
+
+        *status_register_ptr |= 1 << 0; /* Acknowledge a compare event occured */
+    }
 
     /* Acknowledge the interrupt so more can happen */
     if (seL4_IRQHandler_Ack(irq_handler) != 0)
         return CLOCK_R_FAIL; /* Operation failed for other reason (Failed to ack interrupt) */
 
-    return CLOCK_R_OK;
+    return CLOCK_R_OK;   
 }
 
 /*
@@ -228,9 +244,7 @@ time_stamp(void)
     if (!timer_is_started())
         return CLOCK_R_UINT; /* Driver not initialised */
 
-    // TODO: DO 64 BIT TIMESTAMPS
-
-    return (timestamp_t)(*counter_register_ptr);
+    return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
 }
 
 /*
@@ -266,9 +280,8 @@ timer_is_started(void)
 }
 
 /* Joins two 32bit numbers into a 64bit number and returns x1x2 */
-inline void
+static inline uint64_t
 join32to64(uint32_t x1, uint32_t x2)
 {
-	return (uint64_t)x2 | ((uint64_t)x1 << 32);
+    return (uint64_t)x2 | ((uint64_t)x1 << 32);
 }
-
