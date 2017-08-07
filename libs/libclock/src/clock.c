@@ -27,6 +27,7 @@
 
 #define PERIPHERAL_FREQUENCY 66; /* Mhz */
 
+#define EVENT_FAIL 0
 #define REPEAT_EVENT 1
 #define SINGLE_EVENT 0
 #define GEN_UID 0
@@ -175,7 +176,10 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
     uint64_t time = time_stamp() + delay;
     //printf("time: %lld\n", time);    
     int id = pq_push(pq, time, delay, callback, data, repeat, uid);
-    assert(id != -1); /* This should never happen, here for sanity */
+    
+    /* if there was an issue pushing event, terminate early */
+    if (!id)
+        return EVENT_FAIL;
 
     // more  hack
     time = pq_time_peek(pq);
@@ -229,8 +233,8 @@ timer_interrupt(void)
             if (!curEvent)
                 return CLOCK_R_FAIL; /* This should only happen if malloc returned NULL */
 
-            if (curr_event->callback)
-                curr_event->callback(curr_event->uid, curr_event->data);
+            if (curEvent->callback)
+                curEvent->callback(curEvent->uid, curEvent->data);
 
             /* add event back to queue if repeating */
             if (curEvent->repeat)

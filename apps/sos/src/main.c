@@ -526,7 +526,7 @@ int main(void) {
     /* Timer Demonstration */
 
     /* 100ms periodic callback to print out timestamp */
-    //register_timer(100000, callback1, NULL);
+    register_repeating_timer(100000, NULL, NULL);
 
     /* 1 Second periodic callback to print out timestamp */
     //register_timer(1000000, callback2, NULL);
@@ -542,8 +542,8 @@ int main(void) {
     // remove_timer(1);
     // remove_timer(4);
 
-    register_timer(1000000, callback4, NULL); // 0
-    register_timer(2000000, callback4, NULL); // 0
+    //register_timer(1000000, callback4, NULL); // 0
+    //register_timer(2000000, callback4, NULL); // 0
 
 
     /* Timer demonstration with overflow! Prescalar in driver needs to be set to 1 */
