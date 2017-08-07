@@ -6,9 +6,11 @@
 /* individual node */
 typedef struct {
     uint64_t priority;          /* the priority of the event */
+    uint32_t delay;             /* the delay of the event */
     timer_callback_t callback;  /* the callback function pointer */
     void *data;                 /* the data to provide the cb */
     uint32_t uid;               /* unique identifier */
+    uint8_t repeat;             /* is this a repeating event? */
 } event;
 
 /* pq heap structure */
@@ -25,7 +27,7 @@ priority_queue *init_pq();
 /* push a value onto the pq 
  * returns a unique id on success, and 0 on failure  
  */
-int pq_push(priority_queue *pq, uint64_t priority, timer_callback_t cb, void *data);
+int pq_push(priority_queue *pq, uint64_t priority, uint32_t delay, timer_callback_t cb, void *data, uint8_t repeat, uint32_t uid);
 
 /* pop the front of the pq off */
 event *pq_pop(priority_queue *pq);

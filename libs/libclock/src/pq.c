@@ -8,7 +8,9 @@ void remove_element(priority_queue *pq, uint32_t id);
 priority_queue *
 init_pq()
 {
-    return (priority_queue *)calloc(1, sizeof(priority_queue));
+    priority_queue *pq = (priority_queue *)calloc(1, sizeof(priority_queue));
+    pq->counter = 1;
+    return pq;
 }
 
 /*
@@ -21,7 +23,7 @@ init_pq()
  * @returns -1 on error, else a positive uid
  */
 int
-pq_push(priority_queue *pq, uint64_t priority, timer_callback_t cb, void *data)
+pq_push(priority_queue *pq, uint64_t priority, uint32_t delay, timer_callback_t cb, void *data, uint8_t repeat, uint32_t uid)
 {
     /* sanity checks */
     if (pq == NULL)
@@ -45,10 +47,12 @@ pq_push(priority_queue *pq, uint64_t priority, timer_callback_t cb, void *data)
         j = j / 2;
     }
 
-    pq->events[i].uid = pq->counter++;
+    pq->events[i].uid = (uid) ? uid : pq->counter++;
     pq->events[i].priority = priority;
+    pq->events[i].delay = delay;
     pq->events[i].callback = cb;
     pq->events[i].data = data;
+    pq->events[i].repeat = repeat;
     pq->len++;
 
     return pq->events[i].uid;

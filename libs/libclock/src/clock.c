@@ -27,6 +27,10 @@
 
 #define PERIPHERAL_FREQUENCY 66; /* Mhz */
 
+#define REPEAT_EVENT 1
+#define SINGLE_EVENT 0
+#define GEN_UID 0
+
 /* Global var for the start of GPT */
 void *gpt_virtual = NULL;
 
@@ -47,6 +51,7 @@ unsigned int timer_started = 0;
 
 static int timer_is_started(void);
 static uint64_t join32to64(uint32_t x1, uint32_t x2);
+static inline uint32_t add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t repeat, uint32_t uid);
 
 /* This is copied from network.c (and modified), we should abstract this out into a "interrupt.h" or something */
 static int
@@ -147,6 +152,19 @@ start_timer(seL4_CPtr interrupt_ep)
 uint32_t
 register_timer(uint64_t delay, timer_callback_t callback, void *data)
 {
+    return add_event_to_pq(delay, callback, data, SINGLE_EVENT, GEN_UID);
+}
+
+uint32_t
+register_repeating_timer(uint64_t delay, timer_callback_t callback, void *data)
+{
+    return add_event_to_pq(delay, callback, data, REPEAT_EVENT, GEN_UID);
+}
+
+/* adds an event to the PQ */
+static inline uint32_t
+add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t repeat, uint32_t uid)
+{
     if (!timer_is_started())
         return CLOCK_R_OK; /* Return 0 on failure */
 
@@ -156,7 +174,7 @@ register_timer(uint64_t delay, timer_callback_t callback, void *data)
 
     uint64_t time = time_stamp() + delay;
     //printf("time: %lld\n", time);    
-    int id = pq_push(pq, time, callback, data);
+    int id = pq_push(pq, time, delay, callback, data, repeat, uid);
     assert(id != -1); /* This should never happen, here for sanity */
 
     // more  hack
@@ -212,6 +230,11 @@ timer_interrupt(void)
                 return CLOCK_R_FAIL; /* This should only happen if malloc returned NULL */
 
             curEvent->callback(curEvent->uid, curEvent->data);
+
+            /* add event back to queue if repeating */
+            if (curEvent->repeat)
+                add_event_to_pq(curEvent->delay, curEvent->callback, curEvent->data, REPEAT_EVENT, curEvent->uid);
+
             free(curEvent);
         } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
         // TOOD: IM NOT SURE THAT A 1ms BUFFER IS A GOOD IDEA
