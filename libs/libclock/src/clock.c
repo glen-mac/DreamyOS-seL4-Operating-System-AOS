@@ -31,10 +31,6 @@
 /* Bit masks for setting bits in registers */
 #define FREE_RUN_MASK (1 << 9)
 #define PERIPHERAL_CLOCK_MASK (1 << 6)
-#define STOP_MODE_MASK (1 << 5)
-#define DOZE_MODE_MASK (1 << 4)
-#define WAIT_MODE_MASK (1 << 3)
-#define DEBUG_MODE_MASK (1 << 2)
 #define ENMOD_MODE_MASK (1 << 1)
 #define ROLL_OVER_MASK (1 << 5)
 #define OUTPUT_COMPARE_MASK (1 << 0)
@@ -142,10 +138,7 @@ start_timer(seL4_CPtr interrupt_ep)
     /* Set the timer registers for settings */
     *control_register_ptr |= FREE_RUN_MASK; /* Free-Run mode */
     *control_register_ptr |= PERIPHERAL_CLOCK_MASK; /* peripheral clock */
-    *control_register_ptr |= STOP_MODE_MASK; /* stop mode */
-    *control_register_ptr |= DOZE_MODE_MASK; /* doze mode */
-    *control_register_ptr |= WAIT_MODE_MASK; /* wait mode */
-    *control_register_ptr |= DEBUG_MODE_MASK; /* debug mode */
+    *control_register_ptr |= ENMOD_MODE_MASK; /* Counter will reset to 0 when GPT disabled */
 
     *interrupt_register_ptr |= ROLL_OVER_MASK; /* Roll over enabled */
     *interrupt_register_ptr |= OUTPUT_COMPARE_MASK; /* Output compare channel 1 enabled */
