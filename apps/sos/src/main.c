@@ -468,21 +468,21 @@ int main(void) {
     /* Timer Demonstration */
 
     /* 100ms periodic callback to print out timestamp */
-    //register_repeating_timer(100000, callback3, NULL);
+    register_repeating_timer(100000, callback3, NULL);
 
     /* 1 Second periodic callback to print out timestamp */
-    //register_timer(1000000, callback2, NULL);
+    register_timer(1000000, callback2, NULL);
 
     /* Several non repeating timers */
-    register_timer(1000000, callback3, NULL); // 1
-    register_timer(2000000, callback3, NULL); // 2
-    register_timer(3000000, callback3, NULL); // 3
-    register_timer(3000000, callback3, NULL); // 4
-    register_timer(2000000, callback3, NULL); // 5
-    register_timer(1000000, callback3, NULL); // 6
+    // register_timer(1000000, callback3, NULL); // 1
+    // register_timer(2000000, callback3, NULL); // 2
+    // register_timer(3000000, callback3, NULL); // 3
+    // register_timer(3000000, callback3, NULL); // 4
+    // register_timer(2000000, callback3, NULL); // 5
+    // register_timer(1000000, callback3, NULL); // 6
 
-    remove_timer(2);
-    remove_timer(5);
+    // remove_timer(2);
+    // remove_timer(5);
 
     //register_timer(1000000, callback4, NULL); // 0
     //register_timer(2000000, callback4, NULL); // 0

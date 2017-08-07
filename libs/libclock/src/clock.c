@@ -61,6 +61,7 @@ uint32_t timer_started = 0; /* Boolean to state if the timer has started or not 
 
 static uint64_t join32to64(uint32_t upper, uint32_t lower);
 static uint32_t add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t repeat, uint32_t uid);
+static void check_for_rollover(void);
 
 /* 
  * Enable Interrupts for a sepcific IRQ and endpoint
@@ -207,11 +208,7 @@ remove_timer(uint32_t id)
 int
 timer_interrupt(void)
 {
-    if (*status_register_ptr & ROLL_OVER_MASK) {
-        /* Overflow wont happen for ~584 years, we plan to finish AOS by then */
-        *upper_timestamp_register_ptr += 1;
-        *status_register_ptr |= ROLL_OVER_MASK; /* Acknowledge a roll over event occured */
-    }
+    check_for_rollover();
 
     if (*status_register_ptr & OUTPUT_COMPARE_MASK) {
         /* Run all callback events that should have already happened */
@@ -277,6 +274,7 @@ time_stamp(void)
     /* If second is less than first, the second timestamp is in the past, which is condition (1) */
     if (second < first) {
         /* This timestamp shold not be incorrect as we just had the race condition */
+        check_for_rollover(); /* This is required because we might be in an interrupt handler and roll over didnt get recognised yet */
         return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
     }
 
@@ -285,6 +283,7 @@ time_stamp(void)
     uint32_t second_upper = (second >> 32);
     if (first_upper != second_upper) {
         /* This timestamp shold not be incorrect as we just had the race condition */
+        check_for_rollover();
         return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
     }
 
@@ -344,4 +343,15 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
     *compare_register_ptr = pq_time_peek(pq);
 
     return id;
+}
+
+/* Check if a rollover interrupt occured */
+static void
+check_for_rollover(void)
+{
+    if (*status_register_ptr & ROLL_OVER_MASK) {
+        /* Overflow wont happen for ~584 years, we plan to finish AOS by then */
+        *upper_timestamp_register_ptr += 1;
+        *status_register_ptr |= ROLL_OVER_MASK; /* Acknowledge a roll over event occured */ 
+    }
 }
