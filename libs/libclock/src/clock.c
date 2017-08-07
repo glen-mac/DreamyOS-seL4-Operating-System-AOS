@@ -229,7 +229,8 @@ timer_interrupt(void)
             if (!curEvent)
                 return CLOCK_R_FAIL; /* This should only happen if malloc returned NULL */
 
-            curEvent->callback(curEvent->uid, curEvent->data);
+            if (curr_event->callback)
+                curr_event->callback(curr_event->uid, curr_event->data);
 
             /* add event back to queue if repeating */
             if (curEvent->repeat)
@@ -271,6 +272,8 @@ time_stamp(void)
         return CLOCK_R_UINT; /* Driver not initialised */
 
     return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
+
+    // CHECK IF TICKED OVER, THEN GRAB TIMESTAMP AGAIN
 }
 
 /*
