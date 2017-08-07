@@ -462,89 +462,30 @@ int main(void) {
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
 
-    // DEBUG
-    // #define WORD_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c"
-    // #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
-
-    // #define WORD_TO_BINARY(byte)  \
-    //   (byte & 0x80000000 ? '1' : '0'), \
-    //   (byte & 0x40000000 ? '1' : '0'), \
-    //   (byte & 0x20000000 ? '1' : '0'), \
-    //   (byte & 0x10000000 ? '1' : '0'), \
-    //   (byte & 0x8000000 ? '1' : '0'), \
-    //   (byte & 0x4000000 ? '1' : '0'), \
-    //   (byte & 0x2000000 ? '1' : '0'), \
-    //   (byte & 0x1000000 ? '1' : '0'), \
-    //   (byte & 0x800000 ? '1' : '0'), \
-    //   (byte & 0x400000 ? '1' : '0'), \
-    //   (byte & 0x200000 ? '1' : '0'), \
-    //   (byte & 0x100000 ? '1' : '0'), \
-    //   (byte & 0x80000 ? '1' : '0'), \
-    //   (byte & 0x40000 ? '1' : '0'), \
-    //   (byte & 0x20000 ? '1' : '0'), \
-    //   (byte & 0x10000 ? '1' : '0'), \
-    //   (byte & 0x8000 ? '1' : '0'), \
-    //   (byte & 0x4000 ? '1' : '0'), \
-    //   (byte & 0x2000 ? '1' : '0'), \
-    //   (byte & 0x1000 ? '1' : '0'), \
-    //   (byte & 0x800 ? '1' : '0'), \
-    //   (byte & 0x400 ? '1' : '0'), \
-    //   (byte & 0x200 ? '1' : '0'), \
-    //   (byte & 0x100 ? '1' : '0'), \
-    //   (byte & 0x80 ? '1' : '0'), \
-    //   (byte & 0x40 ? '1' : '0'), \
-    //   (byte & 0x20 ? '1' : '0'), \
-    //   (byte & 0x10 ? '1' : '0'), \
-    //   (byte & 0x08 ? '1' : '0'), \
-    //   (byte & 0x04 ? '1' : '0'), \
-    //   (byte & 0x02 ? '1' : '0'), \
-    //   (byte & 0x01 ? '1' : '0') 
-
-    // // DEBUG
-    // printf("control: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*gpt_virtual));
-    // printf("prescale: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 1)));
-    // printf("status: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 2)));   
-    // printf("interrupt: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 3)));
-
-    // // DEBUG
-    // dprintf(0, "Timer has started\n");
-
-    // // DEBUG
-    // dprintf(0, "Timestamp before proc started: %lld\n", time_stamp());
-    // printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
-
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
-
-    /* Wait on synchronous endpoint for IPC */
-    dprintf(0, "\nSOS entering syscall loop\n");
-
-    // DEBUG
-    // dprintf(0, "Timestamp after proc started: %lld\n", time_stamp());
-    // printf("counter: "WORD_TO_BINARY_PATTERN"\n", WORD_TO_BINARY(*(gpt_virtual + 9)));
 
     /* Timer Demonstration */
 
     /* 100ms periodic callback to print out timestamp */
-    register_repeating_timer(100000, NULL, NULL);
+    //register_repeating_timer(100000, callback3, NULL);
 
     /* 1 Second periodic callback to print out timestamp */
     //register_timer(1000000, callback2, NULL);
 
     /* Several non repeating timers */
-    // register_timer(1000000, callback3, NULL); // 0
-    // register_timer(2000000, callback3, NULL); // 1
-    // register_timer(3000000, callback3, NULL); // 2
-    // register_timer(3000000, callback3, NULL); // 3
-    // register_timer(2000000, callback3, NULL); // 4
-    // register_timer(1000000, callback3, NULL); // 5
+    register_timer(1000000, callback3, NULL); // 1
+    register_timer(2000000, callback3, NULL); // 2
+    register_timer(3000000, callback3, NULL); // 3
+    register_timer(3000000, callback3, NULL); // 4
+    register_timer(2000000, callback3, NULL); // 5
+    register_timer(1000000, callback3, NULL); // 6
 
-    // remove_timer(1);
-    // remove_timer(4);
+    remove_timer(2);
+    remove_timer(5);
 
     //register_timer(1000000, callback4, NULL); // 0
     //register_timer(2000000, callback4, NULL); // 0
-
 
     /* Timer demonstration with overflow! Prescalar in driver needs to be set to 1 */
     /* 100ms periodic callback to print out timestamp */
@@ -557,6 +498,9 @@ int main(void) {
     // register_timer(66*1000000, callback3, NULL);
     // register_timer(66*2000000, callback3, NULL);
     // register_timer(66*3000000, callback3, NULL);
+
+    /* Wait on synchronous endpoint for IPC */
+    dprintf(0, "\nSOS entering syscall loop\n");
 
     syscall_loop(_sos_ipc_ep_cap);
 

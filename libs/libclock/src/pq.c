@@ -1,12 +1,14 @@
 #include <stdlib.h>
 #include <clock/pq.h>
 
-/* remove an element by its linear position */
-void remove_element(priority_queue *pq, uint32_t id);
+static void remove_element(priority_queue *pq, uint32_t id);
 
-/* Initialised the priority queue */
+/* 
+ * Initialis the priority queue 
+ * @returns pointer to priority queue
+ */
 priority_queue *
-init_pq()
+init_pq(void)
 {
     priority_queue *pq = (priority_queue *)calloc(1, sizeof(priority_queue));
     pq->counter = 1;
@@ -25,11 +27,11 @@ init_pq()
 int
 pq_push(priority_queue *pq, uint64_t priority, uint32_t delay, timer_callback_t cb, void *data, uint8_t repeat, uint32_t uid)
 {
-    /* sanity checks */
+    /* Sanity checks */
     if (pq == NULL)
         return -1;
 
-    /* resize the heap DS if we need more room */
+    /* Resize the heap DS if we need more room */
     if (pq->len + 1 >= pq->size) {
         pq->size = pq->size ? pq->size * 2 : PQ_STARTING_SIZE;
         pq->events = (event *)realloc(pq->events, pq->size * sizeof(event));
@@ -40,7 +42,7 @@ pq_push(priority_queue *pq, uint64_t priority, uint32_t delay, timer_callback_t 
     uint32_t i = pq->len + 1;
     uint32_t j = i / 2;
 
-    /* do some shifting to make room for the new event */
+    /* Do some shifting to make room for the new event */
     while (i > 1 && pq->events[j].priority > priority) {
         pq->events[i] = pq->events[j];
         i = j;
@@ -68,7 +70,7 @@ pq_push(priority_queue *pq, uint64_t priority, uint32_t delay, timer_callback_t 
 event *
 pq_pop(priority_queue *pq)
 {
-    /* sanity checks */
+    /* Sanity checks */
     if (pq == NULL)
         return NULL;
 
@@ -91,7 +93,7 @@ pq_pop(priority_queue *pq)
  * @param int id, linear position of the element
  * 
  */
-void
+static void
 remove_element(priority_queue *pq, uint32_t id)
 {
     uint32_t i, j, k;
