@@ -260,8 +260,36 @@ time_stamp(void)
     if (!timer_started)
         return CLOCK_R_UINT; /* Driver not initialised */
 
-    // TODO: HANDLE RACE CONDITION IN TICKING OVER
-    return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
+    /*
+     * There can be a race condition here where between reading the lower and upper 32 bits
+     * The data can change. In particular there can be two cases:
+     *
+     * 1. We read upper bits first, but then lower ticks over and we end up reading a value that 
+     * is in the past, because upper will have stayed the same but lower is now 0x00000000 etc.
+     * 
+     * 2. We read lower bits first (close to 0xFFFFFFFF), then upper ticks over before we read. 
+     * And we see a value that is very far into the future.
+     */
+
+    timestamp_t first = (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
+    timestamp_t second = (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
+
+    /* If second is less than first, the second timestamp is in the past, which is condition (1) */
+    if (second < first) {
+        /* This timestamp shold not be incorrect as we just had the race condition */
+        return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
+    }
+
+    /* If the upper 32 bits mismatch then a rollover occured and its POSSIBLE the condition (2) is met */
+    uint32_t first_upper = (first >> 32);
+    uint32_t second_upper = (second >> 32);
+    if (first_upper != second_upper) {
+        /* This timestamp shold not be incorrect as we just had the race condition */
+        return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
+    }
+
+    /* We have caught all the possibilites of the condition above, so second is now correct to return */
+    return second;
 }
 
 /*
