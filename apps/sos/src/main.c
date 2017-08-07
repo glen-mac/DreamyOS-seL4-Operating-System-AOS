@@ -461,6 +461,15 @@ int main(void) {
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
 
+    stop_timer();
+    err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
+    conditional_panic(err, "Failed to start the timer\n");
+
+    stop_timer();
+    err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
+    conditional_panic(err, "Failed to start the timer\n");
+
+
     // DEBUG
     // #define WORD_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c %c%c%c%c%c%c%c%c"
     // #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"

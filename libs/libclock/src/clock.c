@@ -39,11 +39,11 @@ seL4_Word *counter_register_ptr;
 
 seL4_CPtr irq_handler; /* Global IRQ handler */
 priority_queue *pq; /* timer event pq handler */
+seL4_CPtr interrupt_endpoint_handler;
 
 unsigned int timer_started = 0;
 
 static int timer_is_started(void);
-
 
 /* This is copied from network.c (and modified), we should abstract this out into a "interrupt.h" or something */
 static int
@@ -97,6 +97,9 @@ start_timer(seL4_CPtr interrupt_ep)
     /* Set timer interupts to be sent to interrupt_ep, and creates an interrupt capability */
     if (enable_irq(GPT_IRQ, interrupt_ep, &irq_handler) != 0)
         return CLOCK_R_FAIL; /* Operation failed for other reason (IRQ failed setup) */
+
+    /* assign the ep handler so we can stop the timer */
+    interrupt_endpoint_handler = interrupt_ep;
 
     /* Reset key registers */
     *control_register_ptr = 0x00000000;
@@ -241,10 +244,14 @@ time_stamp(void)
 int
 stop_timer(void)
 {
-    // TODO: Turn off receiving interrupts
-
     /* Stop the clock */
     *control_register_ptr &= ~(1 << 0);
+
+    /* clear the handler */
+    seL4_IRQHandler_Clear(irq_handler);
+
+    /* delete the capability from the cspace */
+    cspace_delete_cap(cur_cspace, irq_handler);
 
     /* Remove all upcoming events from the queue */
     pq_purge(pq);
@@ -266,7 +273,7 @@ timer_is_started(void)
 }
 
 /* Joins two 32bit numbers into a 64bit number and returns x1x2 */
-inline void
+inline uint64_t
 join32to64(uint32_t x1, uint32_t x2)
 {
 	return (uint64_t)x2 | ((uint64_t)x1 << 32);
