@@ -264,3 +264,11 @@ timer_is_started(void)
 {
     return timer_started;
 }
+
+/* Joins two 32bit numbers into a 64bit number and returns x1x2 */
+inline void
+join32to64(uint32_t x1, uint32_t x2)
+{
+	return (uint64_t)x2 | ((uint64_t)x1 << 32);
+}
+
