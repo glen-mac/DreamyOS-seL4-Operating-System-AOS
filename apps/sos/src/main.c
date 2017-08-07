@@ -544,6 +544,19 @@ int main(void) {
     register_timer(2000000, callback3, NULL);
     register_timer(3000000, callback3, NULL);
 
+
+    /* Timer demonstration with overflow! Prescalar in driver needs to be set to 1 */
+    /* 100ms periodic callback to print out timestamp */
+    // register_timer(66*100000, callback1, NULL);
+
+    // // /* 1 Second periodic callback to print out timestamp */
+    // register_timer(66*1000000, callback2, NULL);
+
+    // //  Several non repeating timers 
+    // register_timer(66*1000000, callback3, NULL);
+    // register_timer(66*2000000, callback3, NULL);
+    // register_timer(66*3000000, callback3, NULL);
+
     syscall_loop(_sos_ipc_ep_cap);
 
     /* Not reached */

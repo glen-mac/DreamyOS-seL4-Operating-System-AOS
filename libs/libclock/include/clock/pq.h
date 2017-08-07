@@ -5,9 +5,9 @@
 
 /* individual node */
 typedef struct {
-    uint64_t priority;		    /* the priority of the event */
-    timer_callback_t callback;	/* the callback function pointer */
-    void *data;		            /* the data to provide the cb */
+    uint64_t priority;          /* the priority of the event */
+    timer_callback_t callback;  /* the callback function pointer */
+    void *data;                 /* the data to provide the cb */
     uint32_t uid;               /* unique identifier */
 } event;
 
