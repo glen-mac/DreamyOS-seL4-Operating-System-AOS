@@ -23,6 +23,7 @@
 #define GPT_CNT 0x24 /* Counter Register */
 
 #define GPT_PERIPHERAL_CLOCK_FREQUENCY 66; /* Mhz */
+#define ONE_MILLISECOND 1000 /* in micrseconds */
 
 /* Register reset values */
 #define ZERO_RESET_VALUE 0x00000000
@@ -42,6 +43,7 @@
 /* Flags to specify if an event failed and if a UID needs to be generated */
 #define EVENT_FAIL 0
 #define GEN_UID 0
+
 
 /* Global var for the start of GPT mapped memory */
 void *gpt_virtual = NULL;
@@ -226,7 +228,7 @@ timer_interrupt(void)
                 add_event_to_pq(cur_event->delay, cur_event->callback, cur_event->data, REPEAT_EVENT, cur_event->uid);
 
             free(cur_event);
-        } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + 1000); /* 1ms buffer */
+        } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + ONE_MILLISECOND); /* 1ms buffer */
 
 
         if (pq_is_empty(pq)) {
@@ -328,6 +330,13 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
 {
     if (!timer_started)
         return CLOCK_R_OK; /* Return 0 on failure */
+
+    if (delay < ONE_MILLISECOND) {
+        uint32_t id = pq_get_next_id(pq);
+        if (callback) 
+            callback(id, data);
+        return id;
+    }
 
     /* Turn interrupts back on, there will be a non empty PQ */
     if (pq_is_empty(pq))
