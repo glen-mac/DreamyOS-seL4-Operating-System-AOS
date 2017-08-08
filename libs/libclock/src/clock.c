@@ -328,11 +328,16 @@ join32to64(uint32_t upper, uint32_t lower)
 static uint32_t
 add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t repeat, uint32_t uid)
 {
+    uint32_t id;
+
     if (!timer_started)
         return CLOCK_R_OK; /* Return 0 on failure */
 
     if (delay < ONE_MILLISECOND) {
-        uint32_t id = pq_get_next_id(pq);
+        id = pq_get_next_id(pq);
+        if (!id)
+            return EVENT_FAIL;
+
         if (callback) 
             callback(id, data);
         return id;
@@ -342,7 +347,7 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
     if (pq_is_empty(pq))
         *interrupt_register_ptr |= OUTPUT_COMPARE_MASK; /* Output compare channel 1 enabled */
 
-    int id = pq_push(pq, time_stamp() + delay, delay, callback, data, repeat, uid);
+    id = pq_push(pq, time_stamp() + delay, delay, callback, data, repeat, uid);
 
     /* If there was an issue pushing event, terminate early */
     if (!id)
