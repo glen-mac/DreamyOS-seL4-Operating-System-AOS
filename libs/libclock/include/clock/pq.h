@@ -44,3 +44,6 @@ int pq_is_empty(priority_queue *pq);
 
 /* get the timestamp value of the current head of the pq */
 uint64_t pq_time_peek(priority_queue *pq);
+
+/* get next available id and increment struct global counter */
+uint32_t pq_get_next_id(priority_queue *pq);

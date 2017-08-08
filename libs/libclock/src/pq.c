@@ -177,3 +177,15 @@ pq_is_empty(priority_queue *pq)
         return pq->len ? 0 : 1;
     return 1;
 }
+
+/*
+ * Return the next available id, and increments the pq counter.
+ * Used for race-condition handling in register_timer
+ * @returns uint32_t event id, 0 on error
+ */
+uint32_t
+pq_get_next_id(priority_queue *pq) {
+    if (pq)
+        return pq->counter++;
+    return 0;
+}
