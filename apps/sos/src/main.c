@@ -457,6 +457,57 @@ int main(void) {
     /* Start the user application */
     // start_first_process(TTY_NAME, _sos_ipc_ep_cap);
 
+    /* M2 Demonstration */
+
+    /* Allocate 10 pages and make sure you can touch them all */
+    for (int i = 0; i < 10; i++) {
+        /* Allocate a page */
+        seL4_Word vaddr;
+        frame_alloc(&vaddr);
+        assert(vaddr);
+
+        // Test you can touch the page 
+        *vaddr = 0x37;
+        assert(*vaddr == 0x37);
+
+        printf("Page #%d allocated at %p\n",  i, (void *) vaddr);
+    }
+
+    // /* Test that you never run out of memory if you always free frames. */
+    // for (int i = 0; i < 10000; i++) {
+    //      /* Allocate a page */
+    //      seL4_Word vaddr;
+    //      page = frame_alloc(&vaddr);
+    //      assert(vaddr != 0);
+
+    //      /* Test you can touch the page */
+    //      *vaddr = 0x37;
+    //      assert(*vaddr == 0x37);
+
+    //      /* print every 1000 iterations */
+    //      if (i % 1000 == 0) {
+    //          printf("Page #%d allocated at %p\n",  i, vaddr);
+    //      }
+
+    //      frame_free(page);
+    // }
+
+    // /* Test that you eventually run out of memory gracefully,
+    //    and doesn't crash */
+    // while (true) {
+    //      /* Allocate a page */
+    //      seL4_Word vaddr;
+    //      frame_alloc(&vaddr);
+    //      if (!vaddr) {
+    //         printf("Out of memory!\n");
+    //         break;
+    //      }
+
+    //      /* Test you can touch the page */
+    //      *vaddr = 0x37;
+    //      assert(*vaddr == 0x37);
+    // }
+
     /* Wait on synchronous endpoint for IPC */
     dprintf(0, "\nSOS entering syscall loop\n");
 
