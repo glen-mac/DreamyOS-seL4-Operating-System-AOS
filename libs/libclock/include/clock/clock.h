@@ -11,7 +11,13 @@
 #ifndef _CLOCK_H_
 #define _CLOCK_H_
 
+#include <stdint.h>
 #include <sel4/sel4.h>
+
+/* Physical address of the memory mapped timer */
+#define CLOCK_GPT 0x2098000
+#define CLOCK_GPT_NUM_REGS 10
+#define CLOCK_GPT_SIZE 4 * CLOCK_GPT_NUM_REGS /* In bytes */
 
 /*
  * Return codes for driver functions
@@ -24,6 +30,10 @@
 typedef int64_t timestamp_t;
 typedef void (*timer_callback_t)(uint32_t id, void *data);
 
+/* 
+ * Set the virtual address for the memory mapped timer 
+ */
+void init_timer(void *vaddr);
 
 /*
  * Initialise driver. Performs implicit stop_timer() if already initialised.
@@ -43,6 +53,7 @@ int start_timer(seL4_CPtr interrupt_ep);
  * Returns 0 on failure, otherwise an unique ID for this timeout
  */
 uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data);
+uint32_t register_repeating_timer(uint64_t delay, timer_callback_t callback, void *data);
 
 /*
  * Remove a previously registered callback by its ID

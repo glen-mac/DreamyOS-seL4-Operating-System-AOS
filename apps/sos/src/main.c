@@ -19,6 +19,7 @@
 #include <nfs/nfs.h>
 #include <elf/elf.h>
 #include <serial/serial.h>
+#include <clock/clock.h>
 
 #include "network.h"
 #include "elf.h"
@@ -44,6 +45,7 @@
 /* All badged IRQs set high bet, then we use uniq bits to
  * distinguish interrupt sources */
 #define IRQ_BADGE_NETWORK (1 << 0)
+#define IRQ_BADGE_TIMER (1 << 1)
 
 #define TTY_NAME             CONFIG_SOS_STARTUP_APP
 #define TTY_PRIORITY         (0)
@@ -55,6 +57,11 @@ extern char _cpio_archive[];
 
 const seL4_BootInfo* _boot_info;
 
+/* For demonstration */
+void callback1(uint32_t id, void *data);
+void callback2(uint32_t id, void *data);
+void callback3(uint32_t id, void *data);
+void callback4(uint32_t id, void *data);
 
 struct {
 
@@ -152,24 +159,28 @@ void syscall_loop(seL4_CPtr ep) {
 
         message = seL4_Wait(ep, &badge);
         label = seL4_MessageInfo_get_label(message);
-        if(badge & IRQ_EP_BADGE){
+        if (badge & IRQ_EP_BADGE) {
             /* Interrupt */
-            if (badge & IRQ_BADGE_NETWORK) {
+            if (badge & IRQ_BADGE_NETWORK)
                 network_irq();
+
+            /* IF or ELSE IT???? */
+            else if (badge & IRQ_BADGE_TIMER) {
+                dprintf(0, "Timer interrupt\n");
+                timer_interrupt();
             }
 
-        }else if(label == seL4_VMFault){
+        } else if (label == seL4_VMFault) {
             /* Page fault */
             dprintf(0, "vm fault at 0x%08x, pc = 0x%08x, %s\n", seL4_GetMR(1),
                     seL4_GetMR(0),
                     seL4_GetMR(2) ? "Instruction Fault" : "Data fault");
 
             assert(!"Unable to handle vm faults");
-        }else if(label == seL4_NoFault) {
+        } else if (label == seL4_NoFault) {
             /* System call */
             handle_syscall(badge, seL4_MessageInfo_get_length(message) - 1);
-
-        }else{
+        } else {
             printf("Rootserver got an unknown message\n");
         }
     }
@@ -428,6 +439,7 @@ static inline seL4_CPtr badge_irq_ep(seL4_CPtr ep, seL4_Word badge) {
  * Main entry point - called by crt.
  */
 int main(void) {
+    int err;
 
 #ifdef SEL4_DEBUG_KERNEL
     seL4_DebugNameThread(seL4_CapInitThreadTCB, "SOS:root");
@@ -442,16 +454,75 @@ int main(void) {
 
     /* Must happen after network initialisation */
     serial_port = serial_init();
+   
+    /* Map in the GPT into virtual memory and provide that address to the timer library */
+    init_timer(map_device((void *)CLOCK_GPT, CLOCK_GPT_SIZE));
+
+    /* Initialise timer with badged capability */
+    err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
+    conditional_panic(err, "Failed to start the timer\n");
 
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
 
+    /* Timer Demonstration */
+
+    /* 100ms periodic callback to print out timestamp */
+    register_repeating_timer(100000, callback3, NULL);
+
+    /* 1 Second periodic callback to print out timestamp */
+    register_timer(1000000, callback2, NULL);
+
+    /* Several non repeating timers */
+    // register_timer(1000000, callback3, NULL); // 1
+    // register_timer(2000000, callback3, NULL); // 2
+    // register_timer(3000000, callback3, NULL); // 3
+    // register_timer(3000000, callback3, NULL); // 4
+    // register_timer(2000000, callback3, NULL); // 5
+    // register_timer(1000000, callback3, NULL); // 6
+
+    // remove_timer(2);
+    // remove_timer(5);
+
+    //register_timer(1000000, callback4, NULL); // 0
+    //register_timer(2000000, callback4, NULL); // 0
+
+    /* Timer demonstration with overflow! Prescalar in driver needs to be set to 1 */
+    /* 100ms periodic callback to print out timestamp */
+    // register_timer(66*100000, callback1, NULL);
+
+    // // /* 1 Second periodic callback to print out timestamp */
+    // register_timer(66*1000000, callback2, NULL);
+
+    // //  Several non repeating timers 
+    // register_timer(66*1000000, callback3, NULL);
+    // register_timer(66*2000000, callback3, NULL);
+    // register_timer(66*3000000, callback3, NULL);
+
     /* Wait on synchronous endpoint for IPC */
     dprintf(0, "\nSOS entering syscall loop\n");
+
     syscall_loop(_sos_ipc_ep_cap);
 
     /* Not reached */
     return 0;
 }
 
+void callback1(uint32_t id, void *data) {
+    dprintf(0, "100ms Callback, id:%d, time: %lld\n", id, time_stamp());
+    dprintf(0, "registered callback: %d\n", register_timer(100000, callback1, NULL));
+}
 
+void callback2(uint32_t id, void *data) {
+    dprintf(0, "1 second Callback, id:%d, time: %lld\n", id, time_stamp());
+    dprintf(0, "registered callback: %d\n", register_timer(1000000, callback2, NULL));
+}
+
+void callback3(uint32_t id, void *data) {
+    dprintf(0, "Non-periodic callback id:%d, time: %lld\n", id, time_stamp());
+}
+
+void callback4(uint32_t id, void *data) {
+    dprintf(0, "Callback 4 id:%d, time: %lld\n", id, time_stamp());
+    dprintf(0, "registered callback: %d\n", register_timer(0, NULL, NULL));
+}
