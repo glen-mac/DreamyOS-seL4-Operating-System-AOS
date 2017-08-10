@@ -5,6 +5,7 @@
 
 #include "frametable.h"
 
+#include <assert.h>
 #include <strings.h>
 
 #include <cspace/cspace.h>
@@ -16,13 +17,15 @@
 
 #include <stdio.h> // DEBUG
 
-#define PAGESIZE (1 << seL4_PageBits)
+#define PAGE_SIZE (1 << seL4_PageBits)
+#define PAGE_FRAME 0xFFFFF000   /* Mask for getting page number from addr */
 
 /*
  * Reserve a physical frame
  * @param[out] virtual address of the frame
+ * @returns ID of the frame. Index into the frametable
  */
-void
+seL4_Word
 frame_alloc(seL4_Word *vaddr)
 {
     /* Grab a page sized chunk of untyped memory */
@@ -40,7 +43,9 @@ frame_alloc(seL4_Word *vaddr)
     conditional_panic(err, "Unable to map page");
 
     /* Zero out the memory */
-    bzero((void *)(*vaddr), PAGESIZE);
+    bzero((void *)(*vaddr), PAGE_SIZE);
+
+    return paddr & PAGE_FRAME;
 
     /* TODO: We need to keep track of frame_cap, seL4_CapInitThreadPD, vaddr and paddr */
 }
@@ -49,12 +54,10 @@ frame_alloc(seL4_Word *vaddr)
  * Free a physical frame
  */
 void
-frame_free(seL4_Word vaddr)
+frame_free(seL4_Word frame_id)
 {
-
+    assert(frame_id % PAGE_SIZE == 0);
     // seL4_ARM_Page_Unmap(frame_cap);
     // cspace_delete_cap(frame_cap);
-    // ut_free(paddr, seL4_PageBits);
-
-    return;
+    // ut_free(frame_id, seL4_PageBits);
 }

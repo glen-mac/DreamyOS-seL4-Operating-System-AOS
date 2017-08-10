@@ -11,8 +11,9 @@
 /*
  * Reserve a physical frame
  * @param[out] virtual address of the frame
+ * @return frame id
  */
-void frame_alloc(seL4_Word *vaddr);
+seL4_Word frame_alloc(seL4_Word *vaddr);
 
 /*
  * Free a physical frame

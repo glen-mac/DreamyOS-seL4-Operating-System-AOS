@@ -486,24 +486,24 @@ int main(void) {
 
     dprintf(0, "Test 2 Passed\n");
 
-    // /* Test that you never run out of memory if you always free frames. */
-    // for (int i = 0; i < 10000; i++) {
-    //      /* Allocate a page */
-    //      seL4_Word vaddr;
-    //      page = frame_alloc(&vaddr);
-    //      assert(vaddr != 0);
+    /* Test 3 Test that you never run out of memory if you always free frames. */
+    // for (int i = 0; i < 1000000; i++) {
+    //     /* Allocate a page */
+    //     seL4_Word frame_id = frame_alloc(&vaddr);
+    //     assert(vaddr != 0);
 
-    //      /* Test you can touch the page */
-    //      *vaddr = 0x37;
-    //      assert(*vaddr == 0x37);
+    //     /* Test you can touch the page */
+    //     *(seL4_Word *)vaddr = 0x37;
+    //     assert(*(seL4_Word *)vaddr == 0x37);
 
-    //      /* print every 1000 iterations */
-    //      if (i % 1000 == 0) {
-    //          printf("Page #%d allocated at %p\n",  i, vaddr);
-    //      }
+    //     /* print every 1000 iterations */
+    //     if (i % 10000 == 0)
+    //         printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
 
-    //      frame_free(page);
+    //     frame_free(frame_id);
     // }
+
+    // dprintf(0, "Test 3 Passed\n");
 
     // /* Test that you eventually run out of memory gracefully,
     //    and doesn't crash */
