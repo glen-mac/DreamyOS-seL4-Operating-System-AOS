@@ -465,25 +465,26 @@ int main(void) {
     frame_alloc(&vaddr);
     assert(vaddr);
 
-    // Test you can touch the page 
+    /* Test you can touch the page */
     *(seL4_Word *)vaddr = 0x37;
     assert(*(seL4_Word *)vaddr == 0x37);
 
     dprintf(0, "Test 1 Passed\n");
 
-    /* Allocate 10 pages and make sure you can touch them all */
-    // for (int i = 0; i < 10; i++) {
-    //     /* Allocate a page */
-    //     seL4_Word vaddr;
-    //     frame_alloc(&vaddr);
-    //     assert(vaddr);
+    /* Test 2: Allocate 10 pages and make sure you can touch them all */
+    for (int i = 0; i < 10; i++) {
+        /* Allocate a page */
+        frame_alloc(&vaddr);
+        assert(vaddr);
 
-    //     // Test you can touch the page 
-    //     // *(seL4_Word *)vaddr = 0x37;
-    //     // assert(*(seL4_Word *)vaddr == 0x37);
+        /* Test you can touch the page  */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
 
-    //     printf("Page #%d allocated at %p\n",  i, (void *) vaddr);
-    // }
+        printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
+    }
+
+    dprintf(0, "Test 2 Passed\n");
 
     // /* Test that you never run out of memory if you always free frames. */
     // for (int i = 0; i < 10000; i++) {

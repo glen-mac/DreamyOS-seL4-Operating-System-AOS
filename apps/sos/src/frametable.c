@@ -10,8 +10,11 @@
 #include <cspace/cspace.h>
 #include <sys/panic.h>
 
+#include "vmem_layout.h"
 #include "ut_manager/ut.h"
 #include "mapping.h"
+
+#include <stdio.h> // DEBUG
 
 #define PAGESIZE (1 << seL4_PageBits)
 
@@ -32,7 +35,7 @@ frame_alloc(seL4_Word *vaddr)
     conditional_panic(err, "Failed to retype to a frame object");
 
     /* Map the page into SOS virtual address space */
-    *vaddr = 0xA0000000;
+    *vaddr = PHYSICAL_VSTART + paddr;
     err = map_page(frame_cap, seL4_CapInitThreadPD, *vaddr, seL4_AllRights, seL4_ARM_Default_VMAttributes);
     conditional_panic(err, "Unable to map page");
 
