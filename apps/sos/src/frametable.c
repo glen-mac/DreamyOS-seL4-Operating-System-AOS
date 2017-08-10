@@ -19,6 +19,17 @@
 
 #define PAGE_SIZE (1 << seL4_PageBits)
 #define PAGE_FRAME 0xFFFFF000   /* Mask for getting page number from addr */
+#define ADDR_TO_INDEX(x) ((x & PAGE_FRAME) >> seL4_PageBits)
+
+/*
+ * Init the frame table
+ * @return success if 1, 0 otherwise
+ */
+int frame_table_init() {
+    // TODO: find the number of frames to alloc (10 is a filler)
+    frame_table = (frame_entry *)malloc(sizeof(frame_entry)*10);
+    return (frame_table != NULL);
+}
 
 /*
  * Reserve a physical frame
@@ -45,6 +56,10 @@ frame_alloc(seL4_Word *vaddr)
     /* Zero out the memory */
     bzero((void *)(*vaddr), PAGE_SIZE);
 
+    /* Store the metadata in the frame table */
+    seL4_Word index = ADDR_TO_INDEX(paddr);
+    frame_table[index].cap = frame_cap;
+
     return paddr & PAGE_FRAME;
 
     /* TODO: We need to keep track of frame_cap, seL4_CapInitThreadPD, vaddr and paddr */
@@ -57,7 +72,12 @@ void
 frame_free(seL4_Word frame_id)
 {
     assert(frame_id % PAGE_SIZE == 0);
-    // seL4_ARM_Page_Unmap(frame_cap);
-    // cspace_delete_cap(frame_cap);
-    // ut_free(frame_id, seL4_PageBits);
+    
+    /* get the cap from the frame_table */
+    seL4_Word index = ADDR_TO_INDEX(frame_id);
+    seL4_CPtr frame_cap = frame_table[index].cap;
+
+    //seL4_ARM_Page_Unmap(frame_cap);
+    //cspace_delete_cap(frame_cap);
+    ut_free(frame_id, seL4_PageBits);
 }

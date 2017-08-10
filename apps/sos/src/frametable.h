@@ -8,6 +8,20 @@
 
 #include <sel4/sel4.h>
 
+/* individual frame */
+typedef struct {
+	seL4_CPtr cap;		/* the cap for the frame */
+} frame_entry;
+
+/* the frame table is an array of frame entries */
+frame_entry *frame_table;
+
+/*
+ * Init the frame table
+ * @return success if 1, 0 otherwise
+ */
+int frame_table_init();
+
 /*
  * Reserve a physical frame
  * @param[out] virtual address of the frame
