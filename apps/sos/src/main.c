@@ -21,6 +21,7 @@
 #include <serial/serial.h>
 #include <clock/clock.h>
 
+#include "frametable.h"
 #include "network.h"
 #include "elf.h"
 
@@ -459,19 +460,30 @@ int main(void) {
 
     /* M2 Demonstration */
 
+    /* Test 1: Allocate a frame and test read & write */
+    seL4_Word vaddr;
+    frame_alloc(&vaddr);
+    assert(vaddr);
+
+    // Test you can touch the page 
+    *(seL4_Word *)vaddr = 0x37;
+    assert(*(seL4_Word *)vaddr == 0x37);
+
+    dprintf(0, "Test 1 Passed\n");
+
     /* Allocate 10 pages and make sure you can touch them all */
-    for (int i = 0; i < 10; i++) {
-        /* Allocate a page */
-        seL4_Word vaddr;
-        frame_alloc(&vaddr);
-        assert(vaddr);
+    // for (int i = 0; i < 10; i++) {
+    //     /* Allocate a page */
+    //     seL4_Word vaddr;
+    //     frame_alloc(&vaddr);
+    //     assert(vaddr);
 
-        // Test you can touch the page 
-        *vaddr = 0x37;
-        assert(*vaddr == 0x37);
+    //     // Test you can touch the page 
+    //     // *(seL4_Word *)vaddr = 0x37;
+    //     // assert(*(seL4_Word *)vaddr == 0x37);
 
-        printf("Page #%d allocated at %p\n",  i, (void *) vaddr);
-    }
+    //     printf("Page #%d allocated at %p\n",  i, (void *) vaddr);
+    // }
 
     // /* Test that you never run out of memory if you always free frames. */
     // for (int i = 0; i < 10000; i++) {
