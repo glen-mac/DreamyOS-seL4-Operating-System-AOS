@@ -30,6 +30,10 @@ static seL4_Word ut_base;   /* the base of the UT chunk we reference from */
  * @return success if 1, 0 otherwise
  */
 int frame_table_init() {
+    /* table already exists */
+    if (frame_table)
+        return 0;
+    
     /* find the size of the UT block we have to play with */
     seL4_Word high;
     ut_find_memory(&ut_base, &high);
@@ -37,8 +41,8 @@ int frame_table_init() {
     dprintf(0, "****** ut memory starts at %x and ends at %x for a size of %x and %d pages\n", ut_base, high, high-ut_base, (high-ut_base)/4096);
 
     /* allocate the table with enough pages */
-    seL4_Word n_pages = (high - ut_base) / 4096;
-    frame_table = (frame_entry *)malloc(sizeof(frame_entry)*n_pages);
+    seL4_Word n_pages = (high - ut_base) / PAGE_SIZE;
+    frame_table = (frame_entry *)malloc(sizeof(frame_entry) * n_pages);
 
     return (frame_table != NULL);
 }
@@ -72,26 +76,28 @@ frame_alloc(seL4_Word *vaddr)
     seL4_Word p_id = (paddr - ut_base) >> seL4_PageBits;
 
     /* Store the metadata in the frame table */
-    frame_table[p_id].cap = frame_cap;
-
-    return p_id;
-
     /* TODO: We need to keep track of frame_cap, seL4_CapInitThreadPD, vaddr and paddr */
+    frame_table[p_id].cap = frame_cap;
+    
+    return p_id;
 }
 
 /*
  * Free a physical frame
+ * @param index id into the frame_table
  */
 void
 frame_free(seL4_Word frame_id)
 {
-    assert(frame_id % PAGE_SIZE == 0);
-    
     /* get the cap from the frame_table */
     seL4_CPtr frame_cap = frame_table[frame_id].cap;
 
+    /* ensure this is a frame we can have allocated */
+    if (!frame_cap)
+        return;
+    
     /* clean stuff */
     seL4_ARM_Page_Unmap(frame_cap);
     cspace_delete_cap(cur_cspace, frame_cap);
-    ut_free(frame_id << 12, seL4_PageBits);
+    ut_free(frame_id << seL4_PageBits, seL4_PageBits);
 }
