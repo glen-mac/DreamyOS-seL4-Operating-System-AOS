@@ -536,7 +536,6 @@ int main(void) {
 
     dprintf(0, "Test 5 Passed\n");
 
-
     /* Wait on synchronous endpoint for IPC */
     dprintf(0, "\nSOS entering syscall loop\n");
 

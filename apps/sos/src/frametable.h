@@ -8,26 +8,29 @@
 
 #include <sel4/sel4.h>
 
-/* individual frame */
+// TODO: DOES THIS BELONG IN FRAMETABLE.C?
+
+/* Individual frame */
 typedef struct {
-    seL4_CPtr cap;      /* the cap for the frame */
+    seL4_CPtr cap; /* the cap for the frame */
 } frame_entry;
 
 /*
- * Init the frame table
- * @return success if 1, 0 otherwise
+ * Initialise the frame table
+ * @return 0 on success, else 1
  */
 int frame_table_init();
 
 /*
  * Reserve a physical frame
  * @param[out] virtual address of the frame
- * @return frame id
+ * @returns ID of the frame. Index into the frametable
  */
 seL4_Word frame_alloc(seL4_Word *vaddr);
 
 /*
- * Free a physical frame
+ * Free an allocated frame
+ * @param frame_id of the frame to be freed.
  */
 void frame_free(seL4_Word vaddr);
 
