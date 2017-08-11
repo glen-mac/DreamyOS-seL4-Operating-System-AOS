@@ -25,6 +25,10 @@
 
 static seL4_Word ut_base;   /* the base of the UT chunk we reference from */
 
+/* sizing constraints */
+static seL4_Word frame_table_max = 0;
+static seL4_Word frame_table_cnt = 0;
+
 /*
  * Init the frame table
  * @return success if 1, 0 otherwise
@@ -39,6 +43,9 @@ int frame_table_init() {
     ut_find_memory(&ut_base, &high);
 
     dprintf(0, "****** ut memory starts at %x and ends at %x for a size of %x and %d pages\n", ut_base, high, high-ut_base, (high-ut_base)/4096);
+    
+    /* set upper bound on frames that can be allocated */
+    frame_table_max = (high-ut_base)/PAGE_SIZE * 0.9;
 
     /* allocate the table with enough pages */
     seL4_Word n_pages = (high - ut_base) / PAGE_SIZE;
@@ -55,6 +62,12 @@ int frame_table_init() {
 seL4_Word
 frame_alloc(seL4_Word *vaddr)
 {
+
+    /* ensure we aren't exceeding limits */
+    if (frame_table_cnt >= frame_table_max) {
+        return 0;
+    }
+
     /* Grab a page sized chunk of untyped memory */
     seL4_Word paddr = ut_alloc(seL4_PageBits);
     conditional_panic(!paddr, "Out of memory - could not allocate frame");
@@ -78,6 +91,8 @@ frame_alloc(seL4_Word *vaddr)
     /* Store the metadata in the frame table */
     /* TODO: We need to keep track of frame_cap, seL4_CapInitThreadPD, vaddr and paddr */
     frame_table[p_id].cap = frame_cap;
+
+    frame_table_cnt++;
     
     return p_id;
 }

@@ -13,6 +13,7 @@ typedef struct {
 	seL4_CPtr cap;		/* the cap for the frame */
 } frame_entry;
 
+
 /* the frame table is an array of frame entries */
 frame_entry *frame_table;
 
