@@ -521,6 +521,8 @@ int main(void) {
     //      assert(*vaddr == 0x37);
     // }
 
+    frame_table_init();
+
     /* Wait on synchronous endpoint for IPC */
     dprintf(0, "\nSOS entering syscall loop\n");
 
