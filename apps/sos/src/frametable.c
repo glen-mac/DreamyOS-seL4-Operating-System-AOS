@@ -20,7 +20,7 @@
 #define verbose 5
 
 #define PAGE_SIZE (1 << seL4_PageBits)
-#define PAGE_ALIGN(addr) (addr + PAGE_SIZE-1) & ~(PAGE_SIZE-1)
+#define PAGE_ALIGN(addr) ((addr + PAGE_SIZE-1) & ~(PAGE_SIZE-1))
 #define ADDR_TO_INDEX(paddr) ((paddr - ut_base) >> seL4_PageBits)
 #define INDEX_TO_ADDR(index) (ut_base + (index << seL4_PageBits))
 
@@ -63,7 +63,7 @@ frame_table_init()
     frame_table_max = ((high - ut_base) / PAGE_SIZE) * 0.8;
 
     /* Allocate the table with enough pages */
-    seL4_Word n_pages = (high - ut_base) / PAGE_SIZE;
+    seL4_Word n_pages = PAGE_ALIGN(high - ut_base) / PAGE_SIZE;
     //frame_table = (frame_entry *)malloc(sizeof(frame_entry) * n_pages);
     seL4_Word num_bytes = sizeof(frame_entry) * n_pages;
     seL4_Word num_bytes_rounded = upper_power_of_two(num_bytes);
