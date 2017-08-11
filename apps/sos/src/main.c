@@ -458,9 +458,13 @@ int main(void) {
     /* Start the user application */
     // start_first_process(TTY_NAME, _sos_ipc_ep_cap);
 
+    err = frame_table_init();
+    conditional_panic(err, "Failed to initialise the frametable\n");
+
     /* M2 Demonstration */
 
     /* Test 1: Allocate a frame and test read & write */
+    seL4_Word frame_id;
     seL4_Word vaddr;
     frame_alloc(&vaddr);
     assert(vaddr);
@@ -486,42 +490,52 @@ int main(void) {
 
     dprintf(0, "Test 2 Passed\n");
 
-    /* Test 3 Test that you never run out of memory if you always free frames. */
-    // for (int i = 0; i < 1000000; i++) {
-    //     /* Allocate a page */
-    //     seL4_Word frame_id = frame_alloc(&vaddr);
-    //     assert(vaddr != 0);
+    /* Test 3: Allocate then Free */
+    frame_id = frame_alloc(&vaddr);
+    assert(vaddr);
 
-    //     /* Test you can touch the page */
-    //     *(seL4_Word *)vaddr = 0x37;
-    //     assert(*(seL4_Word *)vaddr == 0x37);
+    /* Test you can touch the page */
+    *(seL4_Word *)vaddr = 0x37;
+    assert(*(seL4_Word *)vaddr == 0x37);
+    frame_free(frame_id);
 
-    //     /* print every 1000 iterations */
-    //     if (i % 10000 == 0)
-    //         printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
+    dprintf(0, "Test 3 Passed\n");
 
-    //     frame_free(frame_id);
-    // }
+    /* Test 4 Test that you never run out of memory if you always free frames. */
+    for (int i = 0; i < 1000000; i++) {
+        /* Allocate a page */
+        seL4_Word frame_id = frame_alloc(&vaddr);
+        assert(vaddr != 0);
 
-    // dprintf(0, "Test 3 Passed\n");
+        /* Test you can touch the page  */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
 
-    // /* Test that you eventually run out of memory gracefully,
-    //    and doesn't crash */
-    // while (true) {
-    //      /* Allocate a page */
-    //      seL4_Word vaddr;
-    //      frame_alloc(&vaddr);
-    //      if (!vaddr) {
-    //         printf("Out of memory!\n");
-    //         break;
-    //      }
+        /* print every 1000 iterations */
+        if (i % 10000 == 0)
+            printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
 
-    //      /* Test you can touch the page */
-    //      *vaddr = 0x37;
-    //      assert(*vaddr == 0x37);
-    // }
+        frame_free(frame_id);
+    }
 
-    frame_table_init();
+    dprintf(0, "Test 4 Passed\n");
+
+    /* Test 5: Test that you eventually run out of memory gracefully, and doesn't crash */
+    while (1) {
+        /* Allocate a page */
+        frame_alloc(&vaddr);
+        if (!vaddr) {
+            printf("Out of memory!\n");
+            break;
+        }
+
+        /* Test you can touch the page */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
+    }
+
+    dprintf(0, "Test 5 Passed\n");
+
 
     /* Wait on synchronous endpoint for IPC */
     dprintf(0, "\nSOS entering syscall loop\n");
