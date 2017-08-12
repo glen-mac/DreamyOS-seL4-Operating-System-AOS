@@ -64,12 +64,15 @@ frame_table_init()
 
     /* Allocate the table with enough pages */
     seL4_Word n_pages = PAGE_ALIGN(high - ut_base) / PAGE_SIZE;
-    //frame_table = (frame_entry *)malloc(sizeof(frame_entry) * n_pages);
+    frame_table = (frame_entry *)malloc(sizeof(frame_entry) * n_pages);
+    /*
     seL4_Word num_bytes = sizeof(frame_entry) * n_pages;
     seL4_Word num_bytes_rounded = upper_power_of_two(num_bytes);
     seL4_Word num_bits = value_log_two(num_bytes_rounded);
+    dprintf(0, "*** num_bytes=%d, num_bytes_rounded=%d, num_bits=%d\n", num_bytes, num_bytes_rounded, num_bits);
     frame_table = (frame_entry *)ut_steal_mem(num_bits);
-    
+    */
+
     if (!frame_table)
         return 1;
 
