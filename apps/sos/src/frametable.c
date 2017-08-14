@@ -24,8 +24,13 @@
 #define ADDR_TO_INDEX(paddr) ((paddr - ut_base) >> seL4_PageBits)
 #define INDEX_TO_ADDR(index) (ut_base + (index << seL4_PageBits))
 
+#define HIGH_WATERMARK 64
+#define LOW_WATERMARK 32
+
 static int value_log_two(seL4_Word value);
 static seL4_Word upper_power_of_two(seL4_Word v);
+
+void _frame_free(seL4_Word frame_id);
 
 /* Individual frame */
 typedef struct {
@@ -41,6 +46,10 @@ static seL4_Word ut_top; /* The top of the UT chunk we reference from */
 /* Sizing Constraints */
 static seL4_Word frame_table_max = 0;
 static seL4_Word frame_table_cnt = 0;
+
+/* Global buffer to store free frames */
+static uint32_t free_frames[HIGH_WATERMARK];
+static uint32_t free_index = 0;
 
 /*
  * Initialise the frame table
@@ -99,6 +108,7 @@ frame_alloc(seL4_Word *vaddr)
 {
     seL4_Word paddr;
     seL4_ARM_Page frame_cap;
+    seL4_Word p_id;
 
     /* Check if frame_table is initialised */
     if (!frame_table)
@@ -107,6 +117,20 @@ frame_alloc(seL4_Word *vaddr)
     /* Ensure we aren't exceeding limits */
     if (frame_table_cnt >= frame_table_max)
         goto frame_alloc_error;
+
+    /* If there are free frames in the buffer */
+    if (free_index > 0) {
+        p_id = free_frames[free_index];
+        free_index--;
+
+        paddr = INDEX_TO_ADDR(p_id);
+        *vaddr = PHYSICAL_VSTART + paddr;
+        bzero((void *)(*vaddr), PAGE_SIZE);
+
+        return p_id;
+    }
+
+    /* Else, we need to allocate a frame from the UT Memory pool */
 
     /* Grab a page sized chunk of untyped memory */
     if ((paddr = ut_alloc(seL4_PageBits)) == (seL4_Word)NULL)
@@ -121,16 +145,16 @@ frame_alloc(seL4_Word *vaddr)
     if (map_page(frame_cap, seL4_CapInitThreadPD, *vaddr, seL4_AllRights, seL4_ARM_Default_VMAttributes) != 0)
         goto frame_alloc_error;
 
-    /* Zero out the memory */
-    bzero((void *)(*vaddr), PAGE_SIZE);
-
     /* Offset the paddr to align with our ut block */
-    seL4_Word p_id = ADDR_TO_INDEX(paddr);
+    p_id = ADDR_TO_INDEX(paddr);
 
     /* Store the metadata in the frame table */
     assert(frame_table[p_id].cap == (seL4_CPtr)NULL);
     frame_table[p_id].cap = frame_cap;
     frame_table_cnt++;
+
+    /* Zero out the memory */
+    bzero((void *)(*vaddr), PAGE_SIZE);
 
     return p_id;
 
@@ -155,9 +179,30 @@ frame_free(seL4_Word frame_id)
     if (frame_id < 0 || frame_id > ADDR_TO_INDEX(ut_top))
         return;
 
-    /* Get the cap from the frame_table */
+    /* If there is space to place the frame into the free frame buffer */
+    if (free_index < HIGH_WATERMARK) {
+        free_index++;
+        free_frames[free_index] = frame_id;
+        return;
+    }
+
+    dprintf(0, "Releasing frames from %d to %d watermark\n", LOW_WATERMARK, HIGH_WATERMARK);
+
+    /* Free index if equal to high watermark, we should release the current frame
+     * And all frames from low watermark to high watermark */
+    _frame_free(frame_id);
+    for (uint32_t id = LOW_WATERMARK; id < HIGH_WATERMARK; id++)
+        _frame_free(free_frames[id]);
+
+    free_index = LOW_WATERMARK - 1;
+}
+
+
+void 
+_frame_free(seL4_Word frame_id)
+{
     seL4_CPtr frame_cap = frame_table[frame_id].cap;
-    frame_table[frame_id].cap = (seL4_CPtr)NULL;
+    frame_table[frame_id].cap = (seL4_CPtr)NULL; /* Error guarding */
 
     /* Ensure this is a frame we have allocated */
     if (!frame_cap)

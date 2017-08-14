@@ -519,6 +519,22 @@ int main(void) {
 
     dprintf(0, "Test 4 Passed\n");
 
+    /* Test 5 Test that watermarking works */
+    int frames[65];
+    for (int i = 0; i < 65; i++) {
+        frames[i] = frame_alloc(&vaddr);
+        assert(vaddr != 0);
+
+        /* Test you can touch the page  */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
+    }
+
+    for (int i = 0; i < 65; i++)
+        frame_free(frames[i]);
+
+    dprintf(0, "Test 5 Passed\n");
+
     /* Test 5: Test that you eventually run out of memory gracefully, and doesn't crash */
     while (1) {
         /* Allocate a page */
@@ -533,7 +549,7 @@ int main(void) {
         assert(*(seL4_Word *)vaddr == 0x37);
     }
 
-    dprintf(0, "Test 5 Passed\n");
+    dprintf(0, "Test 6 Passed\n");
 
     /* Wait on synchronous endpoint for IPC */
     dprintf(0, "\nSOS entering syscall loop\n");
