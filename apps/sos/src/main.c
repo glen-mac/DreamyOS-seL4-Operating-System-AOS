@@ -521,6 +521,7 @@ int main(void) {
     dprintf(0, "Test 4 Passed\n");
 
     /* Test 5: Test that you eventually run out of memory gracefully, and doesn't crash */
+    int i= 0;
     while (1) {
         /* Allocate a page */
         frame_alloc(&vaddr);
@@ -532,6 +533,11 @@ int main(void) {
         /* Test you can touch the page */
         *(seL4_Word *)vaddr = 0x37;
         assert(*(seL4_Word *)vaddr == 0x37);
+
+        /* print every 1000 iterations */
+        if (++i % 100 == 0)
+            printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
+
     }
 
     dprintf(0, "Test 5 Passed\n");

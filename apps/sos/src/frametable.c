@@ -24,7 +24,12 @@
 #define ADDR_TO_INDEX(paddr) ((paddr - ut_base) >> seL4_PageBits)
 #define INDEX_TO_ADDR(index) (ut_base + (index << seL4_PageBits))
 
-static inline int value_log_two(seL4_Word value);
+/* filthy macro to round up the number of bits for ut_alloc, except when > 14 */
+#define ROUND_ALLOC_BITS(x) ((x<=4)?4:((x<=9)?9:((x<=10)?10:((x<=12)?12:((x<=14)?14:x)))))
+#define FT_PORTION 0.8
+#define MAX_ALLOC_BITS 14
+
+static inline int log_two(seL4_Word value);
 static inline seL4_Word upper_power_of_two(seL4_Word v);
 
 static seL4_Word ut_base; /* the base of the UT chunk we reference from */
@@ -60,21 +65,40 @@ frame_table_init()
      *
      * We set aside 80% of the memory for user application frames, and 20% of UT for SOS.
      */
-    frame_table_max = ((high - ut_base) / PAGE_SIZE) * 0.8;
+    frame_table_max = ((high - ut_base) / PAGE_SIZE) * FT_PORTION;
 
     /* Allocate the table with enough pages */
     seL4_Word n_pages = PAGE_ALIGN(high - ut_base) / PAGE_SIZE;
-    frame_table = (frame_entry *)malloc(sizeof(frame_entry) * n_pages);
-    /*
+    //frame_table = (frame_entry *)malloc(sizeof(frame_entry) * n_pages);
+    
+    seL4_Word paddr = 0; 
     seL4_Word num_bytes = sizeof(frame_entry) * n_pages;
     seL4_Word num_bytes_rounded = upper_power_of_two(num_bytes);
-    seL4_Word num_bits = value_log_two(num_bytes_rounded);
+    seL4_Word num_bits = log_two(num_bytes_rounded);
     dprintf(0, "*** num_bytes=%d, num_bytes_rounded=%d, num_bits=%d\n", num_bytes, num_bytes_rounded, num_bits);
-    frame_table = (frame_entry *)ut_steal_mem(num_bits);
-    */
+    assert(num_bits > MAX_ALLOC_BITS); /* frametable should always be larger than 2**14 in size */
+    seL4_Word num_allocs = 2<<(num_bits-MAX_ALLOC_BITS-1);
+    dprintf(0, "** need to make %d allocs of %d bits for a total of %d bytes\n", num_allocs, 14, (2<<13)*num_allocs);
+    for(int i = 0; i < num_allocs; i++)
+        paddr = ut_alloc(MAX_ALLOC_BITS);
+    
+    seL4_ARM_Page frame_cap;
+
+    /* Retype the untyped memory to a frame object */
+    if (cspace_ut_retype_addr(paddr, seL4_ARM_SmallPageObject, num_bits, cur_cspace, &frame_cap) != 0)
+        dprintf(0, "** retype error :)\n");
+
+    /* Map the page into SOS virtual address space */
+    seL4_Word vaddr = PHYSICAL_VSTART + paddr;
+    if (map_page(frame_cap, seL4_CapInitThreadPD, vaddr, seL4_AllRights, seL4_ARM_Default_VMAttributes) != 0)
+        dprintf(0, "** map error :)\n");
+
+    frame_table = (frame_entry *)vaddr;
 
     if (!frame_table)
         return 1;
+
+    dprintf(0, "** returned :)\n");
 
     return 0;
 }
@@ -101,9 +125,9 @@ static inline seL4_Word upper_power_of_two(seL4_Word v)
  * @param the power of two value
  * @returns the bit set
  */
-static inline int value_log_two(seL4_Word value)
+static inline int log_two(seL4_Word value)
 {
-    seL4_Word bit_num = 1;
+    seL4_Word bit_num = 0;
     while (((value & 1) == 0) && value > 1) {
         value >>= 1;
         bit_num++;
