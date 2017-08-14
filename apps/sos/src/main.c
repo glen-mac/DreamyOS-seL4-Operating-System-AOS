@@ -417,7 +417,9 @@ static void _sos_init(seL4_CPtr* ipc_ep, seL4_CPtr* async_ep){
     err = dma_init(dma_addr, DMA_SIZE_BITS);
     conditional_panic(err, "Failed to intiialise DMA memory\n");
 
-    /* Initialiase other system compenents here */
+    /* Initialiase frametable */
+    err = frame_table_init(low, high);
+    conditional_panic(err, "Failed to initialise the frametable\n");
 
     _sos_ipc_init(ipc_ep, async_ep);
 }
@@ -457,9 +459,6 @@ int main(void) {
 
     /* Start the user application */
     // start_first_process(TTY_NAME, _sos_ipc_ep_cap);
-
-    err = frame_table_init();
-    conditional_panic(err, "Failed to initialise the frametable\n");
 
     /* M2 Demonstration */
 
@@ -520,6 +519,22 @@ int main(void) {
 
     dprintf(0, "Test 4 Passed\n");
 
+    /* Test 5 Test that watermarking works */
+    int frames[65];
+    for (int i = 0; i < 65; i++) {
+        frames[i] = frame_alloc(&vaddr);
+        assert(vaddr != 0);
+
+        /* Test you can touch the page  */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
+    }
+
+    for (int i = 0; i < 65; i++)
+        frame_free(frames[i]);
+
+    dprintf(0, "Test 5 Passed\n");
+
     /* Test 5: Test that you eventually run out of memory gracefully, and doesn't crash */
     int i= 0;
     while (1) {
@@ -540,7 +555,7 @@ int main(void) {
 
     }
 
-    dprintf(0, "Test 5 Passed\n");
+    dprintf(0, "Test 6 Passed\n");
 
     /* Wait on synchronous endpoint for IPC */
     dprintf(0, "\nSOS entering syscall loop\n");
