@@ -98,8 +98,10 @@ frame_alloc(seL4_Word *vaddr)
         goto frame_alloc_error;
 
     /* Ensure we aren't exceeding limits */
-    if (frame_table_cnt >= frame_table_max)
+    if (frame_table_cnt >= frame_table_max) {
+        LOG_INFO("frame limit exceeded");
         goto frame_alloc_error;
+    }
 
     /* If there are free frames in the buffer */
     if (free_index > 0) {
@@ -136,6 +138,7 @@ frame_alloc(seL4_Word *vaddr)
 
     /* On error, set the vaddr to null and return -1 */
     frame_alloc_error:
+        LOG_ERROR("Unable to allocate frame");
         *vaddr = (seL4_Word)NULL;
         return -1;
 }
@@ -148,12 +151,16 @@ frame_free(seL4_Word frame_id)
         return;
 
     /* Check if address is within frame_table bounds */
-    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top)))
+    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
+        LOG_ERROR("frame_id: %d out of bounds", frame_id);
         return;
+    }
 
     /* Check if capability exists */
-    if (!frame_table[frame_id].cap)
+    if (!frame_table[frame_id].cap) {
+        LOG_ERROR("capability for frame_id: %d does not exist", frame_id);
         return;
+    }
 
     /* If there is space to place the frame into the free frame buffer */
     if (free_index < HIGH_WATERMARK) {
@@ -187,8 +194,10 @@ _frame_free(seL4_Word frame_id)
     frame_table[frame_id].cap = (seL4_ARM_Page)NULL; /* Error guarding */
 
     /* Ensure this is a frame we have allocated */
-    if (!frame_cap)
+    if (!frame_cap) {
+        LOG_INFO("capability for %d does not exist", frame_id);
         return;
+    }
     
     /* Unmap the page */
     seL4_ARM_Page_Unmap(frame_cap);
