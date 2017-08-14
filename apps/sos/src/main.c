@@ -417,7 +417,9 @@ static void _sos_init(seL4_CPtr* ipc_ep, seL4_CPtr* async_ep){
     err = dma_init(dma_addr, DMA_SIZE_BITS);
     conditional_panic(err, "Failed to intiialise DMA memory\n");
 
-    /* Initialiase other system compenents here */
+    /* Initialiase frametable */
+    err = frame_table_init(low, high);
+    conditional_panic(err, "Failed to initialise the frametable\n");
 
     _sos_ipc_init(ipc_ep, async_ep);
 }
@@ -457,9 +459,6 @@ int main(void) {
 
     /* Start the user application */
     // start_first_process(TTY_NAME, _sos_ipc_ep_cap);
-
-    err = frame_table_init();
-    conditional_panic(err, "Failed to initialise the frametable\n");
 
     /* M2 Demonstration */
 
