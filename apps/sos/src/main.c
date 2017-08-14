@@ -21,6 +21,10 @@
 #include <serial/serial.h>
 #include <clock/clock.h>
 
+#include <utils/page.h>
+#include <utils/builtin.h>
+#include <utils/math.h>
+
 #include "frametable.h"
 #include "network.h"
 #include "elf.h"
@@ -405,6 +409,18 @@ static void _sos_init(seL4_CPtr* ipc_ep, seL4_CPtr* async_ep){
     /* find available memory */
     ut_find_memory(&low, &high);
 
+    /* 
+     * Our frame table allocation has some redundancy as we size it based on a larger block of UT
+     * but the simplicity is worth it. We steal memory to place the table contiguosly at a physical address.
+     * We then map this into virtual memory in frame_table_init.
+     */
+    seL4_Word n_pages = BYTES_TO_4K_PAGES(high - low);
+    seL4_Word n_bits = LOG_BASE_2(nearest_power_of_two(sizeof(frame_entry) * n_pages));
+    seL4_Word frame_table_paddr = ut_steal_mem(n_bits);
+
+    /* Resize memory after we just stole from it */
+    ut_find_memory(&low, &high);
+
     /* Initialise the untyped memory allocator */
     ut_allocator_init(low, high);
 
@@ -417,9 +433,9 @@ static void _sos_init(seL4_CPtr* ipc_ep, seL4_CPtr* async_ep){
     err = dma_init(dma_addr, DMA_SIZE_BITS);
     conditional_panic(err, "Failed to intiialise DMA memory\n");
 
-    /* Initialiase frametable */
-    err = frame_table_init(low, high);
-    conditional_panic(err, "Failed to initialise the frametable\n");
+    /* Initialise frame table */
+    err = frame_table_init(frame_table_paddr, n_bits, low, high);
+    conditional_panic(err, "Failed to intiialise frame table\n");
 
     _sos_ipc_init(ipc_ep, async_ep);
 }
@@ -549,9 +565,9 @@ int main(void) {
         *(seL4_Word *)vaddr = 0x37;
         assert(*(seL4_Word *)vaddr == 0x37);
 
-        /* print every 1000 iterations */
-        if (++i % 100 == 0)
-            printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
+        // /* print every 1000 iterations */
+        // if (++i % 100 == 0)
+        //     printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
 
     }
 
