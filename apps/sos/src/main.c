@@ -20,9 +20,7 @@
 #include <elf/elf.h>
 #include <serial/serial.h>
 #include <clock/clock.h>
-
 #include <utils/page.h>
-#include <utils/builtin.h>
 #include <utils/math.h>
 
 #include "frametable.h"
@@ -402,6 +400,7 @@ static void _sos_init(seL4_CPtr* ipc_ep, seL4_CPtr* async_ep){
     /* Initialise the untyped sub system and reserve memory for DMA */
     err = ut_table_init(_boot_info);
     conditional_panic(err, "Failed to initialise Untyped Table\n");
+
     /* DMA uses a large amount of memory that will never be freed */
     dma_addr = ut_steal_mem(DMA_SIZE_BITS);
     conditional_panic(dma_addr == 0, "Failed to reserve DMA memory\n");
@@ -415,8 +414,8 @@ static void _sos_init(seL4_CPtr* ipc_ep, seL4_CPtr* async_ep){
      * We then map this into virtual memory in frame_table_init.
      */
     seL4_Word n_pages = BYTES_TO_4K_PAGES(high - low);
-    seL4_Word n_bits = LOG_BASE_2(nearest_power_of_two(sizeof(frame_entry) * n_pages));
-    seL4_Word frame_table_paddr = ut_steal_mem(n_bits);
+    seL4_Word frame_table_size_in_bits = LOG_BASE_2(nearest_power_of_two(sizeof(frame_entry) * n_pages));
+    seL4_Word frame_table_paddr = ut_steal_mem(frame_table_size_in_bits);
 
     /* Resize memory after we just stole from it */
     ut_find_memory(&low, &high);
@@ -433,8 +432,8 @@ static void _sos_init(seL4_CPtr* ipc_ep, seL4_CPtr* async_ep){
     err = dma_init(dma_addr, DMA_SIZE_BITS);
     conditional_panic(err, "Failed to intiialise DMA memory\n");
 
-    /* Initialise frame table */
-    err = frame_table_init(frame_table_paddr, n_bits, low, high);
+    /* Initialise the frame table */
+    err = frame_table_init(frame_table_paddr, frame_table_size_in_bits, low, high);
     conditional_panic(err, "Failed to intiialise frame table\n");
 
     _sos_ipc_init(ipc_ep, async_ep);
@@ -487,6 +486,11 @@ int main(void) {
     /* Test you can touch the page */
     *(seL4_Word *)vaddr = 0x37;
     assert(*(seL4_Word *)vaddr == 0x37);
+
+    /* Testing an invalid id does not crash */
+    frame_free(-1);
+    /* Testing an id that does not map to a valid frame does not crash */
+    frame_free(1);
 
     dprintf(0, "Test 1 Passed\n");
 
@@ -552,7 +556,6 @@ int main(void) {
     dprintf(0, "Test 5 Passed\n");
 
     /* Test 5: Test that you eventually run out of memory gracefully, and doesn't crash */
-    int i= 0;
     while (1) {
         /* Allocate a page */
         frame_alloc(&vaddr);
@@ -564,11 +567,6 @@ int main(void) {
         /* Test you can touch the page */
         *(seL4_Word *)vaddr = 0x37;
         assert(*(seL4_Word *)vaddr == 0x37);
-
-        // /* print every 1000 iterations */
-        // if (++i % 100 == 0)
-        //     printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
-
     }
 
     dprintf(0, "Test 6 Passed\n");

@@ -1,5 +1,5 @@
 /*
- * Frametable management
+ * Frametable
  * Glenn McGuire and Cameron Lonsdale
  */
 
@@ -15,6 +15,8 @@ typedef struct {
 
 /*
  * Initialise the frame table
+ * @param paddr, the physical address of the frame_table
+ * @param size_in_bits, the size in bits of the frame_table
  * @param low, low address of the UT memory region
  * @param high, high address of the UT memory region
  * @return 0 on success, else 1
@@ -33,6 +35,5 @@ seL4_Word frame_alloc(seL4_Word *vaddr);
  * @param frame_id of the frame to be freed.
  */
 void frame_free(seL4_Word vaddr);
-
 
 #endif /* _MAPPING_H_ */
