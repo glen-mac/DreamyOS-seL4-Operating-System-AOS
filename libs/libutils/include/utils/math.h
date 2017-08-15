@@ -62,4 +62,22 @@ static inline uint64_t muldivu64(uint64_t a, uint64_t b, uint64_t c)
     return quotient;
 }
 
+/* 
+ * Rounds a value up to the next value of two
+ * @param value to round
+ * @returns the provided value rounded 
+ */
+static inline uint32_t nearest_power_of_two(uint32_t v)
+{
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
 #endif /* _UTILS_MATH_H */
+

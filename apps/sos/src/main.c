@@ -20,7 +20,10 @@
 #include <elf/elf.h>
 #include <serial/serial.h>
 #include <clock/clock.h>
+#include <utils/page.h>
+#include <utils/math.h>
 
+#include "frametable.h"
 #include "network.h"
 #include "elf.h"
 
@@ -56,12 +59,6 @@
 extern char _cpio_archive[];
 
 const seL4_BootInfo* _boot_info;
-
-/* For demonstration */
-void callback1(uint32_t id, void *data);
-void callback2(uint32_t id, void *data);
-void callback3(uint32_t id, void *data);
-void callback4(uint32_t id, void *data);
 
 struct {
 
@@ -161,11 +158,9 @@ void syscall_loop(seL4_CPtr ep) {
         label = seL4_MessageInfo_get_label(message);
         if (badge & IRQ_EP_BADGE) {
             /* Interrupt */
-            if (badge & IRQ_BADGE_NETWORK)
+            if (badge & IRQ_BADGE_NETWORK) {
                 network_irq();
-
-            /* IF or ELSE IT???? */
-            else if (badge & IRQ_BADGE_TIMER) {
+            } else if (badge & IRQ_BADGE_TIMER) {
                 dprintf(0, "Timer interrupt\n");
                 timer_interrupt();
             }
@@ -405,11 +400,24 @@ static void _sos_init(seL4_CPtr* ipc_ep, seL4_CPtr* async_ep){
     /* Initialise the untyped sub system and reserve memory for DMA */
     err = ut_table_init(_boot_info);
     conditional_panic(err, "Failed to initialise Untyped Table\n");
+
     /* DMA uses a large amount of memory that will never be freed */
     dma_addr = ut_steal_mem(DMA_SIZE_BITS);
     conditional_panic(dma_addr == 0, "Failed to reserve DMA memory\n");
 
     /* find available memory */
+    ut_find_memory(&low, &high);
+
+    /* 
+     * Our frame table allocation has some redundancy as we size it based on a larger block of UT
+     * but the simplicity is worth it. We steal memory to place the table contiguosly at a physical address.
+     * We then map this into virtual memory in frame_table_init.
+     */
+    seL4_Word n_pages = BYTES_TO_4K_PAGES(high - low);
+    seL4_Word frame_table_size_in_bits = LOG_BASE_2(nearest_power_of_two(sizeof(frame_entry) * n_pages));
+    seL4_Word frame_table_paddr = ut_steal_mem(frame_table_size_in_bits);
+
+    /* Resize memory after we just stole from it */
     ut_find_memory(&low, &high);
 
     /* Initialise the untyped memory allocator */
@@ -424,7 +432,9 @@ static void _sos_init(seL4_CPtr* ipc_ep, seL4_CPtr* async_ep){
     err = dma_init(dma_addr, DMA_SIZE_BITS);
     conditional_panic(err, "Failed to intiialise DMA memory\n");
 
-    /* Initialiase other system compenents here */
+    /* Initialise the frame table */
+    err = frame_table_init(frame_table_paddr, frame_table_size_in_bits, low, high);
+    conditional_panic(err, "Failed to intiialise frame table\n");
 
     _sos_ipc_init(ipc_ep, async_ep);
 }
@@ -463,41 +473,108 @@ int main(void) {
     conditional_panic(err, "Failed to start the timer\n");
 
     /* Start the user application */
-    start_first_process(TTY_NAME, _sos_ipc_ep_cap);
+    // start_first_process(TTY_NAME, _sos_ipc_ep_cap);
 
-    /* Timer Demonstration */
+    /* M2 Demonstration */
 
-    /* 100ms periodic callback to print out timestamp */
-    register_repeating_timer(100000, callback3, NULL);
+    /* Test 1: Allocate a frame and test read & write */
+    seL4_Word frame_id;
+    seL4_Word vaddr;
+    frame_alloc(&vaddr);
+    assert(vaddr);
 
-    /* 1 Second periodic callback to print out timestamp */
-    register_timer(1000000, callback2, NULL);
+    /* Test you can touch the page */
+    *(seL4_Word *)vaddr = 0x37;
+    assert(*(seL4_Word *)vaddr == 0x37);
 
-    /* Several non repeating timers */
-    // register_timer(1000000, callback3, NULL); // 1
-    // register_timer(2000000, callback3, NULL); // 2
-    // register_timer(3000000, callback3, NULL); // 3
-    // register_timer(3000000, callback3, NULL); // 4
-    // register_timer(2000000, callback3, NULL); // 5
-    // register_timer(1000000, callback3, NULL); // 6
+    /* Testing an invalid id does not crash */
+    frame_free(-1);
+    /* Testing an id that does not map to a valid frame does not crash */
+    frame_free(1);
 
-    // remove_timer(2);
-    // remove_timer(5);
+    dprintf(0, "Test 1 Passed\n");
 
-    //register_timer(1000000, callback4, NULL); // 0
-    //register_timer(2000000, callback4, NULL); // 0
+    /* Test 2: Allocate 10 pages and make sure you can touch them all */
+    for (int i = 0; i < 10; i++) {
+        /* Allocate a page */
+        frame_alloc(&vaddr);
+        assert(vaddr);
 
-    /* Timer demonstration with overflow! Prescalar in driver needs to be set to 1 */
-    /* 100ms periodic callback to print out timestamp */
-    // register_timer(66*100000, callback1, NULL);
+        /* Test you can touch the page  */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
 
-    // // /* 1 Second periodic callback to print out timestamp */
-    // register_timer(66*1000000, callback2, NULL);
+        printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
+    }
 
-    // //  Several non repeating timers 
-    // register_timer(66*1000000, callback3, NULL);
-    // register_timer(66*2000000, callback3, NULL);
-    // register_timer(66*3000000, callback3, NULL);
+    dprintf(0, "Test 2 Passed\n");
+
+    /* Test 3: Allocate then Free */
+    frame_id = frame_alloc(&vaddr);
+    assert(vaddr);
+
+    /* Test you can touch the page */
+    *(seL4_Word *)vaddr = 0x37;
+    assert(*(seL4_Word *)vaddr == 0x37);
+    frame_free(frame_id);
+
+    dprintf(0, "Test 3 Passed\n");
+
+    /* Test 4 Test that you never run out of memory if you always free frames. */
+    for (int i = 0; i < 1000000; i++) {
+        /* Allocate a page */
+        seL4_Word frame_id = frame_alloc(&vaddr);
+        assert(vaddr != 0);
+
+        /* Test you can touch the page  */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
+
+        /* print every 1000 iterations */
+        if (i % 10000 == 0)
+            printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
+
+        frame_free(frame_id);
+    }
+
+    dprintf(0, "Test 4 Passed\n");
+
+    /* Test 5 Test that watermarking works */
+    int frames[65];
+    for (int i = 0; i < 65; i++) {
+        frames[i] = frame_alloc(&vaddr);
+        assert(vaddr != 0);
+
+        /* Test you can touch the page  */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
+    }
+
+    for (int i = 0; i < 65; i++)
+        frame_free(frames[i]);
+
+    dprintf(0, "Test 5 Passed\n");
+
+    /* Test 5: Test that you eventually run out of memory gracefully, and doesn't crash */
+    while (1) {
+        /* Allocate a page */
+        frame_alloc(&vaddr);
+        if (!vaddr) {
+            printf("Out of memory!\n");
+            break;
+        }
+
+        /* Test you can touch the page */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
+    }
+
+    dprintf(0, "Test 6 Passed\n");
+
+    assert(frame_table_init(NULL, 0, 0, 0) == 1);
+    dprintf(0, "Test 7 Passed\n");
+
+    dprintf(0, "All tests pass, you are awesome! :)\n");
 
     /* Wait on synchronous endpoint for IPC */
     dprintf(0, "\nSOS entering syscall loop\n");
@@ -506,23 +583,4 @@ int main(void) {
 
     /* Not reached */
     return 0;
-}
-
-void callback1(uint32_t id, void *data) {
-    dprintf(0, "100ms Callback, id:%d, time: %lld\n", id, time_stamp());
-    dprintf(0, "registered callback: %d\n", register_timer(100000, callback1, NULL));
-}
-
-void callback2(uint32_t id, void *data) {
-    dprintf(0, "1 second Callback, id:%d, time: %lld\n", id, time_stamp());
-    dprintf(0, "registered callback: %d\n", register_timer(1000000, callback2, NULL));
-}
-
-void callback3(uint32_t id, void *data) {
-    dprintf(0, "Non-periodic callback id:%d, time: %lld\n", id, time_stamp());
-}
-
-void callback4(uint32_t id, void *data) {
-    dprintf(0, "Callback 4 id:%d, time: %lld\n", id, time_stamp());
-    dprintf(0, "registered callback: %d\n", register_timer(0, NULL, NULL));
 }

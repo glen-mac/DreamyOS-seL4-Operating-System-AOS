@@ -6,6 +6,10 @@
 
 * If you make interrupt handling multithreaded in the future, make sure to lock the Priority queue.
 
+## M2
+
+* Might want to refactor the free_frames buffer into a general stack data structure
+* If we want to share or free the frame table later, we need to keep track of the capabilties for it
 
 # Design Features
 
