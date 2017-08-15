@@ -56,7 +56,7 @@ frame_table_init(seL4_Word paddr, seL4_Word size_in_bits, seL4_Word low, seL4_Wo
     ut_top = high;
     ut_base = low;
 
-    LOG_INFO("frame_table_init: UT memory starts at %x and ends at %x for a size of %x and %d pages", ut_base, ut_top, ut_top - ut_base, BYTES_TO_4K_PAGES(ut_top - ut_base));
+    LOG_INFO("frame_table_init: UT memory starts at %x and ends at %x for a size of %x and %lu pages", ut_base, ut_top, ut_top - ut_base, BYTES_TO_4K_PAGES(ut_top - ut_base));
 
     /* 
      * Set upper bound on frames that can be allocated.

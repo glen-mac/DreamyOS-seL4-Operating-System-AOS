@@ -571,7 +571,7 @@ int main(void) {
 
     dprintf(0, "Test 6 Passed\n");
 
-    assert(frame_table_init(NULL, 0, 0, 0) == 1);
+    assert(frame_table_init((seL4_Word)NULL, 0, 0, 0) == 1);
     dprintf(0, "Test 7 Passed\n");
 
     dprintf(0, "All tests pass, you are awesome! :)\n");
