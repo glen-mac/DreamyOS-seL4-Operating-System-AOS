@@ -5,9 +5,10 @@
  */
 
 #include <clock/clock.h>
-
 #include <clock/pq.h>
+
 #include <cspace/cspace.h>
+#include <utils/util.h>
 
 /* Interrupt Request ID */
 #define GPT_IRQ 87
@@ -194,8 +195,10 @@ remove_timer(uint32_t id)
     if (!timer_started)
         return CLOCK_R_UINT; /* Driver not initialised */
 
-    if (!pq_remove(pq, id))
+    if (!pq_remove(pq, id)) {
+        LOG_ERROR("Invalid timer id %d", id);
         return CLOCK_R_FAIL; /* Operation failed for other reason (invalid id) */
+    }
 
     /* The timer we just removed could have been the next event so we need to update the compare reg */
     *compare_register_ptr = pq_time_peek(pq);
@@ -217,8 +220,10 @@ timer_interrupt(void)
         /* Because multiple interrupts can bascially happen at the same time, so we need to account for that */
         do {
             event *cur_event = pq_pop(pq);
-            if (!cur_event)
+            if (!cur_event) {
+                LOG_ERROR("Malloc returned null when popping");
                 return CLOCK_R_FAIL; /* This should only happen if malloc returned NULL */
+            }
 
             if (cur_event->callback)
                 cur_event->callback(cur_event->uid, cur_event->data);
@@ -228,7 +233,7 @@ timer_interrupt(void)
                 add_event_to_pq(cur_event->delay, cur_event->callback, cur_event->data, REPEAT_EVENT, cur_event->uid);
 
             free(cur_event);
-        } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + ONE_MILLISECOND); /* 1ms buffer */
+        } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + MILLISECONDS(1));
 
 
         if (pq_is_empty(pq)) {
@@ -243,8 +248,10 @@ timer_interrupt(void)
     }
 
     /* Acknowledge the interrupt so more can happen */
-    if (seL4_IRQHandler_Ack(irq_handler) != 0)
+    if (seL4_IRQHandler_Ack(irq_handler) != 0) {
+        LOG_INFO("Interrupt Acknowledge failed");
         return CLOCK_R_FAIL; /* Operation failed for other reason (Failed to ack interrupt) */
+    }
 
     return CLOCK_R_OK;   
 }
@@ -277,15 +284,17 @@ time_stamp(void)
     if (second < first) {
         /* This timestamp shold not be incorrect as we just had the race condition */
         check_for_rollover(); /* This is required because we might be in an interrupt handler and roll over didnt get recognised yet */
+        LOG_INFO("64-bit timer race condition detected");
         return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
     }
 
     /* If the upper 32 bits mismatch then a rollover occured and its POSSIBLE the condition (2) is met */
-    uint32_t first_upper = (first >> 32);
-    uint32_t second_upper = (second >> 32);
+    uint32_t first_upper = (first >> sizeof(uint32_t));
+    uint32_t second_upper = (second >> sizeof(uint32_t));
     if (first_upper != second_upper) {
         /* This timestamp shold not be incorrect as we just had the race condition */
         check_for_rollover();
+        LOG_INFO("64-bit timer race condition detected");
         return (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
     }
 
@@ -333,7 +342,7 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
     if (!timer_started)
         return CLOCK_R_OK; /* Return 0 on failure */
 
-    if (delay < ONE_MILLISECOND) {
+    if (delay < MILLISECONDS(1)) {
         id = pq_get_next_id(pq);
         if (!id)
             return EVENT_FAIL;
@@ -350,8 +359,10 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
     id = pq_push(pq, time_stamp() + delay, delay, callback, data, repeat, uid);
 
     /* If there was an issue pushing event, terminate early */
-    if (!id)
+    if (!id)  {
+        LOG_ERROR("Error pushing event to the queue");
         return EVENT_FAIL;
+    }
 
     /* The event might be at the front of the queue, in that case we need to update the compare reg */
     *compare_register_ptr = pq_time_peek(pq);

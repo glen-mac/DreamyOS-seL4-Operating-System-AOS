@@ -11,10 +11,12 @@
 #include <cspace/cspace.h>
 #include <utils/page.h>
 #include <utils/util.h>
+#include <utils/time.h>
 
 #include "vmem_layout.h"
 #include "ut_manager/ut.h"
 #include "mapping.h"
+
 
 /* Macros to go from physical address to frame table index and the reverse */
 #define ADDR_TO_INDEX(paddr) ((paddr - ut_base) >> seL4_PageBits)
