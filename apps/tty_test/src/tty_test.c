@@ -99,11 +99,14 @@ test_m3(void)
     for (int i = 0; i < NPAGES; i++) {
         buf1[i * PAGE_SIZE_4K] = i;
     }
-
     /* check */
     for (int i = 0; i < NPAGES; i++) {
         assert(buf1[i * PAGE_SIZE_4K] == i);
     }
+
+    /* This should generate a Read fault type */
+    seL4_Word *addr = (seL4_Word *)TEST_ADDRESS;
+
 
     // /* heap test */
     // char *buf2 = malloc(NPAGES * PAGE_SIZE_4K);

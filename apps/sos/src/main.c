@@ -142,13 +142,12 @@ void syscall_loop(seL4_CPtr ep) {
     seL4_Word badge;
     seL4_Word label;
     seL4_MessageInfo_t message;
-     seL4_MessageInfo_t reply;
-    seL4_CPtr reply_cap;
 
     /* VM Fault */
     seL4_Word fault_addr;
-    seL4_Word pc;
+    seL4_Word fault_pc;
     seL4_Word fault_type;
+    seL4_Word fault_cause;
 
     while (1) {
         message = seL4_Wait(ep, &badge);
@@ -163,24 +162,11 @@ void syscall_loop(seL4_CPtr ep) {
 
         } else if (label == seL4_VMFault) {
             /* Page fault */
-           
-
-            reply_cap = cspace_save_reply_cap(cur_cspace);
-            assert(reply_cap != CSPACE_NULL);
-
+            fault_pc = seL4_GetMR(0);
             fault_addr = seL4_GetMR(1);
-            pc = seL4_GetMR(0);
             fault_type = seL4_GetMR(2);
-            dprintf(0, "vm fault at 0x%08x, pc = 0x%08x, %s\n",
-                    fault_addr, pc, fault_type ? "Instruction Fault" : "Data fault");
-
-            vm_fault(fault_addr, pc, fault_type);
-
-            reply = seL4_MessageInfo_new(0, 0, 0, 1);
-            seL4_SetMR(0, 0);
-            seL4_Send(reply_cap, reply);
-
-            // assert(!"Unable to handle vm faults");
+            fault_cause = seL4_GetMR(3);
+            vm_fault(fault_addr, fault_pc, fault_type, fault_cause);
         } else if (label == seL4_NoFault) {
             /* System call */
             handle_syscall(badge, seL4_MessageInfo_get_length(message) - 1);
