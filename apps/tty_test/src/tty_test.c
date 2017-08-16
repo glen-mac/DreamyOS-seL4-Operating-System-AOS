@@ -51,13 +51,7 @@ int main(void) {
     /* initialise communication */
     ttyout_init();
 
-    do {
-        //test_m0();
-        test_m3();
-
-        thread_block();
-        // sleep(1);	// Implement this as a syscall
-    } while(1);
+    test_m3();
 
     return 0;
 }

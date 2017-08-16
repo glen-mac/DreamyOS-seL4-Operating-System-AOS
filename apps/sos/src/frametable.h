@@ -40,4 +40,4 @@ void frame_free(seL4_Word vaddr);
 /* Return frame capability for a frame */
 seL4_ARM_Page get_frame_capabilty(seL4_Word frame_id);
 
-#endif /* _MAPPING_H_ */
+#endif /* FRAMETABLE_H_ */

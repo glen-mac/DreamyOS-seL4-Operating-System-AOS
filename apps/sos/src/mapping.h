@@ -40,11 +40,11 @@ void* map_device(void* paddr, int size);
 
 
 /*
- *
+ * Map a page into 
  *
  *
  */
-int sos_map_page(seL4_Word fault_addr, seL4_ARM_PageDirectory address_space, cspace_t *croot);
+int sos_map_page(seL4_Word fault_addr, seL4_ARM_PageDirectory address_space);
 
 
 #endif /* _MAPPING_H_ */
