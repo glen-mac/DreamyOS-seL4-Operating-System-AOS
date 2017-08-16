@@ -182,6 +182,11 @@ frame_free(seL4_Word frame_id)
     free_index = LOW_WATERMARK - 1;
 }
 
+seL4_ARM_Page
+get_frame_capabilty(seL4_Word frame_id)
+{
+    return frame_table[frame_id].cap;
+}
 
 /*
  * Private function to unmap a page, delete the capability and release memory back to UT manager

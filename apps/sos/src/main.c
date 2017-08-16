@@ -163,17 +163,27 @@ void syscall_loop(seL4_CPtr ep) {
             if (badge & IRQ_BADGE_NETWORK) {
                 network_irq();
             } else if (badge & IRQ_BADGE_TIMER) {
-                dprintf(0, "Timer interrupt\n");
                 timer_interrupt();
             }
 
         } else if (label == seL4_VMFault) {
-            /* Page fault */
-            dprintf(0, "vm fault at 0x%08x, pc = 0x%08x, %s\n", seL4_GetMR(1),
-                    seL4_GetMR(0),
-                    seL4_GetMR(2) ? "Instruction Fault" : "Data fault");
+            seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
+            assert(reply_cap != CSPACE_NULL);
 
-            assert(!"Unable to handle vm faults");
+            seL4_Word fault_addr = seL4_GetMR(1);
+            seL4_Word pc = seL4_GetMR(0);
+            seL4_Word fault_type = seL4_GetMR(2);
+            sos_map_page(fault_addr, tty_test_process.vroot, tty_test_process.croot);
+
+            /* Page fault */
+            dprintf(0, "vm fault at 0x%08x, pc = 0x%08x, %s\n",
+                    fault_addr, pc, fault_type ? "Instruction Fault" : "Data fault");
+
+            seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);
+            seL4_SetMR(0, 0);
+            seL4_Send(reply_cap, reply);
+
+            // assert(!"Unable to handle vm faults");
         } else if (label == seL4_NoFault) {
             /* System call */
             handle_syscall(badge, seL4_MessageInfo_get_length(message) - 1);
@@ -269,6 +279,7 @@ void start_first_process(char* app_name, seL4_CPtr fault_ep) {
                                 seL4_PageDirBits,
                                 cur_cspace,
                                 &tty_test_process.vroot);
+
     conditional_panic(err, "Failed to allocate page directory cap for client");
 
     /* Create a simple 1 level CSpace */
@@ -473,7 +484,7 @@ int main(void) {
     /* Initialise timer with badged capability */
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
-
+        
     /* Start the user application */
     start_first_process(TTY_NAME, _sos_ipc_ep_cap);
 

@@ -12,6 +12,7 @@
 #define _MAPPING_H_
 
 #include <sel4/sel4.h>
+#include <cspace/cspace.h>
 
  /**
  * Maps a page into a page table. 
@@ -36,5 +37,14 @@ int map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr,
  * @return The new virtual address of the device
  */
 void* map_device(void* paddr, int size);
+
+
+/*
+ *
+ *
+ *
+ */
+int sos_map_page(seL4_Word fault_addr, seL4_ARM_PageDirectory address_space, cspace_t *croot);
+
 
 #endif /* _MAPPING_H_ */

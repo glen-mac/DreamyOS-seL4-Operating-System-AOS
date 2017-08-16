@@ -12,11 +12,13 @@
 
 #include <ut_manager/ut.h>
 #include "vmem_layout.h"
+#include "frametable.h"
 
-#define verbose 0
+#define verbose 1
 #include <sys/panic.h>
 #include <sys/debug.h>
 #include <cspace/cspace.h>
+#include <utils/page.h>
 
 extern const seL4_BootInfo* _boot_info;
 
@@ -106,3 +108,22 @@ map_device(void* paddr, int size){
 }
 
 
+int
+sos_map_page(seL4_Word fault_addr, seL4_ARM_PageDirectory address_space, cspace_t *croot)
+{
+    seL4_Word page_id = PAGE_ALIGN_4K(fault_addr);
+    dprintf(0, "page id is %p\n", page_id);
+
+    seL4_Word frame_vaddr;
+    seL4_Word frame_id = frame_alloc(&frame_vaddr);
+
+    seL4_ARM_Page frame_cap = get_frame_capabilty(frame_id);
+    dprintf(0, "frame_cap %p\n", frame_cap);
+
+    /* Destination, Source */
+    seL4_CPtr new_frame_cap = cspace_copy_cap(cur_cspace, cur_cspace, frame_cap, seL4_AllRights);
+    assert(map_page(new_frame_cap, address_space, page_id, seL4_AllRights, seL4_ARM_Default_VMAttributes) == 0);
+
+    dprintf(0, "This happened\n");
+    return 0;
+}
