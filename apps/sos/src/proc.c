@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include "proc.h"
 
+#define verbose 5
+#include <sys/debug.h>
+
 /*
  * Create a new address space region and add it to a proc region list
  * @param start the virtual addr where the region starts
@@ -10,7 +13,7 @@
  * @returns ptr to the new virtual region
  */
 vaddr_region *
-proc_create_region(seL4_Word start, seL4_Word size, proc_ctl_blk * proc) {
+proc_create_region(seL4_Word start, seL4_Word size, proc_ctl_blk * proc, seL4_Word permissions) {
     
     /* sanity check */
     if (proc == NULL)
@@ -30,6 +33,7 @@ proc_create_region(seL4_Word start, seL4_Word size, proc_ctl_blk * proc) {
     /* alter details of new region */
     new_region->vaddr_start = start;
     new_region->vaddr_end = start + size;
+    new_region->permissions = permissions;
     
     return new_region;
 }
@@ -66,3 +70,18 @@ end_add:
     return 0;
 }
 
+
+int
+proc_get_region(proc_ctl_blk *proc, seL4_Word vaddr, vaddr_region **region)
+{
+    vaddr_region *curr = proc->region_list;
+    while (curr != NULL) {
+        dprintf(0, "%p <= %p < %p\n", (uint32_t)curr->vaddr_start, (uint32_t)vaddr, (uint32_t)curr->vaddr_end);
+        if (vaddr >= curr->vaddr_start && vaddr < curr->vaddr_end) {
+            *region = curr;
+            return 0;
+        }
+        curr = curr->next_region;
+    }
+    return 1;
+}

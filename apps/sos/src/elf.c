@@ -89,7 +89,7 @@ static int load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
     assert(file_size <= segment_size);
 
     /* add the region to the curproc region list */
-    proc_add_region(proc_create_region(dst, segment_size, curproc), curproc);
+    proc_add_region(proc_create_region(dst, segment_size, curproc, permissions), curproc);
 
     /* We work a page at a time in the destination vspace. */
     unsigned long pos = 0;
@@ -156,7 +156,7 @@ int elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file) {
     /* map in the heap region after all other regions were added */
     assert(vaddr != 0);
     seL4_Word heap_loc = PAGE_ALIGN(vaddr+PAGESIZE);
-    vaddr_region *heap = proc_create_region(heap_loc, 0, curproc);
+    vaddr_region *heap = proc_create_region(heap_loc, 0, curproc, seL4_CanRead | seL4_CanWrite);
     proc_add_region(heap, curproc);
     curproc->region_heap = heap;
     LOG_INFO("heap start = %x, heap end = %x\n", curproc->region_heap->vaddr_start, curproc->region_heap->vaddr_end);

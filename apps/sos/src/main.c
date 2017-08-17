@@ -372,8 +372,10 @@ void start_first_process(char* app_name, seL4_CPtr fault_ep) {
     //                seL4_AllRights, seL4_ARM_Default_VMAttributes);
     // conditional_panic(err, "Unable to map stack IPC buffer for user app");
     /* create the region for the stack */
-    vaddr_region *stack = proc_create_region(PROCESS_STACK_TOP-PAGE_SIZE_4K, PAGE_SIZE_4K, curproc);
+    seL4_Word initial_stack_size = 2*PAGE_SIZE_4K; /* 1 guard page */
+    vaddr_region *stack = proc_create_region(PROCESS_STACK_TOP - initial_stack_size, initial_stack_size, curproc, seL4_CanRead | seL4_CanWrite);
     proc_add_region(stack, curproc);
+    curproc->region_stack = stack;
     
     /* Map in the IPC buffer for the thread */
     seL4_CPtr pt_cap;
@@ -382,7 +384,7 @@ void start_first_process(char* app_name, seL4_CPtr fault_ep) {
                    seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap);
     conditional_panic(err, "Unable to map IPC buffer for user app");
     /* create region for the ipc buffer */
-    vaddr_region *ipc_region = proc_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, curproc);
+    vaddr_region *ipc_region = proc_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, curproc, seL4_CanRead | seL4_CanWrite);
     proc_add_region(ipc_region, curproc);
 
 
