@@ -15,6 +15,7 @@
 #include <cspace/cspace.h>
 
 #include "elf.h"
+#include "proc.h"
 
 #include <vmem_layout.h>
 #include <ut_manager/ut.h>
@@ -82,10 +83,11 @@ static int load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
        zero-filling a newly allocated frame.
 
     */
-
-
-
+    
     assert(file_size <= segment_size);
+
+    /* add the region to the curproc region list */
+    proc_create_region(dst, segment_size, curproc);
 
     unsigned long pos;
 
