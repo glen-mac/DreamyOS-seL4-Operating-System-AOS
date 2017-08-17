@@ -36,8 +36,11 @@ seL4_Word frame_alloc(seL4_Word *vaddr);
  */
 void frame_free(seL4_Word vaddr);
 
-
-/* Return frame capability for a frame */
-seL4_ARM_Page get_frame_capabilty(seL4_Word frame_id);
+/*
+ * Return the capabilty for a frame
+ * @param frame_id, id of the frame to lookup
+ * @return capability of the frame, NULL on error.
+ */
+seL4_ARM_Page frame_table_get_capability(seL4_Word frame_id);
 
 #endif /* FRAMETABLE_H_ */
