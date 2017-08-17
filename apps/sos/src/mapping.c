@@ -12,7 +12,9 @@
 
 #include <ut_manager/ut.h>
 #include "vmem_layout.h"
+#include "proc.h"
 #include "frametable.h"
+#include "pagetable.h"
 
 #define verbose 1
 #include <sys/panic.h>
@@ -117,15 +119,21 @@ sos_map_page(seL4_Word fault_addr, seL4_ARM_PageDirectory address_space)
     seL4_Word frame_vaddr;
     seL4_Word frame_id = frame_alloc(&frame_vaddr);
 
-    seL4_ARM_Page frame_cap = get_frame_capabilty(frame_id);
-    dprintf(0, "frame_cap %p\n", frame_cap);
+    seL4_ARM_Page frame_cap = frame_table_get_capability(frame_id);
+    assert(frame_cap);
 
-    seL4_ARM_Page_GetAddress_t addr = seL4_ARM_Page_GetAddress(frame_cap);
-    dprintf(0, "address is %p\n", addr.paddr);
+    // seL4_ARM_Page_GetAddress_t addr = seL4_ARM_Page_GetAddress(frame_cap);
+    // dprintf(0, "address is %p\n", addr.paddr);
 
-    /* Destination, Source */
+    /*
+     * In order to map the frame into the applications address space, we must first copy the capability
+     * Because we have already used the cap to map the frame into SOS's address space.
+     */
     seL4_CPtr new_frame_cap = cspace_copy_cap(cur_cspace, cur_cspace, frame_cap, seL4_AllRights);
     assert(map_page(new_frame_cap, address_space, page_id, seL4_AllRights, seL4_ARM_Default_VMAttributes) == 0);
+
+    /* Insert the capability into the processes 2-level page table */
+    assert(page_directory_insert(curproc.page_directory, page_id, new_frame_cap) == 0);
 
     return 0;
 }

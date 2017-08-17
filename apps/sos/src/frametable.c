@@ -182,10 +182,27 @@ frame_free(seL4_Word frame_id)
     free_index = LOW_WATERMARK - 1;
 }
 
-seL4_ARM_Page
-get_frame_capabilty(seL4_Word frame_id)
+seL4_ARM_Page 
+frame_table_get_capability(seL4_Word frame_id)
 {
-    return frame_table[frame_id].cap;
+    /* Check if frame_table is initialised */
+    if (!frame_table)
+        return (seL4_ARM_Page)NULL;
+
+    /* Check if address is within frame_table bounds */
+    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
+        LOG_ERROR("frame_id: %d out of bounds", frame_id);
+        return (seL4_ARM_Page)NULL;
+    }
+
+    seL4_ARM_Page cap = frame_table[frame_id].cap;
+    /* Check if capability exists */
+    if (!cap) {
+        LOG_ERROR("capability for frame_id: %d does not exist", frame_id);
+        return (seL4_ARM_Page)NULL;
+    }
+
+    return cap;
 }
 
 /*
