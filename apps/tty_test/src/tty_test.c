@@ -104,29 +104,24 @@ static void
 test_m3(void)
 {
     /* need a decent sized stack */
-//    char buf1[NPAGES * PAGE_SIZE_4K];
+    char buf1[NPAGES * PAGE_SIZE_4K];
 
     /* check the stack is above phys mem */
-//    assert((void *) buf1 > (void *) TEST_ADDRESS);
-    
-    /* stack test */
-    /* set */
-//    for (int i = 0; i < NPAGES; i++) {
-//        buf1[i * PAGE_SIZE_4K] = i;
-//    }
-    /* check */
-//    for (int i = 0; i < NPAGES; i++) {
-//        assert(buf1[i * PAGE_SIZE_4K] == i);
-//    }
+    assert((void *) buf1 > (void *) TEST_ADDRESS);
 
-    /* This should generate a Read fault type */
-//    seL4_Word *addr = (seL4_Word *)TEST_ADDRESS;
+    do_pt_test(buf1);
 
+    /* This should generate a Read fault type  */
+    seL4_Word *addr = (seL4_Word *)TEST_ADDRESS;
 
-    // /* heap test */
+    /* heap test */
     char *buf2 = malloc(NPAGES * PAGE_SIZE_4K);
     assert(buf2);
     do_pt_test(buf2);
     free(buf2);
+
+    /* This should generate a permissions fault, we cant write to the code section */
+    addr = (seL4_Word *)0x00008000;
+    *addr = 5;
 }
 

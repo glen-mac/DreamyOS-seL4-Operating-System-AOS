@@ -8,6 +8,7 @@
 
 #define verbose 5
 #include <sys/debug.h>
+#include <sys/panic.h>
 #include <assert.h>
 #include <utils/page.h>
 
@@ -43,6 +44,9 @@ vm_fault(seL4_Word fault_addr, seL4_Word pc, seL4_Word fault_type, seL4_Word fau
     seL4_Word fault_status = get_fault_status(fault_cause);
     dprintf(0, "Access type %s, fault_status %d\n", access_type? "Write": "Read", fault_status);
     dprintf(0, "vm fault at 0x%08x, pc = 0x%08x, %s\n", fault_addr, pc, fault_type ? "Instruction Fault" : "Data fault");
+
+    if (fault_status == PERMISSION_FAULT_PAGE)
+        panic("Incorrect permissions!");
 
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
     assert(reply_cap != CSPACE_NULL);
