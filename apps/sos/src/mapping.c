@@ -133,7 +133,7 @@ sos_map_page(seL4_Word fault_addr, seL4_ARM_PageDirectory address_space)
     assert(map_page(new_frame_cap, address_space, page_id, seL4_AllRights, seL4_ARM_Default_VMAttributes) == 0);
 
     /* Insert the capability into the processes 2-level page table */
-    assert(page_directory_insert(curproc.page_directory, page_id, new_frame_cap) == 0);
+    assert(page_directory_insert(curproc->page_directory, page_id, new_frame_cap) == 0);
 
     return 0;
 }
