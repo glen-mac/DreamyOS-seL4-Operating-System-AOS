@@ -23,10 +23,11 @@
  * @param vaddr The virtual address for the mapping
  * @param rights The access rights for the mapping
  * @param attr The VM attributes to use for the mapping
+ * @param pt_cap, the cap of the page table that may have been created. Will be NULL if was not created
  * @return 0 on success
  */
 int map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr, 
-                seL4_CapRights rights, seL4_ARM_VMAttributes attr);
+                seL4_CapRights rights, seL4_ARM_VMAttributes attr, seL4_CPtr *pt_cap);
  
  /**
  * Maps a device to virtual memory
@@ -44,7 +45,7 @@ void* map_device(void* paddr, int size);
  *
  *
  */
-int sos_map_page(seL4_Word fault_addr, seL4_ARM_PageDirectory address_space);
+int sos_map_page(seL4_Word vaddr, seL4_ARM_PageDirectory address_space, unsigned long permissions, seL4_Word *kvaddr);
 
 
 #endif /* _MAPPING_H_ */

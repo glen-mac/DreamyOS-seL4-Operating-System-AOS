@@ -51,8 +51,8 @@ int main(void) {
     /* initialise communication */
     ttyout_init();
 
+    test_m0();
     test_m3();
-
     return 0;
 }
 

@@ -9,6 +9,7 @@
 #define verbose 5
 #include <sys/debug.h>
 #include <assert.h>
+#include <utils/page.h>
 
 #include "mapping.h"
 #include "proc.h"
@@ -46,7 +47,9 @@ vm_fault(seL4_Word fault_addr, seL4_Word pc, seL4_Word fault_type, seL4_Word fau
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
     assert(reply_cap != CSPACE_NULL);
     
-    sos_map_page(fault_addr, curproc->vroot);
+    unsigned long permissions = seL4_CanRead | seL4_CanWrite;
+    seL4_Word kvaddr;
+    assert(sos_map_page(PAGE_ALIGN_4K(fault_addr), curproc->vroot, permissions, &kvaddr) == 0);
 
     seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);
     seL4_SetMR(0, 0);

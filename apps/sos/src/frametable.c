@@ -205,6 +205,13 @@ frame_table_get_capability(seL4_Word frame_id)
     return cap;
 }
 
+seL4_Word
+frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr)
+{
+    seL4_Word paddr = sos_vaddr - PHYSICAL_VSTART;
+    return ADDR_TO_INDEX(paddr);
+}
+
 /*
  * Private function to unmap a page, delete the capability and release memory back to UT manager
  * @param frame_id, id of the frame to release. Index into the frame table.
@@ -245,7 +252,8 @@ retype_and_map(seL4_Word paddr, seL4_Word vaddr, seL4_ARM_Page *frame_cap)
     if (cspace_ut_retype_addr(paddr, seL4_ARM_SmallPageObject, seL4_PageBits, cur_cspace, frame_cap) != 0)
         return 1;
 
-    if (map_page(*frame_cap, seL4_CapInitThreadPD, vaddr, seL4_AllRights, seL4_ARM_Default_VMAttributes) != 0)
+    seL4_CPtr pt_cap;
+    if (map_page(*frame_cap, seL4_CapInitThreadPD, vaddr, seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap) != 0)
         return 1;
 
     return 0;

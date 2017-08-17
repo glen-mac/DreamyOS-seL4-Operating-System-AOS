@@ -376,9 +376,10 @@ void start_first_process(char* app_name, seL4_CPtr fault_ep) {
     proc_add_region(stack, curproc);
     
     /* Map in the IPC buffer for the thread */
+    seL4_CPtr pt_cap;
     err = map_page(tty_test_process->ipc_buffer_cap, tty_test_process->vroot,
                    PROCESS_IPC_BUFFER,
-                   seL4_AllRights, seL4_ARM_Default_VMAttributes);
+                   seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap);
     conditional_panic(err, "Unable to map IPC buffer for user app");
     /* create region for the ipc buffer */
     vaddr_region *ipc_region = proc_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, curproc);

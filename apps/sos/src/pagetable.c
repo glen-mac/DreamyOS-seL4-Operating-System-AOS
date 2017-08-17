@@ -61,7 +61,7 @@ page_directory_insert(page_directory_t *table, seL4_Word vaddr, seL4_CPtr cap)
    /* LOG_INFO("directory %p", directory);
     LOG_INFO("directory index %u", directory_index);
     LOG_INFO("table index %u", table_index);
-*/
+    */
     /* Alloc the second level if it doesnt exist */
     if (!directory[directory_index]) {
         LOG_INFO("Creating second level page table at index %d", directory_index);

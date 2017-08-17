@@ -31,9 +31,9 @@ extern const seL4_BootInfo* _boot_info;
  * @return 0 on success
  */
 static int 
-_map_page_table(seL4_ARM_PageDirectory pd, seL4_Word vaddr){
+_map_page_table(seL4_ARM_PageDirectory pd, seL4_Word vaddr, seL4_CPtr *pt_cap)
+{
     seL4_Word pt_addr;
-    seL4_ARM_PageTable pt_cap;
     int err;
 
     /* Allocate a PT object */
@@ -46,12 +46,12 @@ _map_page_table(seL4_ARM_PageDirectory pd, seL4_Word vaddr){
                                  seL4_ARM_PageTableObject,
                                  seL4_PageTableBits,
                                  cur_cspace,
-                                 &pt_cap);
+                                 pt_cap);
     if(err){
         return !0;
     }
     /* Tell seL4 to map the PT in for us */
-    err = seL4_ARM_PageTable_Map(pt_cap, 
+    err = seL4_ARM_PageTable_Map(*pt_cap, 
                                  pd, 
                                  vaddr, 
                                  seL4_ARM_Default_VMAttributes);
@@ -60,14 +60,16 @@ _map_page_table(seL4_ARM_PageDirectory pd, seL4_Word vaddr){
 
 int 
 map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr, 
-                seL4_CapRights rights, seL4_ARM_VMAttributes attr){
+                seL4_CapRights rights, seL4_ARM_VMAttributes attr, seL4_CPtr *pt_cap)
+{
     int err;
+    *pt_cap = (seL4_CPtr)NULL; /* kernel cap only set if we mapped in a 2nd level page table */
 
     /* Attempt the mapping */
     err = seL4_ARM_Page_Map(frame_cap, pd, vaddr, rights, attr);
     if(err == seL4_FailedLookup){
         /* Assume the error was because we have no page table */
-        err = _map_page_table(pd, vaddr);
+        err = _map_page_table(pd, vaddr, pt_cap);
         if(!err){
             /* Try the mapping again */
             err = seL4_ARM_Page_Map(frame_cap, pd, vaddr, rights, attr);
@@ -77,8 +79,9 @@ map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr,
     return err;
 }
 
-void* 
-map_device(void* paddr, int size){
+void * 
+map_device(void* paddr, int size)
+{
     static seL4_Word virt = DEVICE_START;
     seL4_Word phys = (seL4_Word)paddr;
     seL4_Word vstart = virt;
@@ -88,6 +91,8 @@ map_device(void* paddr, int size){
     while(virt - vstart < size){
         seL4_Error err;
         seL4_ARM_Page frame_cap;
+        seL4_CPtr pt_cap;
+
         /* Retype the untype to a frame */
         err = cspace_ut_retype_addr(phys,
                                     seL4_ARM_SmallPageObject,
@@ -100,7 +105,8 @@ map_device(void* paddr, int size){
                        seL4_CapInitThreadPD, 
                        virt, 
                        seL4_AllRights,
-                       0);
+                       0,
+                       &pt_cap);
         conditional_panic(err, "Unable to map device");
         /* Next address */
         phys += (1 << seL4_PageBits);
@@ -111,13 +117,12 @@ map_device(void* paddr, int size){
 
 
 int
-sos_map_page(seL4_Word fault_addr, seL4_ARM_PageDirectory address_space)
+sos_map_page(seL4_Word page_id, seL4_ARM_PageDirectory address_space, unsigned long permissions, seL4_Word *kvaddr)
 {
-    seL4_Word page_id = PAGE_ALIGN_4K(fault_addr);
-    dprintf(0, "page id is %p\n", page_id);
+    assert(IS_ALIGNED_4K(page_id));
 
-    seL4_Word frame_vaddr;
-    seL4_Word frame_id = frame_alloc(&frame_vaddr);
+    seL4_Word frame_id = frame_alloc(kvaddr);
+    assert(frame_id != -1);
 
     seL4_ARM_Page frame_cap = frame_table_get_capability(frame_id);
     assert(frame_cap);
@@ -130,10 +135,15 @@ sos_map_page(seL4_Word fault_addr, seL4_ARM_PageDirectory address_space)
      * Because we have already used the cap to map the frame into SOS's address space.
      */
     seL4_CPtr new_frame_cap = cspace_copy_cap(cur_cspace, cur_cspace, frame_cap, seL4_AllRights);
-    assert(map_page(new_frame_cap, address_space, page_id, seL4_AllRights, seL4_ARM_Default_VMAttributes) == 0);
+    assert(new_frame_cap);
+
+    seL4_CPtr pt_cap;
+    assert(map_page(new_frame_cap, address_space, page_id, permissions, seL4_ARM_Default_VMAttributes, &pt_cap) == 0);
 
     /* Insert the capability into the processes 2-level page table */
     assert(page_directory_insert(curproc->page_directory, page_id, new_frame_cap) == 0);
+
+    /* TODO: keep track of pt_cap */
 
     return 0;
 }
