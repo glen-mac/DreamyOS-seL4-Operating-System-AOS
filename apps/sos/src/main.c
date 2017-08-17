@@ -69,8 +69,10 @@ const seL4_BootInfo* _boot_info;
 /*
  * A dummy starting syscall
  */
+// TODO: make these global so user libraries can reference these defines too
 #define SOS_SYSCALL0 0
 #define SOS_SYSCALL_WRITE 1
+#define SOS_SYSCALL_BRK 2
 
 seL4_CPtr _sos_ipc_ep_cap;
 seL4_CPtr _sos_interrupt_ep_cap;
@@ -126,6 +128,35 @@ void handle_syscall(seL4_Word badge, size_t nwords) {
         seL4_Send(reply_cap, reply);
 
         break;
+
+    case SOS_SYSCALL_BRK:
+        dprintf(0, "syscall: thread made sos_brk\n");
+        
+        seL4_Word newbrk = seL4_GetMR(1);
+        seL4_Word * heap_b = &curproc->region_heap->vaddr_start;
+        seL4_Word * heap_t = &curproc->region_heap->vaddr_end;
+
+        /* will return status code and addr */
+        reply = seL4_MessageInfo_new(0, 0, 0, 2);
+
+        /* set return value as okay by default */
+        seL4_SetMR(0, 0);
+        
+        /* if we actually desire to change heap brk */
+        if (newbrk) {
+            /* if the newbrk is silly, then we change return value */
+            if (*heap_b > newbrk)
+                seL4_SetMR(0, 1);
+            /* otherwise we change the brk */
+            else 
+                *heap_t = newbrk;
+        }
+        
+        seL4_SetMR(1, *heap_t);
+        seL4_Send(reply_cap, reply);
+
+        break;
+
     default:
         printf("%s:%d (%s) Unknown syscall %d\n",
                    __FILE__, __LINE__, __func__, syscall_number);
@@ -340,13 +371,22 @@ void start_first_process(char* app_name, seL4_CPtr fault_ep) {
     //                PROCESS_STACK_TOP - (1 << seL4_PageBits),
     //                seL4_AllRights, seL4_ARM_Default_VMAttributes);
     // conditional_panic(err, "Unable to map stack IPC buffer for user app");
-
+    /* create the region for the stack */
+    vaddr_region *stack = proc_create_region(PROCESS_STACK_TOP-PAGE_SIZE_4K, PAGE_SIZE_4K, curproc);
+    proc_add_region(stack, curproc);
+    
     /* Map in the IPC buffer for the thread */
     err = map_page(tty_test_process->ipc_buffer_cap, tty_test_process->vroot,
                    PROCESS_IPC_BUFFER,
                    seL4_AllRights, seL4_ARM_Default_VMAttributes);
     conditional_panic(err, "Unable to map IPC buffer for user app");
-    proc_create_region(PROCESS_IPC_BUFFER, seL4_PageBits, curproc);
+    /* create region for the ipc buffer */
+    vaddr_region *ipc_region = proc_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, curproc);
+    proc_add_region(ipc_region, curproc);
+
+
+    dprintf(1, "********** heap start is %x and top is %x\n", curproc->region_heap->vaddr_start, curproc->region_heap->vaddr_end);
+
 
     /* Start the new process */
     memset(&context, 0, sizeof(context));

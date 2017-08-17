@@ -13,6 +13,7 @@
 #include <string.h>
 #include <assert.h>
 #include <cspace/cspace.h>
+#include <utils/util.h>
 
 #include "elf.h"
 #include "proc.h"
@@ -87,7 +88,7 @@ static int load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
     assert(file_size <= segment_size);
 
     /* add the region to the curproc region list */
-    proc_create_region(dst, segment_size, curproc);
+    proc_add_region(proc_create_region(dst, segment_size, curproc), curproc);
 
     unsigned long pos;
 
@@ -146,6 +147,8 @@ static int load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
 
 int elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file) {
 
+    char *source_addr;
+    unsigned long flags, file_size, segment_size, vaddr = 0;
     int num_headers;
     int err;
     int i;
@@ -157,9 +160,7 @@ int elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file) {
 
     num_headers = elf_getNumProgramHeaders(elf_file);
     for (i = 0; i < num_headers; i++) {
-        char *source_addr;
-        unsigned long flags, file_size, segment_size, vaddr;
-
+        
         /* Skip non-loadable segments (such as debugging data). */
         if (elf_getProgramHeaderType(elf_file, i) != PT_LOAD)
             continue;
@@ -178,5 +179,13 @@ int elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file) {
         conditional_panic(err != 0, "Elf loading failed!\n");
     }
 
+    /* map in the heap region after all other regions were added */
+    assert(vaddr != 0);
+    seL4_Word heap_loc = PAGE_ALIGN(vaddr+PAGESIZE);
+    vaddr_region *heap = proc_create_region(heap_loc, 0, curproc);
+    proc_add_region(heap, curproc);
+    curproc->region_heap = heap;
+    LOG_INFO("heap start = %x, heap end = %x\n", curproc->region_heap->vaddr_start, curproc->region_heap->vaddr_end);
+    
     return 0;
 }

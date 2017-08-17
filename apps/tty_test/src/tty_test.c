@@ -84,34 +84,49 @@ test_m0(void)
     assert((size_t)seL4_GetMR(0) == max_msg_size);
 }
 
+static void
+do_pt_test(char *buf)
+{
+    int i;
+
+    /* set */
+    for (int i = 0; i < NPAGES; i++) {
+	    buf[i * PAGE_SIZE_4K] = i;
+    }
+
+    /* check */
+    for (int i = 0; i < NPAGES; i++) {
+	    assert(buf[i * PAGE_SIZE_4K] == i);
+    }
+}
 
 static void
 test_m3(void)
 {
     /* need a decent sized stack */
-    char buf1[NPAGES * PAGE_SIZE_4K];
+//    char buf1[NPAGES * PAGE_SIZE_4K];
 
     /* check the stack is above phys mem */
-    assert((void *) buf1 > (void *) TEST_ADDRESS);
+//    assert((void *) buf1 > (void *) TEST_ADDRESS);
     
     /* stack test */
     /* set */
-    for (int i = 0; i < NPAGES; i++) {
-        buf1[i * PAGE_SIZE_4K] = i;
-    }
+//    for (int i = 0; i < NPAGES; i++) {
+//        buf1[i * PAGE_SIZE_4K] = i;
+//    }
     /* check */
-    for (int i = 0; i < NPAGES; i++) {
-        assert(buf1[i * PAGE_SIZE_4K] == i);
-    }
+//    for (int i = 0; i < NPAGES; i++) {
+//        assert(buf1[i * PAGE_SIZE_4K] == i);
+//    }
 
     /* This should generate a Read fault type */
-    seL4_Word *addr = (seL4_Word *)TEST_ADDRESS;
+//    seL4_Word *addr = (seL4_Word *)TEST_ADDRESS;
 
 
     // /* heap test */
-    // char *buf2 = malloc(NPAGES * PAGE_SIZE_4K);
-    // assert(buf2);
-    // do_pt_test(buf2);
-    // free(buf2);
+    char *buf2 = malloc(NPAGES * PAGE_SIZE_4K);
+    assert(buf2);
+    do_pt_test(buf2);
+    free(buf2);
 }
 

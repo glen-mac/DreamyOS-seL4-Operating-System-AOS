@@ -2,22 +2,19 @@
 #include <stdlib.h>
 #include "proc.h"
 
-static int proc_add_region(proc_ctl_blk *, vaddr_region *);
-
 /*
  * Create a new address space region and add it to a proc region list
  * @param start the virtual addr where the region starts
  * @param end the virtual addr where the region ends
  * @param proc the process control block to add the region to
- * @returns 1 on error and 0 on success
+ * @returns ptr to the new virtual region
  */
-int
+vaddr_region *
 proc_create_region(seL4_Word start, seL4_Word size, proc_ctl_blk * proc) {
-    int result;
-
+    
     /* sanity check */
     if (proc == NULL)
-        return 1;
+        return NULL;
     
     /* check for stupid things */
     //if (size < 0)
@@ -28,20 +25,13 @@ proc_create_region(seL4_Word start, seL4_Word size, proc_ctl_blk * proc) {
     
     /* check if alloc failed */
     if (new_region == NULL)
-        return 1;
+        return NULL;
 
     /* alter details of new region */
     new_region->vaddr_start = start;
     new_region->vaddr_end = start + size;
     
-    /* add region to proc and return result */
-    result = proc_add_region(proc, new_region);
-    
-    /* make sure we don't leak memory on failure */
-    if (result)
-        free(new_region);
-
-    return result;
+    return new_region;
 }
 
 
@@ -51,8 +41,8 @@ proc_create_region(seL4_Word start, seL4_Word size, proc_ctl_blk * proc) {
  * @param region a pointer to a new region
  * @returns 1 on failure and 0 on success
  */
-static int
-proc_add_region(proc_ctl_blk * proc, vaddr_region *region) {
+int
+proc_add_region(vaddr_region *region, proc_ctl_blk *proc) {
     
     // TODO: make this insert in order of vaddr_start so they are in order
     

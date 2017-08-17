@@ -12,9 +12,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <sos.h>
 #include <sys/mman.h>
 #include <errno.h>
 #include <assert.h>
+
+#include <utils/util.h>
 
 /*
  * Statically allocated morecore area.
@@ -36,18 +39,11 @@ static uintptr_t morecore_top = (uintptr_t) &morecore_area[MORECORE_AREA_BYTE_SI
 long
 sys_brk(va_list ap)
 {
-
     uintptr_t ret;
     uintptr_t newbrk = va_arg(ap, uintptr_t);
 
-    /*if the newbrk is 0, return the bottom of the heap*/
-    if (!newbrk) {
-        ret = morecore_base;
-    } else if (newbrk < morecore_top && newbrk > (uintptr_t)&morecore_area[0]) {
-        ret = morecore_base = newbrk;
-    } else {
-        ret = 0;
-    }
+    ret = sos_sys_brk((seL4_Word)newbrk);
+    printf("sys_brk(%x) return %x\n",newbrk,ret);
 
     return ret;
 }
@@ -57,6 +53,7 @@ sys_brk(va_list ap)
 long
 sys_mmap2(va_list ap)
 {
+    LOG_INFO("SYS_MMAP2 BEING CALLED!!!");
     void *addr = va_arg(ap, void*);
     size_t length = va_arg(ap, size_t);
     int prot = va_arg(ap, int);

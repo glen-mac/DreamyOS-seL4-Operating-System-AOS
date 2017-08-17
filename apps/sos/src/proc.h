@@ -33,6 +33,7 @@ typedef struct {
     seL4_ARM_PageDirectory vroot;
 
     vaddr_region *region_list;              /* pointer to region LL */
+    vaddr_region *region_heap;              /* pointer to the heap region */
 
     page_directory_t *page_directory;
 
@@ -57,6 +58,14 @@ proc_ctl_blk sos_procs[MAX_PROCS];
  * @param proc the process control block to add the region to
  * @returns 1 on error and 0 on success
  */
-int proc_create_region(seL4_Word, seL4_Word, proc_ctl_blk *);
+vaddr_region * proc_create_region(seL4_Word, seL4_Word, proc_ctl_blk *);
+
+/*
+ * Add a region to a process control block region list
+ * @param proc a pointer to a process control block
+ * @param region a pointer to a new region
+ * @returns 1 on failure and 0 on success
+ */
+int proc_add_region(vaddr_region *, proc_ctl_blk *);
 
 #endif /* _PROC_H_ */
