@@ -143,7 +143,8 @@ sos_map_page(seL4_Word page_id, seL4_ARM_PageDirectory address_space, unsigned l
     /* Insert the capability into the processes 2-level page table */
     assert(page_directory_insert(curproc->page_directory, page_id, new_frame_cap) == 0);
 
-    /* TODO: keep track of pt_cap */
+    if (pt_cap)
+        assert(cap_table_insert(curproc->page_directory, page_id, pt_cap) == 0);
 
     return 0;
 }

@@ -50,4 +50,7 @@ seL4_ARM_Page frame_table_get_capability(seL4_Word frame_id);
  */
 seL4_Word frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr);
 
+
+seL4_Word four_frame_alloc(seL4_Word *vaddr);
+
 #endif /* FRAMETABLE_H_ */

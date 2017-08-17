@@ -9,20 +9,30 @@
 #include <assert.h>
 #include <strings.h>
 
+#include <sys/panic.h>
+
+#include "ut_manager/ut.h"
+#include "vmem_layout.h"
+
 #include <cspace/cspace.h>
 #include <utils/page.h>
 #include <utils/util.h>
 
 #include "frametable.h"
 
-#define DIRECTORY_OFFSET (32 - DIRECTORY_SIZE_BITS)
-#define TABLE_OFFSET (32 - DIRECTORY_SIZE_BITS - TABLE_SIZE_BITS)
+#define CAPS_SIZE_BITS 12
+
+#define DIRECTORY_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS)
+#define TABLE_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS - TABLE_SIZE_BITS)
+#define CAP_OFFSET (seL4_WordBits - CAPS_SIZE_BITS)
 
 #define DIRECTORY_MASK (MASK(DIRECTORY_SIZE_BITS) << DIRECTORY_OFFSET)
 #define TABLE_MASK (MASK(TABLE_SIZE_BITS) << TABLE_OFFSET)
+#define CAP_MASK (MASK(CAPS_SIZE_BITS) << CAP_OFFSET)
 
 #define DIRECTORY_INDEX(x) ((x & DIRECTORY_MASK) >> DIRECTORY_OFFSET)
 #define TABLE_INDEX(x) ((x & TABLE_MASK) >> TABLE_OFFSET)
+#define CAP_INDEX(x) ((x & CAP_MASK) >> CAP_OFFSET)
 
 page_directory_t *
 page_directory_create(void)
@@ -32,7 +42,7 @@ page_directory_create(void)
     if (frame_alloc(&directory_vaddr) == -1)
         return (page_directory_t *)NULL;
 
-    if (frame_alloc(&kernel_cap_table_vaddr) == -1)
+    if (four_frame_alloc(&kernel_cap_table_vaddr) == -1)
         return (page_directory_t *)NULL;
 
     page_directory_t *top_level = malloc(sizeof(page_directory_t));
@@ -46,10 +56,12 @@ page_directory_create(void)
 }
 
 int 
-page_directory_insert(page_directory_t *table, seL4_Word vaddr, seL4_CPtr cap)
+page_directory_insert(page_directory_t *table, seL4_Word page_id, seL4_CPtr cap)
 {
-    seL4_Word directory_index = DIRECTORY_INDEX(vaddr);
-    seL4_Word table_index = TABLE_INDEX(vaddr);
+    assert(IS_ALIGNED_4K(page_id));
+
+    seL4_Word directory_index = DIRECTORY_INDEX(page_id);
+    seL4_Word table_index = TABLE_INDEX(page_id);
 
     /* Error if table doesnt exist for some reason */
     if (!table || !(table->directory)) {
@@ -75,6 +87,22 @@ page_directory_insert(page_directory_t *table, seL4_Word vaddr, seL4_CPtr cap)
     seL4_Word *second_level = directory[directory_index];
     assert(second_level[table_index] == (seL4_CPtr)NULL); 
     second_level[table_index] = cap;
+
+    return 0;
+}
+
+int
+cap_table_insert(page_directory_t *table, seL4_Word page_id, seL4_CPtr cap)
+{
+    LOG_INFO("cap is %p", cap);
+
+    assert(IS_ALIGNED_4K(page_id));
+    seL4_Word index = CAP_INDEX(page_id);
+
+    seL4_CPtr *cap_table = table->kernel_cap_table;
+    LOG_INFO("index %u, value %p", index, cap_table[index]);
+    assert(!cap_table[index]);
+    cap_table[index] = cap;
 
     return 0;
 }

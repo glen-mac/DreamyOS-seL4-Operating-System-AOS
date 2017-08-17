@@ -212,6 +212,44 @@ frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr)
     return ADDR_TO_INDEX(paddr);
 }
 
+
+seL4_Word four_frame_alloc(seL4_Word *vaddr)
+{
+    seL4_Word paddr;
+    seL4_ARM_Page frame_cap;
+    seL4_Word p_id;
+
+    /* Grab a page sized chunk of untyped memory */
+    if ((paddr = ut_alloc(seL4_PageBits + 2)) == (seL4_Word)NULL) 
+        goto frame_alloc_error;
+
+    seL4_Word multi_frame_id = ADDR_TO_INDEX(paddr);
+
+    *vaddr = PHYSICAL_VSTART + paddr;
+    for (int i = 0; i < 4; i++) {
+        if (retype_and_map(paddr, *vaddr + (i * PAGE_SIZE_4K), &frame_cap) != 0)
+            goto frame_alloc_error;
+
+        /* Offset the paddr to align with our ut block */
+        p_id = ADDR_TO_INDEX(paddr);
+
+        /* Store the metadata in the frame table */
+        assert(frame_table[p_id].cap == (seL4_ARM_Page)NULL);
+        frame_table[p_id].cap = frame_cap;
+        frame_table_cnt++;
+        paddr += PAGE_SIZE_4K;
+    }
+
+    bzero((void *)(*vaddr), PAGE_SIZE_4K * 4);
+    return multi_frame_id;
+
+    /* On error, set the vaddr to null and return -1 */
+    frame_alloc_error:
+        LOG_ERROR("Unable to allocate frame");
+        *vaddr = (seL4_Word)NULL;
+        return -1;
+}
+
 /*
  * Private function to unmap a page, delete the capability and release memory back to UT manager
  * @param frame_id, id of the frame to release. Index into the frame table.
