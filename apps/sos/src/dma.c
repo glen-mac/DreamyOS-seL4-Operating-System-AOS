@@ -66,8 +66,9 @@ _dma_fill(seL4_Word pstart, seL4_Word pend, int cached){
                                         seL4_PageBits, cur_cspace, caps);
             assert(!err);
             /* Map in the frame */
+            seL4_CPtr pt_cap;
             err = map_page(*caps, seL4_CapInitThreadPD, VIRT(pstart), 
-                           seL4_AllRights, vm_attr);
+                           seL4_AllRights, vm_attr, &pt_cap);
             assert(!err);
         }
         /* Next */

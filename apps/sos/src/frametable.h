@@ -1,7 +1,6 @@
 /*
  * Frametable
- * Glenn McGuire and Cameron Lonsdale
- */
+ * Glenn McGuire and Cameron Lonsdale */
 
 #ifndef _FRAMETABLE_H_
 #define _FRAMETABLE_H_
@@ -42,5 +41,13 @@ void frame_free(seL4_Word vaddr);
  * @return capability of the frame, NULL on error.
  */
 seL4_ARM_Page frame_table_get_capability(seL4_Word frame_id);
+
+
+/*
+ * Given the SOS vaddr of the frame, return its index
+ * @param sos_vaddr, virtual address of the frame inside SOS address space
+ * @return id that corresponds to that vaddr
+ */
+seL4_Word frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr);
 
 #endif /* FRAMETABLE_H_ */

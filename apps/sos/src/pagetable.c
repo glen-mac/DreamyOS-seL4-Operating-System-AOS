@@ -58,7 +58,6 @@ page_directory_insert(page_directory_t *table, seL4_Word vaddr, seL4_CPtr cap)
     }
 
     seL4_Word *directory = table->directory;
-    LOG_INFO("directory %p", directory);
     LOG_INFO("directory index %u", directory_index);
     LOG_INFO("table index %u", table_index);
 
