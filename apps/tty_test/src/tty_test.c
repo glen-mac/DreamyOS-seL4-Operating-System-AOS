@@ -121,7 +121,7 @@ test_m3(void)
     free(buf2);
 
     /* This should generate a permissions fault, we cant write to the code section */
-    addr = (seL4_Word *)0x00008000;
-    *addr = 5;
+    //addr = (seL4_Word *)0x00008000;
+    //*addr = 5;
 }
 
