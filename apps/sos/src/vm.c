@@ -56,16 +56,27 @@ vm_fault(seL4_Word fault_addr, seL4_Word pc, seL4_Word fault_type, seL4_Word fau
     assert(reply_cap != CSPACE_NULL);
 
     vaddr_region *region;
+    seL4_Word not_in_region = proc_get_region(curproc, fault_addr, &region);
+    if (not_in_region) {
+        /* check if the addr lies between the heap end and stack end */
+        if (fault_addr >= curproc->region_heap->vaddr_end && fault_addr < curproc->region_stack->vaddr_start) {
+            /* if it is, we need to extend the stack! */
+            curproc->region_stack->vaddr_start = PAGE_ALIGN_4K(fault_addr);
+        }
+    }
+    
+    /* this assert should pass given the stack may have been extended */
     assert(proc_get_region(curproc, fault_addr, &region) == 0);
     assert(has_permissions(access_type, region->permissions));
     if (proc_get_region(curproc, fault_addr, &region) == 0 && has_permissions(access_type, region->permissions)) {
         seL4_Word kvaddr;
         assert(sos_map_page(PAGE_ALIGN_4K(fault_addr), curproc->vroot, region->permissions, &kvaddr) == 0);
 
-        if (region == curproc->region_stack) {
+        // not needed anymore due to the region update made above ^
+        /*if (region == curproc->region_stack) {
             region->vaddr_start -= PAGE_SIZE_4K;
             dprintf(0, "mapped more of the stack\n");
-        }
+        } */
     }
 
     seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);

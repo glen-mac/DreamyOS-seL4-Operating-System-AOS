@@ -159,7 +159,6 @@ int elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file) {
     vaddr_region *heap = proc_create_region(heap_loc, 0, curproc, seL4_CanRead | seL4_CanWrite);
     proc_add_region(heap, curproc);
     curproc->region_heap = heap;
-    LOG_INFO("heap start = %x, heap end = %x\n", curproc->region_heap->vaddr_start, curproc->region_heap->vaddr_end);
     
     return 0;
 }
