@@ -42,11 +42,12 @@ int map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr,
 void *map_device(void *paddr, int size);
 
 /*
- * Map a page into 
- *
- *
+ * Map a user level page into a process address space
+ * @param vaddr, the address of the page 
+ * @param as, the process address space
+ * @param permissions, the permissions of the page
+ * @param[out] kvaddr, the sos virtual address to access the physical memory
  */
-int sos_map_page(seL4_Word vaddr, addrspace *address_space, unsigned long permissions, seL4_Word *kvaddr);
-
+int sos_map_page(seL4_Word vaddr, addrspace *as, unsigned long permissions, seL4_Word *kvaddr);
 
 #endif /* _MAPPING_H_ */

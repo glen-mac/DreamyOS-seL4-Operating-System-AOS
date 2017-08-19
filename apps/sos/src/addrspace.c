@@ -108,3 +108,13 @@ as_find_region(addrspace *as, seL4_Word vaddr, region **found_region)
     }
     return 1;
 }
+
+int
+as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end)
+{
+    // TODO: Refactor this to check the addr doesnt collide with any other regions
+    if (start >= as->region_heap->vaddr_end && start < as->region_stack->vaddr_start)
+        return 0;
+
+    return 1;
+}

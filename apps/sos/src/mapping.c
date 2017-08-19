@@ -128,12 +128,19 @@ sos_map_page(seL4_Word page_id, addrspace *as, unsigned long permissions, seL4_W
     seL4_CPtr pt_cap;
     if (map_page(new_frame_cap, as->vspace, page_id, permissions, seL4_ARM_Default_VMAttributes, &pt_cap) != 0) {
         LOG_ERROR("Error mapping page");
-        cspace_delete_cap(cur_cspace, frame_cap);
+        cspace_delete_cap(cur_cspace, new_frame_cap);
         frame_free(frame_id);
         return 1;
     }
 
     /* Insert the capability into the processes 2-level page table */
-    assert(page_directory_insert(as->directory, page_id, new_frame_cap, pt_cap) == 0);
+    if (page_directory_insert(as->directory, page_id, new_frame_cap, pt_cap) != 0) {
+        LOG_ERROR("Error inserting into page directory");
+        seL4_ARM_Page_Unmap(new_frame_cap);
+        cspace_delete_cap(cur_cspace, new_frame_cap);
+        frame_free(frame_id);
+        return 1;
+    }
+
     return 0;
 }

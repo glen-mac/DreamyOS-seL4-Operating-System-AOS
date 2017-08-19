@@ -6,31 +6,15 @@
 
 #include "vm.h"
 
-#include <sel4/sel4.h>
-
-#include "vmem_layout.h"
+#include "frametable.h"
 #include "mapping.h"
 #include "proc.h"
 
+#include <utils/util.h>
 
 #define verbose 5
 #include <sys/debug.h>
 #include <sys/panic.h>
-#include <assert.h>
-#include <utils/page.h>
-
-
-#include <strings.h>
-
-#include <sys/panic.h>
-
-#include "ut_manager/ut.h"
-
-#include <cspace/cspace.h>
-#include <utils/page.h>
-#include <utils/util.h>
-
-#include "frametable.h"
 
 /* Fault handling */
 
@@ -43,8 +27,10 @@ static int has_permissions(seL4_Word access_type, seL4_Word permissions);
  * Architecture specifc interpretation of the the fault register
  * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.100511_0401_10_en/ric1447333676062.html
  */
-#define ACCESS_TYPE_MASK (1 << 11)
-#define ACCESS_TYPE(x) ((x & ACCESS_TYPE_MASK) >> 11)
+#define ACCESS_TYPE_BIT 11
+#define ACCESS_TYPE_MASK BIT(ACCESS_TYPE_BIT)
+#define ACCESS_TYPE(x) ((x & ACCESS_TYPE_MASK) >> ACCESS_TYPE_BIT)
+
 #define ACCESS_READ 0
 #define ACCESS_WRITE 1
 
@@ -57,6 +43,27 @@ static int has_permissions(seL4_Word access_type, seL4_Word permissions);
 #define PERMISSION_FAULT_PAGE 0b001111
 
 static seL4_Word get_fault_status(seL4_Word fault_cause);
+
+/*
+ * Two level page table operations
+ */
+
+#define DIRECTORY_SIZE_BITS 10
+#define TABLE_SIZE_BITS 10
+#define CAPS_INDEX_BITS 12
+
+#define DIRECTORY_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS)
+#define TABLE_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS - TABLE_SIZE_BITS)
+#define CAP_OFFSET (seL4_WordBits - CAPS_INDEX_BITS)
+
+#define DIRECTORY_MASK (MASK(DIRECTORY_SIZE_BITS) << DIRECTORY_OFFSET)
+#define TABLE_MASK (MASK(TABLE_SIZE_BITS) << TABLE_OFFSET)
+#define CAP_MASK (MASK(CAPS_INDEX_BITS) << CAP_OFFSET)
+
+#define DIRECTORY_INDEX(x) ((x & DIRECTORY_MASK) >> DIRECTORY_OFFSET)
+#define TABLE_INDEX(x) ((x & TABLE_MASK) >> TABLE_OFFSET)
+#define CAP_INDEX(x) ((x & CAP_MASK) >> CAP_OFFSET)
+
 
 void 
 vm_fault(void)
@@ -81,19 +88,17 @@ vm_fault(void)
 
     addrspace *as = curproc->p_addrspace;
 
+    /* Try to expand the stack */
     region *vaddr_region;
-    if (as_find_region(as, fault_addr, &vaddr_region) != 0) {
-        /* check if the addr lies between the heap end and stack end */
-        // TODO: Refactor this to check the addr doesnt collide with any other regions
-        if (fault_addr >= as->region_heap->vaddr_end && fault_addr < as->region_stack->vaddr_start) {
-            /* if it is, we need to extend the stack! */
-            as->region_stack->vaddr_start = PAGE_ALIGN_4K(fault_addr);
-        }
+    if (as_find_region(as, fault_addr, &vaddr_region) != 0 &&
+        as_region_collision_check(as, PAGE_ALIGN_4K(fault_addr), as->region_stack->vaddr_end) == 0) {
+        as->region_stack->vaddr_start = PAGE_ALIGN_4K(fault_addr);
     }
     
-    /* This assert should pass given the stack may have been extended */
+    /* Check if address belongs to a region and that region has permissions for the access type */
     if (as_find_region(as, fault_addr, &vaddr_region) == 0 && has_permissions(access_type, vaddr_region->permissions)) {
         seL4_Word kvaddr;
+
         // TODO: This can fail, we need to send ENOMEM to the process.
         assert(sos_map_page(PAGE_ALIGN_4K(fault_addr), as, vaddr_region->permissions, &kvaddr) == 0);
     }
@@ -104,50 +109,6 @@ vm_fault(void)
 
     cspace_free_slot(cur_cspace, reply_cap);
 }
-
-/* The status of the fault is indicated by bits 12, 10 and 3:0 all strung together */
-static seL4_Word
-get_fault_status(seL4_Word fault_cause)
-{
-    seL4_Word bit_12 = fault_cause & (1 << 12);
-    seL4_Word bit_10 = fault_cause & (1 << 10);
-    seL4_Word lower_bits = fault_cause & ((1 << 3) | (1 << 2) | (1 << 1) | (1 << 0));
-
-    return (bit_12 << 5) | (bit_10 << 4) | lower_bits;
-}
-
-
-static int
-has_permissions(seL4_Word access_type, seL4_Word permissions)
-{
-    if (access_type == ACCESS_READ && (permissions & seL4_CanRead))
-        return 1;
-
-    if (access_type == ACCESS_WRITE && (permissions & seL4_CanWrite))
-        return 1;
-
-    return 0;
-}
-
-/*
- * Two level page table operations
- */
-
-#define DIRECTORY_SIZE_BITS 10
-#define TABLE_SIZE_BITS 10
-#define CAPS_INDEX_BITS 12
-
-#define DIRECTORY_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS)
-#define TABLE_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS - TABLE_SIZE_BITS)
-#define CAP_OFFSET (seL4_WordBits - CAPS_INDEX_BITS)
-
-#define DIRECTORY_MASK (MASK(DIRECTORY_SIZE_BITS) << DIRECTORY_OFFSET)
-#define TABLE_MASK (MASK(TABLE_SIZE_BITS) << TABLE_OFFSET)
-#define CAP_MASK (MASK(CAPS_INDEX_BITS) << CAP_OFFSET)
-
-#define DIRECTORY_INDEX(x) ((x & DIRECTORY_MASK) >> DIRECTORY_OFFSET)
-#define TABLE_INDEX(x) ((x & TABLE_MASK) >> TABLE_OFFSET)
-#define CAP_INDEX(x) ((x & CAP_MASK) >> CAP_OFFSET)
 
 page_directory *
 page_directory_create(void)
@@ -176,7 +137,7 @@ page_directory_create(void)
     }
 
     top_level->directory = (seL4_Word *)directory_vaddr;
-    top_level->kernel_page_table_caps = (seL4_Word *)kernel_cap_table_vaddr;
+    top_level->kernel_page_table_caps = (seL4_CPtr *)kernel_cap_table_vaddr;
 
     return top_level;
 }
@@ -210,14 +171,40 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
     assert(second_level[table_index].page == (seL4_CPtr)NULL);
     second_level[table_index].page = cap;
 
+    /* Add the kernel cap to our bookkeeping table if one was given to us */
     if (kernel_cap) {
         seL4_Word index = CAP_INDEX(page_id);
 
         seL4_CPtr *cap_table = dir->kernel_page_table_caps;
         assert(!cap_table[index]);
         cap_table[index] = cap;
-        LOG_INFO("Kernel Cap inserted into %u", index);
+        LOG_INFO("kernel cap inserted into %u", index);
     }
+
+    return 0;
+}
+
+
+/* The status of the fault is indicated by bits 12, 10 and 3:0 all strung together */
+static seL4_Word
+get_fault_status(seL4_Word fault_cause)
+{
+    seL4_Word bit_12 = fault_cause & (1 << 12);
+    seL4_Word bit_10 = fault_cause & (1 << 10);
+    seL4_Word lower_bits = fault_cause & ((1 << 3) | (1 << 2) | (1 << 1) | (1 << 0));
+
+    return (bit_12 << 5) | (bit_10 << 4) | lower_bits;
+}
+
+
+static int
+has_permissions(seL4_Word access_type, seL4_Word permissions)
+{
+    if (access_type == ACCESS_READ && (permissions & seL4_CanRead))
+        return 1;
+
+    if (access_type == ACCESS_WRITE && (permissions & seL4_CanWrite))
+        return 1;
 
     return 0;
 }

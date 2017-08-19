@@ -32,6 +32,8 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
 {
     int err;
 
+    seL4_Word stack_addr;
+    seL4_CPtr stack_cap;
     seL4_CPtr user_ep_cap;
 
     /* These required for setting up the TCB */
@@ -42,6 +44,7 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
     unsigned long elf_size;
 
     tty_test_process->p_addrspace = as_create();
+    assert(tty_test_process->p_addrspace != NULL);
 
     /* Create a simple 1 level CSpace */
     tty_test_process->croot = cspace_create(1);
@@ -98,7 +101,7 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
     conditional_panic(err, "Failed to load elf image");
 
     /* Create a stack frame */
-    seL4_Word initial_stack_size = 2*PAGE_SIZE_4K; /* 1 guard page */
+    seL4_Word initial_stack_size = PAGE_SIZE_4K;
     region *stack = as_create_region(PROCESS_STACK_TOP - initial_stack_size, initial_stack_size, seL4_CanRead | seL4_CanWrite);
     as_add_region(curproc->p_addrspace, stack);
     curproc->p_addrspace->region_stack = stack;

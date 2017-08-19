@@ -8,39 +8,32 @@
  * @TAG(NICTA_BSD)
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
+#include <autoconf.h>
 
 #include <cspace/cspace.h>
-
 #include <cpio/cpio.h>
 #include <nfs/nfs.h>
 #include <elf/elf.h>
 #include <serial/serial.h>
 #include <clock/clock.h>
 #include <utils/page.h>
-#include <utils/math.h>
 #include <utils/util.h>
 
-#include "vm.h"
-#include "proc.h"
-#include "frametable.h"
-#include "network.h"
 #include "elf.h"
-
-#include "ut_manager/ut.h"
-#include "vmem_layout.h"
+#include "frametable.h"
 #include "mapping.h"
-
-#include "tests.h"
-
-#include <autoconf.h>
+#include "network.h"
+#include "proc.h"
+#include "ut_manager/ut.h"
+#include "vm.h"
+#include "vmem_layout.h"
 
 #define verbose 5
 #include <sys/debug.h>
 #include <sys/panic.h>
+
+/* For unit tests */
+#include "tests.h"
 
 /* This is the index where a clients syscall enpoint will
  * be stored in the clients cspace. */
@@ -78,6 +71,7 @@ const seL4_BootInfo *_boot_info;
 static void sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
 static void sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
 static void sos_driver_init(void);
+
 static seL4_CPtr badge_irq_ep(seL4_CPtr ep, seL4_Word badge);
 
 /*
@@ -376,6 +370,7 @@ seL4_CPtr badge_irq_ep(seL4_CPtr ep, seL4_Word badge)
 {
     seL4_CPtr badged_cap = cspace_mint_cap(cur_cspace, cur_cspace, ep, seL4_AllRights, seL4_CapData_Badge_new(badge | IRQ_EP_BADGE));
     conditional_panic(!badged_cap, "Failed to allocate badged cap");
+
     return badged_cap;
 }
 

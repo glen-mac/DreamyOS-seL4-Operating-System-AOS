@@ -100,6 +100,7 @@ load_segment_into_vspace(addrspace *as,
         seL4_Word vpage = PAGE_ALIGN_4K(dst);
 
         err = sos_map_page(vpage, as, permissions, &kdst);
+        // TODO: Return error instead of panicing
         conditional_panic(err, "mapping elf segment failed failed");
 
         /* Now copy our data into the destination vspace. */
