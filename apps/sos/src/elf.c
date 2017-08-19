@@ -8,15 +8,20 @@
  * @TAG(NICTA_BSD)
  */
 
+#include "elf.h"
+
 #include <sel4/sel4.h>
 #include <elf/elf.h>
 #include <string.h>
 #include <assert.h>
 #include <cspace/cspace.h>
-#include <utils/util.h>
 
-#include "elf.h"
+#include <utils/arith.h>
+#include <utils/util.h>
+#include <utils/page.h>
+
 #include "proc.h"
+#include "addrspace.h"
 #include "frametable.h"
 
 #include <vmem_layout.h>
@@ -27,21 +32,16 @@
 #include <sys/debug.h>
 #include <sys/panic.h>
 
-/* Minimum of two values. */
-#define MIN(a,b) (((a)<(b))?(a):(b))
-
-#define PAGESIZE              (1 << (seL4_PageBits))
-#define PAGEMASK              ((PAGESIZE) - 1)
-#define PAGE_ALIGN(addr)      ((addr) & ~(PAGEMASK))
-#define IS_PAGESIZE_ALIGNED(addr) !((addr) &  (PAGEMASK))
-
-
 extern seL4_ARM_PageDirectory dest_as;
 
 /*
  * Convert ELF permissions into seL4 permissions.
+ * @param permissions
+ * @return encoded permissions
  */
-static inline seL4_Word get_sel4_rights_from_elf(unsigned long permissions) {
+static inline seL4_Word
+get_sel4_rights_from_elf(unsigned long permissions)
+{
     seL4_Word result = 0;
 
     if (permissions & PF_R)
@@ -56,12 +56,13 @@ static inline seL4_Word get_sel4_rights_from_elf(unsigned long permissions) {
 
 /*
  * Inject data into the given vspace.
- * TODO: Don't keep these pages mapped in
  */
-static int load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
-                                    char *src, unsigned long segment_size,
-                                    unsigned long file_size, unsigned long dst,
-                                    unsigned long permissions) {
+static int
+load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
+                         char *src, unsigned long segment_size,
+                         unsigned long file_size, unsigned long dst,
+                         unsigned long permissions)
+{
 
     /* Overview of ELF segment loading
 
@@ -89,7 +90,7 @@ static int load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
     assert(file_size <= segment_size);
 
     /* add the region to the curproc region list */
-    proc_add_region(proc_create_region(dst, segment_size, curproc, permissions), curproc);
+    as_add_region(curproc->p_addrspace, as_create_region(dst, segment_size, permissions));
 
     /* We work a page at a time in the destination vspace. */
     unsigned long pos = 0;
@@ -98,19 +99,19 @@ static int load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
     int err;
 
     while (pos < segment_size) {
-        seL4_Word vpage = PAGE_ALIGN(dst);
+        seL4_Word vpage = PAGE_ALIGN_4K(dst);
 
-        err = sos_map_page(vpage, dest_as, permissions, &kdst);
+        err = sos_map_page(vpage, curproc->p_addrspace, permissions, &kdst);
         conditional_panic(err, "mapping elf segment failed failed");
 
         /* Now copy our data into the destination vspace. */
-        nbytes = PAGESIZE - (dst & PAGEMASK);
+        nbytes = PAGE_SIZE_4K - (dst & PAGE_MASK_4K);
         if (pos < file_size)
             memcpy((void*)kdst, (void*)src, MIN(nbytes, file_size - pos));
 
         /* Not observable to I-cache yet so flush the frame */
         seL4_Word frame_cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(kdst));
-        seL4_ARM_Page_Unify_Instruction(frame_cap, 0, PAGESIZE);
+        seL4_ARM_Page_Unify_Instruction(frame_cap, 0, PAGE_SIZE_4K);
 
         pos += nbytes;
         dst += nbytes;
@@ -119,21 +120,20 @@ static int load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
     return 0;
 }
 
-int elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file) {
-
+int
+elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file)
+{
     char *source_addr;
     unsigned long flags, file_size, segment_size, vaddr = 0;
     int num_headers;
     int err;
-    int i;
 
     /* Ensure that the ELF file looks sane. */
-    if (elf_checkFile(elf_file)){
+    if (elf_checkFile(elf_file))
         return seL4_InvalidArgument;
-    }
 
     num_headers = elf_getNumProgramHeaders(elf_file);
-    for (i = 0; i < num_headers; i++) {
+    for (int i = 0; i < num_headers; i++) {
         
         /* Skip non-loadable segments (such as debugging data). */
         if (elf_getProgramHeaderType(elf_file, i) != PT_LOAD)
@@ -147,18 +147,20 @@ int elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file) {
         flags = elf_getProgramHeaderFlags(elf_file, i);
 
         /* Copy it across into the vspace. */
-        dprintf(1, " * Loading segment %08x-->%08x\n", (int)vaddr, (int)(vaddr + segment_size));
+        // TODO: Should probably return error here instead of panicing.
+        dprintf(1, "* Loading segment %08x-->%08x\n", (int)vaddr, (int)(vaddr + segment_size));
         err = load_segment_into_vspace(dest_as, source_addr, segment_size, file_size, vaddr,
                                        get_sel4_rights_from_elf(flags) & seL4_AllRights);
         conditional_panic(err != 0, "Elf loading failed!\n");
     }
 
-    /* map in the heap region after all other regions were added */
+    /* Map in the heap region after all other regions were added */
+    // TOOD: Might be able to move this into create_proc and just grab the info from the end of LL of regions
     assert(vaddr != 0);
-    seL4_Word heap_loc = PAGE_ALIGN(vaddr+PAGESIZE);
-    vaddr_region *heap = proc_create_region(heap_loc, 0, curproc, seL4_CanRead | seL4_CanWrite);
-    proc_add_region(heap, curproc);
-    curproc->region_heap = heap;
+    seL4_Word heap_loc = PAGE_ALIGN_4K(vaddr + PAGE_SIZE_4K);
+    region *heap = as_create_region(heap_loc, 0, seL4_CanRead | seL4_CanWrite);
+    as_add_region(curproc->p_addrspace, heap);
+    curproc->p_addrspace->region_heap = heap;
     
     return 0;
 }

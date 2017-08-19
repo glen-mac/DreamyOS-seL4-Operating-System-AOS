@@ -6,15 +6,33 @@
 
 #include "vm.h"
 
+#include <sel4/sel4.h>
+
+#include "vmem_layout.h"
+#include "mapping.h"
+#include "proc.h"
+
+
 #define verbose 5
 #include <sys/debug.h>
 #include <sys/panic.h>
 #include <assert.h>
 #include <utils/page.h>
 
-#include "vmem_layout.h"
-#include "mapping.h"
-#include "proc.h"
+
+#include <strings.h>
+
+#include <sys/panic.h>
+
+#include "ut_manager/ut.h"
+
+#include <cspace/cspace.h>
+#include <utils/page.h>
+#include <utils/util.h>
+
+#include "frametable.h"
+
+/* Fault handling */
 
 #define INSTRUCTION_FAULT 1
 #define DATA_FAULT 0
@@ -42,35 +60,43 @@ static int has_permissions(seL4_Word access_type, seL4_Word permissions);
 static seL4_Word get_fault_status(seL4_Word fault_cause);
 
 void 
-vm_fault(seL4_Word fault_addr, seL4_Word pc, seL4_Word fault_type, seL4_Word fault_cause)
+vm_fault(void)
 {
-    seL4_Word access_type = ACCESS_TYPE(fault_cause);
-    seL4_Word fault_status = get_fault_status(fault_cause);
-    dprintf(0, "Access type %s, fault_status %d\n", access_type? "Write": "Read", fault_status);
-    dprintf(0, "vm fault at 0x%08x, pc = 0x%08x, %s\n", fault_addr, pc, fault_type ? "Instruction Fault" : "Data fault");
-
-    if (fault_status == PERMISSION_FAULT_PAGE)
-        panic("Incorrect permissions!");
+    /* Ordering defined by the kernel */
+    seL4_Word fault_pc = seL4_GetMR(0);
+    seL4_Word fault_addr = seL4_GetMR(1);
+    seL4_Word fault_type = seL4_GetMR(2);
+    seL4_Word fault_cause = seL4_GetMR(3);
 
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
     assert(reply_cap != CSPACE_NULL);
 
-    vaddr_region *region;
-    seL4_Word not_in_region = proc_get_region(curproc, fault_addr, &region);
+    seL4_Word access_type = ACCESS_TYPE(fault_cause);
+    seL4_Word fault_status = get_fault_status(fault_cause);
+
+    LOG_INFO("Access type %s, fault_status %d\n", access_type? "Write": "Read", fault_status);
+    LOG_INFO("Fault at 0x%08x, pc = 0x%08x, %s\n", fault_addr, fault_pc, fault_type ? "Instruction Fault" : "Data fault");
+
+    if (fault_status == PERMISSION_FAULT_PAGE)
+        panic("TODO: Kill the process; Incorrect permissions!");
+
+    
+    addrspace *as = curproc->p_addrspace;
+
+    region *vaddr_region;
+    seL4_Word not_in_region = as_find_region(as, fault_addr, &vaddr_region);
     if (not_in_region) {
         /* check if the addr lies between the heap end and stack end */
-        if (fault_addr >= curproc->region_heap->vaddr_end && fault_addr < curproc->region_stack->vaddr_start) {
+        if (fault_addr >= as->region_heap->vaddr_end && fault_addr < as->region_stack->vaddr_start) {
             /* if it is, we need to extend the stack! */
-            curproc->region_stack->vaddr_start = PAGE_ALIGN_4K(fault_addr);
+            as->region_stack->vaddr_start = PAGE_ALIGN_4K(fault_addr);
         }
     }
     
     /* this assert should pass given the stack may have been extended */
-    assert(proc_get_region(curproc, fault_addr, &region) == 0);
-    assert(has_permissions(access_type, region->permissions));
-    if (proc_get_region(curproc, fault_addr, &region) == 0 && has_permissions(access_type, region->permissions)) {
+    if (as_find_region(as, fault_addr, &vaddr_region) == 0 && has_permissions(access_type, vaddr_region->permissions)) {
         seL4_Word kvaddr;
-        assert(sos_map_page(PAGE_ALIGN_4K(fault_addr), curproc->vroot, region->permissions, &kvaddr) == 0);
+        assert(sos_map_page(PAGE_ALIGN_4K(fault_addr), as, vaddr_region->permissions, &kvaddr) == 0);
 
         // not needed anymore due to the region update made above ^
         /*if (region == curproc->region_stack) {
@@ -104,6 +130,90 @@ has_permissions(seL4_Word access_type, seL4_Word permissions)
 
     if (access_type == ACCESS_WRITE && (permissions & seL4_CanWrite))
         return 1;
+
+    return 0;
+}
+
+/* Page directory */
+
+#define DIRECTORY_SIZE_BITS 10
+#define TABLE_SIZE_BITS 10
+#define CAPS_INDEX_BITS 12
+
+#define DIRECTORY_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS)
+#define TABLE_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS - TABLE_SIZE_BITS)
+#define CAP_OFFSET (seL4_WordBits - CAPS_INDEX_BITS)
+
+#define DIRECTORY_MASK (MASK(DIRECTORY_SIZE_BITS) << DIRECTORY_OFFSET)
+#define TABLE_MASK (MASK(TABLE_SIZE_BITS) << TABLE_OFFSET)
+#define CAP_MASK (MASK(CAPS_INDEX_BITS) << CAP_OFFSET)
+
+#define DIRECTORY_INDEX(x) ((x & DIRECTORY_MASK) >> DIRECTORY_OFFSET)
+#define TABLE_INDEX(x) ((x & TABLE_MASK) >> TABLE_OFFSET)
+#define CAP_INDEX(x) ((x & CAP_MASK) >> CAP_OFFSET)
+
+page_directory *
+page_directory_create(void)
+{   
+    seL4_Word directory_vaddr;
+    seL4_Word kernel_cap_table_vaddr;
+    if (frame_alloc(&directory_vaddr) == -1)
+        return (page_directory *)NULL;
+
+    if (multi_frame_alloc(&kernel_cap_table_vaddr, BIT(seL4_PageDirBits - seL4_PageBits)) == -1)
+        return (page_directory *)NULL;
+
+    page_directory *top_level = malloc(sizeof(page_directory));
+    if (!top_level)
+        return (page_directory *)NULL;
+
+    top_level->directory = (seL4_Word *)directory_vaddr;
+    top_level->kernel_page_table_caps = (seL4_Word *)kernel_cap_table_vaddr;
+
+    return top_level;
+}
+
+int 
+page_directory_insert(page_directory *table, seL4_Word page_id, seL4_CPtr cap, seL4_CPtr kernel_cap)
+{
+    assert(IS_ALIGNED_4K(page_id));
+
+    seL4_Word directory_index = DIRECTORY_INDEX(page_id);
+    seL4_Word table_index = TABLE_INDEX(page_id);
+
+    /* Error if table doesnt exist for some reason */
+    if (!table || !(table->directory)) {
+        LOG_ERROR("Directory doesnt exist");
+        return 1;
+    }
+
+    seL4_Word *directory = table->directory;
+   /* LOG_INFO("directory %p", directory);
+    LOG_INFO("directory index %u", directory_index);
+    LOG_INFO("table index %u", table_index);
+    */
+    /* Alloc the second level if it doesnt exist */
+    if (!directory[directory_index]) {
+        LOG_INFO("Creating second level page table at index %d", directory_index);
+        seL4_Word page_table_vaddr;
+        if (frame_alloc(&page_table_vaddr) == -1)
+            return 1;
+
+        directory[directory_index] = (seL4_Word *)page_table_vaddr;
+    }
+
+    seL4_Word *second_level = directory[directory_index];
+    assert(second_level[table_index] == (seL4_CPtr)NULL); 
+    second_level[table_index] = cap;
+
+    if (kernel_cap) {
+        seL4_Word index = CAP_INDEX(page_id);
+
+        seL4_CPtr *cap_table = table->kernel_page_table_caps;
+        LOG_INFO("index %u, value %p", index, cap_table[index]);
+        assert(!cap_table[index]);
+        cap_table[index] = cap;
+    }
 
     return 0;
 }

@@ -14,7 +14,9 @@
 #include <sel4/sel4.h>
 #include <cspace/cspace.h>
 
- /**
+#include "addrspace.h"
+
+/*
  * Maps a page into a page table. 
  * A 2nd level table will be created if required
  *
@@ -27,9 +29,9 @@
  * @return 0 on success
  */
 int map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr, 
-                seL4_CapRights rights, seL4_ARM_VMAttributes attr, seL4_CPtr *pt_cap);
+             seL4_CapRights rights, seL4_ARM_VMAttributes attr, seL4_CPtr *pt_cap);
  
- /**
+/*
  * Maps a device to virtual memory
  * A 2nd level table will be created if required
  *
@@ -37,15 +39,14 @@ int map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr,
  * @param size the number of bytes that this device occupies
  * @return The new virtual address of the device
  */
-void* map_device(void* paddr, int size);
-
+void *map_device(void *paddr, int size);
 
 /*
  * Map a page into 
  *
  *
  */
-int sos_map_page(seL4_Word vaddr, seL4_ARM_PageDirectory address_space, unsigned long permissions, seL4_Word *kvaddr);
+int sos_map_page(seL4_Word vaddr, addrspace *address_space, unsigned long permissions, seL4_Word *kvaddr);
 
 
 #endif /* _MAPPING_H_ */

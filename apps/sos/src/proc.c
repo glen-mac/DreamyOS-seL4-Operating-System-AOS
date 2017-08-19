@@ -1,87 +1,124 @@
+/*
+ * Process Management
+ *
+ * Cameron Lonsdale & Glenn McGuire
+ */
+
+#include "proc.h"
+
 #include <sel4/sel4.h>
 #include <stdlib.h>
-#include "proc.h"
+#include "mapping.h"
+#include <string.h>
+#include <utils/page.h>
+
+#include <assert.h>
+#include <ut_manager/ut.h>
+#include <sys/panic.h>
+#include "vmem_layout.h"
+#include <cpio/cpio.h>
+#include "elf.h"
+#include <elf/elf.h>
+
 
 #define verbose 5
 #include <sys/debug.h>
 
-/*
- * Create a new address space region and add it to a proc region list
- * @param start the virtual addr where the region starts
- * @param end the virtual addr where the region ends
- * @param proc the process control block to add the region to
- * @returns ptr to the new virtual region
- */
-vaddr_region *
-proc_create_region(seL4_Word start, seL4_Word size, proc_ctl_blk * proc, seL4_Word permissions) {
-    
-    /* sanity check */
-    if (proc == NULL)
-        return NULL;
-    
-    /* check for stupid things */
-    //if (size < 0)
-    //    return 1;
-    
-    /* create new region */
-    vaddr_region *new_region = (vaddr_region *)malloc(sizeof(vaddr_region));
-    
-    /* check if alloc failed */
-    if (new_region == NULL)
-        return NULL;
-
-    /* alter details of new region */
-    new_region->vaddr_start = start;
-    new_region->vaddr_end = start + size;
-    new_region->permissions = permissions;
-    
-    return new_region;
-}
+#define TTY_PRIORITY         (0)
+#define TTY_EP_BADGE         (101)
 
 
-/*
- * Add a region to a process control block region list
- * @param proc a pointer to a process control block
- * @param region a pointer to a new region
- * @returns 1 on failure and 0 on success
- */
-int
-proc_add_region(vaddr_region *region, proc_ctl_blk *proc) {
-    
-    // TODO: make this insert in order of vaddr_start so they are in order
-    
-    /* early termination */
-    if (proc->region_list == NULL) {
-        proc->region_list = region;
-        goto end_add;
-    }
-
-    vaddr_region *cur_reg = proc->region_list;
-    vaddr_region *prev_reg = proc->region_list;
-    while (cur_reg != NULL) {
-        prev_reg = cur_reg;       
-        cur_reg = cur_reg->next_region;
-    }
-    prev_reg->next_region = region;
-    
-end_add:
-    region->next_region = NULL;
-
-    return 0;
-}
-
-
-int
-proc_get_region(proc_ctl_blk *proc, seL4_Word vaddr, vaddr_region **region)
+void
+start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
 {
-    vaddr_region *curr = proc->region_list;
-    while (curr != NULL) {
-        dprintf(0, "%p <= %p < %p\n", (uint32_t)curr->vaddr_start, (uint32_t)vaddr, (uint32_t)curr->vaddr_end);
-        if (vaddr >= curr->vaddr_start && vaddr < curr->vaddr_end) {
-            *region = curr;
-            return 0;
-        }
-        curr = curr->next_region;
-    }
-    return 1;
+    int err;
+
+    seL4_Word stack_addr;
+    seL4_CPtr stack_cap;
+    seL4_CPtr user_ep_cap;
+
+    /* These required for setting up the TCB */
+    seL4_UserContext context;
+
+    /* These required for loading program sections */
+    char* elf_base;
+    unsigned long elf_size;
+
+    tty_test_process->p_addrspace = as_create();
+
+    /* Create a simple 1 level CSpace */
+    tty_test_process->croot = cspace_create(1);
+    assert(tty_test_process->croot != NULL);
+
+    /* Create an IPC buffer */
+    tty_test_process->ipc_buffer_addr = ut_alloc(seL4_PageBits);
+    conditional_panic(!tty_test_process->ipc_buffer_addr, "No memory for ipc buffer");
+    err =  cspace_ut_retype_addr(tty_test_process->ipc_buffer_addr,
+                                 seL4_ARM_SmallPageObject,
+                                 seL4_PageBits,
+                                 cur_cspace,
+                                 &tty_test_process->ipc_buffer_cap);
+    conditional_panic(err, "Unable to allocate page for IPC buffer");
+
+    /* Copy the fault endpoint to the user app to enable IPC */
+    user_ep_cap = cspace_mint_cap(tty_test_process->croot,
+                                  cur_cspace,
+                                  fault_ep,
+                                  seL4_AllRights, 
+                                  seL4_CapData_Badge_new(TTY_EP_BADGE));
+    /* should be the first slot in the space, hack I know */
+    assert(user_ep_cap == 1);
+
+    /* Create a new TCB object */
+    tty_test_process->tcb_addr = ut_alloc(seL4_TCBBits);
+    conditional_panic(!tty_test_process->tcb_addr, "No memory for new TCB");
+    err =  cspace_ut_retype_addr(tty_test_process->tcb_addr,
+                                 seL4_TCBObject,
+                                 seL4_TCBBits,
+                                 cur_cspace,
+                                 &tty_test_process->tcb_cap);
+    conditional_panic(err, "Failed to create TCB");
+
+    /* Configure the TCB */
+    err = seL4_TCB_Configure(tty_test_process->tcb_cap, user_ep_cap, TTY_PRIORITY,
+                             tty_test_process->croot->root_cnode, seL4_NilData,
+                             tty_test_process->p_addrspace->vspace, seL4_NilData, PROCESS_IPC_BUFFER,
+                             tty_test_process->ipc_buffer_cap);
+    conditional_panic(err, "Unable to configure new TCB");
+
+    /* Provide a logical name for the thread -- Helpful for debugging */
+#ifdef SEL4_DEBUG_KERNEL
+    seL4_DebugNameThread(tty_test_process->tcb_cap, app_name);
+#endif
+
+    /* parse the cpio image */
+    dprintf(1, "\nStarting \"%s\"...\n", app_name);
+    elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size);
+    conditional_panic(!elf_base, "Unable to locate cpio header");
+
+    /* load the elf image */
+    err = elf_load(tty_test_process->p_addrspace->vspace, elf_base);
+    conditional_panic(err, "Failed to load elf image");
+
+    /* Create a stack frame */
+    seL4_Word initial_stack_size = 2*PAGE_SIZE_4K; /* 1 guard page */
+    region *stack = as_create_region(PROCESS_STACK_TOP - initial_stack_size, initial_stack_size, seL4_CanRead | seL4_CanWrite);
+    as_add_region(curproc->p_addrspace, stack);
+    curproc->p_addrspace->region_stack = stack;
+    
+    /* Map in the IPC buffer for the thread */
+    seL4_CPtr pt_cap;
+    err = map_page(tty_test_process->ipc_buffer_cap, tty_test_process->p_addrspace->vspace,
+                   PROCESS_IPC_BUFFER,
+                   seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap);
+    conditional_panic(err, "Unable to map IPC buffer for user app");
+    /* create region for the ipc buffer */
+    region *ipc_region = as_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
+    as_add_region(curproc->p_addrspace, ipc_region);
+
+    /* Start the new process */
+    memset(&context, 0, sizeof(context));
+    context.pc = elf_getEntryPoint(elf_base);
+    context.sp = PROCESS_STACK_TOP;
+    seL4_TCB_WriteRegisters(tty_test_process->tcb_cap, 1, 0, 2, &context);
 }

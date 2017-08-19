@@ -12,13 +12,18 @@
 #define _DEBUG_H_
 
 #include <stdio.h>
+#include <sel4/sel4.h>
 
+/*
+ * Print out the boot info
+ */
+void print_bootinfo(char *_cpio_archive, const seL4_BootInfo *info);
 
 void plogf(const char *msg, ...);
 
 #define _dprintf(v, col, args...) \
             do { \
-                if ((v) < verbose){ \
+                if ((v) < verbose) { \
                     printf(col); \
                     plogf(args); \
                     printf("\033[0;0m"); \

@@ -73,22 +73,25 @@ lwip_iface_t *lwip_iface;
  *******************/
 
 static void *
-sos_map_device(void* cookie, uintptr_t addr, size_t size, int cached, ps_mem_flags_t flags){
-    (void)cookie;
+sos_map_device(void *cookie, uintptr_t addr, size_t size, int cached, ps_mem_flags_t flags)
+{
     return map_device((void*)addr, size);
 }
 
 static void
-sos_unmap_device(void *cookie, void *addr, size_t size) {
+sos_unmap_device(void *cookie, void *addr, size_t size)
+{  
+    return;
 }
 
 void 
-sos_usleep(int usecs) {
+sos_usleep(int usecs)
+{
     /* We need to spin because we do not as yet have a timer interrupt */
-    while(usecs-- > 0){
+    while (usecs-- > 0){
         /* Assume 1 GHz clock */
         volatile int i = 1000;
-        while(i-- > 0);
+        while (i-- > 0);
         seL4_Yield();
     }
 
@@ -100,27 +103,31 @@ sos_usleep(int usecs) {
  *** IRQ handler ***
  *******************/
 void 
-network_irq(void) {
-    int err;
+network_irq(void)
+{
     /* skip if the network was not initialised */
-    if(_irq_ep == seL4_CapNull){
+    if(_irq_ep == seL4_CapNull)
         return;
-    }
+
     ethif_lwip_handle_irq(lwip_iface, _net_irqs[0].irq);
-    err = seL4_IRQHandler_Ack(_net_irqs[0].cap);
+    int err = seL4_IRQHandler_Ack(_net_irqs[0].cap);
     assert(!err);
 }
 
 static seL4_CPtr
-enable_irq(int irq, seL4_CPtr aep) {
+enable_irq(int irq, seL4_CPtr aep)
+{
     seL4_CPtr cap;
     int err;
+
     /* Create an IRQ handler */
     cap = cspace_irq_control_get_cap(cur_cspace, seL4_CapIRQControl, irq);
     conditional_panic(!cap, "Failed to acquire and IRQ control cap");
+
     /* Assign to an end point */
     err = seL4_IRQHandler_SetEndpoint(cap, aep);
     conditional_panic(err, "Failed to set interrupt endpoint");
+
     /* Ack the handler before continuing */
     err = seL4_IRQHandler_Ack(cap);
     conditional_panic(err, "Failure to acknowledge pending interrupts");
@@ -132,25 +139,28 @@ enable_irq(int irq, seL4_CPtr aep) {
  ********************/
 
 static void
-network_prime_arp(struct ip_addr *gw){
+network_prime_arp(struct ip_addr *gw)
+{
     int timeout = ARP_PRIME_TIMEOUT_MS;
-    struct eth_addr* eth;
-    struct ip_addr* ip;
-    while(timeout > 0){
+    struct eth_addr *eth;
+    struct ip_addr *ip;
+    while (timeout > 0){
         /* Send an ARP request */
         etharp_request(lwip_iface->netif, gw);
+
         /* Wait for the response */
         sos_usleep(ARP_PRIME_RETRY_DELAY_MS * 1000);
-        if(etharp_find_addr(lwip_iface->netif, gw, &eth, &ip) == -1){
+        if (etharp_find_addr(lwip_iface->netif, gw, &eth, &ip) == -1) {
             timeout += ARP_PRIME_RETRY_DELAY_MS;
-        }else{
+        } else {
             return;
         }
     }
 }
 
 void 
-network_init(seL4_CPtr interrupt_ep) {
+network_init(seL4_CPtr interrupt_ep)
+{
     struct ip_addr netmask, ipaddr, gw;
     int err;
 
@@ -159,6 +169,7 @@ network_init(seL4_CPtr interrupt_ep) {
         .io_map_fn = sos_map_device,
         .io_unmap_fn = sos_unmap_device
     };
+
     ps_dma_man_t dma_man = {
         .cookie = NULL,
         .dma_alloc_fn = sos_dma_malloc,
@@ -214,24 +225,22 @@ network_init(seL4_CPtr interrupt_ep) {
     network_prime_arp(&gw);
 
     /* initialise and mount NFS */
-    if(strlen(SOS_NFS_DIR)) {
+    if (strlen(SOS_NFS_DIR)) {
         /* Initialise NFS */
         int err;
         printf("\nMounting NFS\n");
-        if(!(err = nfs_init(&gw))){
+        if (!(err = nfs_init(&gw))) {
             /* Print out the exports on this server */
             nfs_print_exports();
             if ((err = nfs_mount(SOS_NFS_DIR, &mnt_point))){
                 printf("Error mounting path '%s'!\n", SOS_NFS_DIR);
-            }else{
+            } else {
                 printf("\nSuccessfully mounted '%s'\n", SOS_NFS_DIR);
             }
         }
-        if(err){
+        if (err)
             WARN("Failed to initialise NFS\n");
-        }
-    }else{
-        WARN("Skipping Network initialisation since no mount point was "
-             "specified\n");
+    } else {
+        WARN("Skipping Network initialisation since no mount point was specified\n");
     }
 }

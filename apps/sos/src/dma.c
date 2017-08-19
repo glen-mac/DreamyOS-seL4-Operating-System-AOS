@@ -25,21 +25,24 @@
 #include <mapping.h>
 #include <ut_manager/ut.h>
 #include <vmem_layout.h>
+#include <utils/arith.h>
 
 #define verbose 5
 #include <sys/debug.h>
 #include <sys/panic.h>
 
-#define DMA_SIZE     (_dma_pend - _dma_pstart)
-#define DMA_PAGES    (DMA_SIZE >> seL4_PageBits)
+#define DMA_SIZE (_dma_pend - _dma_pstart)
+#define DMA_PAGES (DMA_SIZE >> seL4_PageBits)
 
-#define PHYS(vaddr)  ((vaddr) - DMA_VSTART + _dma_pstart)
-#define VIRT(paddr)  ((paddr) + DMA_VSTART - _dma_pstart)
+#define PHYS(vaddr) ((vaddr) - DMA_VSTART + _dma_pstart)
+#define VIRT(paddr) ((paddr) + DMA_VSTART - _dma_pstart)
 
-#define PAGE_OFFSET(a) ((a) & ((1 << seL4_PageBits) - 1))
+#define PAGE_OFFSET(a) ((a) & MASK(seL4_PageBits))
 
 #define DMA_ALIGN_BITS  7 /* 128 */
-#define DMA_ALIGN(a)    ROUND_UP(a,DMA_ALIGN_BITS)
+#define DMA_ALIGN(a) ROUND_UP(a, DMA_ALIGN_BITS)
+
+typedef int (*sel4_cache_op_fn_t)(seL4_ARM_PageDirectory, seL4_Word, seL4_Word);
 
 static seL4_CPtr* _dma_caps;
 
@@ -48,23 +51,25 @@ static seL4_Word _dma_pend = 0;
 static seL4_Word _dma_pnext = 0;
 
 static inline void
-_dma_fill(seL4_Word pstart, seL4_Word pend, int cached){
+_dma_fill(seL4_Word pstart, seL4_Word pend, int cached)
+{
     seL4_CPtr* caps = &_dma_caps[(pstart - _dma_pstart) >> seL4_PageBits];
     seL4_ARM_VMAttributes vm_attr = 0;
     int err;
 
-    if(cached){
+    if (cached) {
         vm_attr = seL4_ARM_Default_VMAttributes;
         vm_attr = 0 /* TODO L2CC currently not controlled by kernel */;
     }
 
     pstart -= PAGE_OFFSET(pstart);
-    while(pstart < pend){
-        if(*caps == seL4_CapNull){
+    while (pstart < pend) {
+        if (*caps == seL4_CapNull) {
             /* Create the frame cap */
             err = cspace_ut_retype_addr(pstart, seL4_ARM_SmallPageObject,
                                         seL4_PageBits, cur_cspace, caps);
             assert(!err);
+
             /* Map in the frame */
             seL4_CPtr pt_cap;
             err = map_page(*caps, seL4_CapInitThreadPD, VIRT(pstart), 
@@ -72,19 +77,20 @@ _dma_fill(seL4_Word pstart, seL4_Word pend, int cached){
             assert(!err);
         }
         /* Next */
-        pstart += (1 << seL4_PageBits);
+        pstart += BIT(seL4_PageBits);
         caps++;
     }
 }
 
 
 int 
-dma_init(seL4_Word dma_paddr_start, int sizebits){
+dma_init(seL4_Word dma_paddr_start, int sizebits)
+{
     assert(_dma_pstart == 0);
 
     _dma_pstart = _dma_pnext = dma_paddr_start;
-    _dma_pend = dma_paddr_start + (1 << sizebits);
-    _dma_caps = (seL4_CPtr*)malloc(sizeof(seL4_CPtr) * DMA_PAGES);
+    _dma_pend = dma_paddr_start + BIT(sizebits);
+    _dma_caps = (seL4_CPtr *)malloc(sizeof(seL4_CPtr) * DMA_PAGES);
     conditional_panic(!_dma_caps, "Not enough heap space for dma frame caps");
 
     memset(_dma_caps, 0, sizeof(seL4_CPtr) * DMA_PAGES);
@@ -93,16 +99,17 @@ dma_init(seL4_Word dma_paddr_start, int sizebits){
 
 
 void *
-sos_dma_malloc(void* cookie, size_t size, int align, int cached, ps_mem_flags_t flags) {
+sos_dma_malloc(void* cookie, size_t size, int align, int cached, ps_mem_flags_t flags)
+{
     static int alloc_cached = 0;
     void *dma_addr;
     (void)cookie;
 
     assert(_dma_pstart);
     _dma_pnext = DMA_ALIGN(_dma_pnext);
-    if(_dma_pnext < _dma_pend){
+    if (_dma_pnext < _dma_pend) {
         /* If caching policy has changed we round to page boundary */
-        if(alloc_cached != cached && PAGE_OFFSET(_dma_pnext) != 0){
+        if (alloc_cached != cached && PAGE_OFFSET(_dma_pnext) != 0) {
             _dma_pnext = ROUND_UP(_dma_pnext, BIT(seL4_PageBits));
         }
         /* Round up to the alignment */
@@ -113,7 +120,7 @@ sos_dma_malloc(void* cookie, size_t size, int align, int cached, ps_mem_flags_t 
         /* set return values */
         dma_addr = (void*)VIRT(_dma_pnext);
         _dma_pnext += size;
-    }else{
+    } else {
         dma_addr = NULL;
     }
     dprintf(5, "DMA: 0x%x\n", (uint32_t)dma_addr);
@@ -122,23 +129,29 @@ sos_dma_malloc(void* cookie, size_t size, int align, int cached, ps_mem_flags_t 
     return dma_addr;
 }
 
-void sos_dma_free(void *cookie, void *addr, size_t size) {
+void
+sos_dma_free(void *cookie, void *addr, size_t size)
+{
     /* do not support free */
+    return;
 }
 
-uintptr_t sos_dma_pin(void *cookie, void *addr, size_t size) {
-    if ((uintptr_t)addr < DMA_VSTART || (uintptr_t)addr >= DMA_VEND) {
+uintptr_t
+sos_dma_pin(void *cookie, void *addr, size_t size)
+{
+    if ((uintptr_t)addr < DMA_VSTART || (uintptr_t)addr >= DMA_VEND)
         return 0;
-    } else {
-        return PHYS((uintptr_t)addr);
-    }
+    
+    return PHYS((uintptr_t)addr);
 }
 
-void sos_dma_unpin(void *cookie, void *addr, size_t size) {
+void
+sos_dma_unpin(void *cookie, void *addr, size_t size)
+{
     /* no op */
+    return;
 }
 
-typedef int (*sel4_cache_op_fn_t)(seL4_ARM_PageDirectory, seL4_Word, seL4_Word);
 
 static void
 cache_foreach(void *vaddr, int range, sel4_cache_op_fn_t proc)
@@ -153,17 +166,19 @@ cache_foreach(void *vaddr, int range, sel4_cache_op_fn_t proc)
     }
 }
 
-void sos_dma_cache_op(void *cookie, void *addr, size_t size, dma_cache_op_t op) {
+void
+sos_dma_cache_op(void *cookie, void *addr, size_t size, dma_cache_op_t op)
+{
     /* everything is mapped uncached at the moment */
     switch(op) {
-    case DMA_CACHE_OP_CLEAN:
-        cache_foreach(addr, size, seL4_ARM_PageDirectory_Clean_Data);
-        break;
-    case DMA_CACHE_OP_INVALIDATE:
-        cache_foreach(addr, size, seL4_ARM_PageDirectory_Invalidate_Data);
-        break;
-    case DMA_CACHE_OP_CLEAN_INVALIDATE:
-        cache_foreach(addr, size, seL4_ARM_PageDirectory_CleanInvalidate_Data);
-        break;
+        case DMA_CACHE_OP_CLEAN:
+            cache_foreach(addr, size, seL4_ARM_PageDirectory_Clean_Data);
+            break;
+        case DMA_CACHE_OP_INVALIDATE:
+            cache_foreach(addr, size, seL4_ARM_PageDirectory_Invalidate_Data);
+            break;
+        case DMA_CACHE_OP_CLEAN_INVALIDATE:
+            cache_foreach(addr, size, seL4_ARM_PageDirectory_CleanInvalidate_Data);
+            break;
     }
 }

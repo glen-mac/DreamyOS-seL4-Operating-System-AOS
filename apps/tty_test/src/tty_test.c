@@ -43,7 +43,7 @@ static void
 thread_block(void) {
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
     seL4_SetTag(tag);
-    seL4_SetMR(0, 2);
+    seL4_SetMR(0, 999);
     seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
 }
 
@@ -121,7 +121,7 @@ test_m3(void)
     free(buf2);
 
     /* This should generate a permissions fault, we cant write to the code section */
-    //addr = (seL4_Word *)0x00008000;
-    //*addr = 5;
+    addr = (seL4_Word *)0x00008000;
+    *addr = 5;
 }
 
