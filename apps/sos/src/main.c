@@ -391,8 +391,8 @@ main(void)
     start_first_process(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap);
 
     /* Unit tests */
-    // test_m1();
     // test_m2();
+    // test_m1(); /* After so as to have time to enter event loop */
 
     /* Wait on synchronous endpoint for IPC */
     LOG_INFO("SOS entering event loop");

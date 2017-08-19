@@ -32,8 +32,6 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
 {
     int err;
 
-    seL4_Word stack_addr;
-    seL4_CPtr stack_cap;
     seL4_CPtr user_ep_cap;
 
     /* These required for setting up the TCB */
