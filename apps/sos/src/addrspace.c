@@ -5,20 +5,22 @@
  */
 
 #include "addrspace.h"
+
 #include "vm.h"
-#include <ut_manager/ut.h>
+
+#include <cspace/cspace.h>
 #include <sel4/sel4.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ut_manager/ut.h>
 #include <utils/util.h>
-#include <cspace/cspace.h>
 
 addrspace *
 as_create(void)
 {
     addrspace *as;
     if ((as = malloc(sizeof(addrspace))) == NULL) {
-        LOG_ERROR("malloc returned null");
+        LOG_ERROR("Error mallocing addrspace");
         return NULL;
     }
 
@@ -26,7 +28,7 @@ as_create(void)
 
     /* Create a VSpace */
     if ((as->vspace_addr = ut_alloc(seL4_PageDirBits)) == (seL4_Word)NULL) {
-        LOG_ERROR("vspace_addr was null");
+        LOG_ERROR("Error ut_alloc vspace_addr");
         free(as);
         return NULL;
     }
@@ -59,8 +61,10 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
 {
     assert(size >= 0);
     region *new_region;
-    if ((new_region = (region *)malloc(sizeof(region))) == NULL)
+    if ((new_region = (region *)malloc(sizeof(region))) == NULL) {
+        LOG_ERROR("Unable to create region");
         return NULL;
+    }
 
     new_region->vaddr_start = start;
     new_region->vaddr_end = start + size;
@@ -71,12 +75,12 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
 int
 as_add_region(addrspace *as, region *new_region)
 {
-    /* If region list is empty */
     if (as->region_list == NULL) {
         as->region_list = new_region;
         goto end_add;
     }
 
+    /* Add region to the end of the list */
     region *cur_reg = as->region_list;
     region *prev_reg = as->region_list;
     while (cur_reg != NULL) {

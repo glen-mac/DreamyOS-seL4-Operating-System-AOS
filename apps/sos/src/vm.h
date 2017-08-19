@@ -15,6 +15,11 @@ typedef struct {
     seL4_CPtr *kernel_page_table_caps; /* Virtual address to an array of in-kernel page table caps */
 } page_directory;
 
+/* WARNING: If this grows in size, algorithms will have to change */
+typedef struct {
+	seL4_CPtr page;
+} page_table_entry;
+
 /* 
  * Handle a vm fault.
  */ 
@@ -28,7 +33,7 @@ page_directory *page_directory_create(void);
 
 /*
  * Insert a page into the two level page table
- * @param table, the page directory to insert into
+ * @param directory, the page directory to insert into
  * @param vaddr, the virtual address of the page
  * @param sos_cap, the capability of the page created by sos
  * @param kernel_cap, a capability of the page table created by the kernel

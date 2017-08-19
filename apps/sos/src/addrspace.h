@@ -38,7 +38,9 @@ typedef struct {
     page_directory *directory;
 } addrspace;
 
-
+/*
+ * Create an address space
+ */
 addrspace *as_create(void);
 
 /*

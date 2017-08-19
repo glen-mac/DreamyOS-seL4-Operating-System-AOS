@@ -9,30 +9,30 @@
 
 #include <sel4/sel4.h>
 #include <cspace/cspace.h>
+
 #include "addrspace.h"
 #include "vm.h"
 
-/* maximum number of processes to support */
+/* Maximum number of processes to support */
 #define MAX_PROCS 32
 
-/* entry for a process control block */
+/* Process Struct */
 typedef struct {
     seL4_Word tcb_addr;
     seL4_TCB tcb_cap;
 
-    addrspace *p_addrspace;
+    addrspace *p_addrspace; /* Process address space */
 
     seL4_Word ipc_buffer_addr;  
     seL4_CPtr ipc_buffer_cap;
 
     cspace_t *croot;
-
 } proc;
 
-/* global process array */
+/* Global process array */
 proc sos_procs[MAX_PROCS];
 
-/* hacky first proc */
+/* Hacky first proc */
 #define tty_test_process (&sos_procs[0])
 #define curproc (tty_test_process)
 

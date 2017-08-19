@@ -32,8 +32,6 @@
 #include <sys/debug.h>
 #include <sys/panic.h>
 
-extern seL4_ARM_PageDirectory dest_as;
-
 /*
  * Convert ELF permissions into seL4 permissions.
  * @param permissions
@@ -58,7 +56,7 @@ get_sel4_rights_from_elf(unsigned long permissions)
  * Inject data into the given vspace.
  */
 static int
-load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
+load_segment_into_vspace(addrspace *as,
                          char *src, unsigned long segment_size,
                          unsigned long file_size, unsigned long dst,
                          unsigned long permissions)
@@ -89,8 +87,8 @@ load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
     
     assert(file_size <= segment_size);
 
-    /* add the region to the curproc region list */
-    as_add_region(curproc->p_addrspace, as_create_region(dst, segment_size, permissions));
+    /* Add the region to the curproc region list */
+    as_add_region(as, as_create_region(dst, segment_size, permissions));
 
     /* We work a page at a time in the destination vspace. */
     unsigned long pos = 0;
@@ -101,7 +99,7 @@ load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
     while (pos < segment_size) {
         seL4_Word vpage = PAGE_ALIGN_4K(dst);
 
-        err = sos_map_page(vpage, curproc->p_addrspace, permissions, &kdst);
+        err = sos_map_page(vpage, as, permissions, &kdst);
         conditional_panic(err, "mapping elf segment failed failed");
 
         /* Now copy our data into the destination vspace. */
@@ -121,7 +119,7 @@ load_segment_into_vspace(seL4_ARM_PageDirectory dest_as,
 }
 
 int
-elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file)
+elf_load(addrspace *as, char *elf_file)
 {
     char *source_addr;
     unsigned long flags, file_size, segment_size, vaddr = 0;
@@ -146,10 +144,10 @@ elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file)
         vaddr = elf_getProgramHeaderVaddr(elf_file, i);
         flags = elf_getProgramHeaderFlags(elf_file, i);
 
-        /* Copy it across into the vspace. */
+        /* Copy into the address space */
         // TODO: Should probably return error here instead of panicing.
-        dprintf(1, "* Loading segment %08x-->%08x\n", (int)vaddr, (int)(vaddr + segment_size));
-        err = load_segment_into_vspace(dest_as, source_addr, segment_size, file_size, vaddr,
+        LOG_INFO("Loading segment %08x-->%08x", (int)vaddr, (int)(vaddr + segment_size));
+        err = load_segment_into_vspace(as, source_addr, segment_size, file_size, vaddr,
                                        get_sel4_rights_from_elf(flags) & seL4_AllRights);
         conditional_panic(err != 0, "Elf loading failed!\n");
     }
@@ -159,8 +157,8 @@ elf_load(seL4_ARM_PageDirectory dest_as, char *elf_file)
     assert(vaddr != 0);
     seL4_Word heap_loc = PAGE_ALIGN_4K(vaddr + PAGE_SIZE_4K);
     region *heap = as_create_region(heap_loc, 0, seL4_CanRead | seL4_CanWrite);
-    as_add_region(curproc->p_addrspace, heap);
-    curproc->p_addrspace->region_heap = heap;
+    as_add_region(as, heap);
+    as->region_heap = heap;
     
     return 0;
 }

@@ -197,16 +197,11 @@ multi_frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
     /* Check if frame_table is initialised */
     if (!frame_table) {
         LOG_ERROR("frame_table uninitialised");
-        goto frame_alloc_error;
+        *vaddr = (seL4_Word)NULL;
+        return -1;
     }
 
     return _frame_alloc(vaddr, nframes);
-
-    /* On error, set the vaddr to null and return -1 */
-    frame_alloc_error:
-        LOG_ERROR("Unable to allocate frame");
-        *vaddr = (seL4_Word)NULL;
-        return -1;
 }
 
 static seL4_Word

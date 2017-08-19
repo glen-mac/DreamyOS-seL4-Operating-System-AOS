@@ -12,13 +12,14 @@
 #define _LIBOS_ELF_H_
 
 #include <sel4/sel4.h>
+#include "addrspace.h"
 
 /*
  * Load an elf binary into an address space
- * @param dest_pd, the destination address space
+ * @param as, the destination address space
  * @param elf_file, name of the elf binary
  * @returns 0 on success, else error
  */
-int elf_load(seL4_ARM_PageDirectory dest_pd, char *elf_file);
+int elf_load(addrspace *as, char *elf_file);
 
 #endif /* _LIBOS_ELF_H_ */

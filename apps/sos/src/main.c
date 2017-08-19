@@ -75,6 +75,11 @@ const seL4_BootInfo *_boot_info;
 #define SOS_SYSCALL_WRITE 1
 #define SOS_SYSCALL_BRK 2
 
+static void sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
+static void sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
+static void sos_driver_init(void);
+static seL4_CPtr badge_irq_ep(seL4_CPtr ep, seL4_Word badge);
+
 /*
  * End point capabilities
  */
@@ -244,7 +249,8 @@ event_loop(seL4_CPtr ep)
 static void
 sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
 {
-    seL4_Word ep_addr, aep_addr;
+    seL4_Word ep_addr;
+    seL4_Word aep_addr;
     int err;
 
     /* Create an Async endpoint for interrupts */
@@ -273,6 +279,29 @@ sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
 }
 
 /*
+ * Initialise SOS's drivers
+ * Network, Serial, Timer
+ */
+static void
+sos_driver_init(void)
+{
+    int err;
+
+    /* Initialise the network hardware */
+    network_init(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_NETWORK));
+
+    /* Must happen after network initialisation */
+    serial_port = serial_init();
+   
+    /* Map in the GPT into virtual memory and provide that address to the timer library */
+    init_timer(map_device((void *)CLOCK_GPT, CLOCK_GPT_SIZE));
+
+    /* Initialise timer with badged capability */
+    err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
+    conditional_panic(err, "Failed to start the timer\n");
+}
+
+/*
  * Initialise Simple Operating System
  * @param ipc_ep, the IPC endpoint
  * @param async_epc, the asynchronous endpoint
@@ -281,7 +310,8 @@ static void
 sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
 {
     seL4_Word dma_addr;
-    seL4_Word low, high;
+    seL4_Word low;
+    seL4_Word high;
     int err;
 
     LOG_INFO("SOS Starting");
@@ -291,7 +321,7 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     _boot_info = seL4_GetBootInfo();
     conditional_panic(!_boot_info, "Failed to retrieve boot info\n");
     
-    print_bootinfo(_cpio_archive, _boot_info);
+    // print_bootinfo(_cpio_archive, _boot_info);
 
     /* Initialise the untyped sub system and reserve memory for DMA */
     err = ut_table_init(_boot_info);
@@ -332,6 +362,7 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     conditional_panic(err, "Failed to intiialise frame table\n");
 
     sos_ipc_init(ipc_ep, async_ep);
+    sos_driver_init();
 }
 
 /*
@@ -354,27 +385,12 @@ seL4_CPtr badge_irq_ep(seL4_CPtr ep, seL4_Word badge)
 int 
 main(void)
 {
-    int err;
-
 #ifdef SEL4_DEBUG_KERNEL
     seL4_DebugNameThread(seL4_CapInitThreadTCB, "SOS:root");
 #endif
 
     /* Initialise the operating system */
     sos_init(&_sos_ipc_ep_cap, &_sos_interrupt_ep_cap);
-
-    /* Initialise the network hardware */
-    network_init(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_NETWORK));
-
-    /* Must happen after network initialisation */
-    serial_port = serial_init();
-   
-    /* Map in the GPT into virtual memory and provide that address to the timer library */
-    init_timer(map_device((void *)CLOCK_GPT, CLOCK_GPT_SIZE));
-
-    /* Initialise timer with badged capability */
-    err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
-    conditional_panic(err, "Failed to start the timer\n");
         
     /* Start the user application */
     start_first_process(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap);

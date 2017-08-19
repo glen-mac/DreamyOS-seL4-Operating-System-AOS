@@ -24,17 +24,14 @@
 #define verbose 5
 #include <sys/debug.h>
 
-#define TTY_PRIORITY         (0)
-#define TTY_EP_BADGE         (101)
-
+#define TTY_PRIORITY (0)
+#define TTY_EP_BADGE (101)
 
 void
 start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
 {
     int err;
 
-    seL4_Word stack_addr;
-    seL4_CPtr stack_cap;
     seL4_CPtr user_ep_cap;
 
     /* These required for setting up the TCB */
@@ -97,7 +94,7 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
     conditional_panic(!elf_base, "Unable to locate cpio header");
 
     /* load the elf image */
-    err = elf_load(tty_test_process->p_addrspace->vspace, elf_base);
+    err = elf_load(tty_test_process->p_addrspace, elf_base);
     conditional_panic(err, "Failed to load elf image");
 
     /* Create a stack frame */

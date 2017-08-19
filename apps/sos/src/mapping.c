@@ -125,8 +125,6 @@ sos_map_page(seL4_Word page_id, addrspace *as, unsigned long permissions, seL4_W
         return 1;
     }
 
-    LOG_INFO("as is %p", as);
-
     seL4_CPtr pt_cap;
     if (map_page(new_frame_cap, as->vspace, page_id, permissions, seL4_ARM_Default_VMAttributes, &pt_cap) != 0) {
         LOG_ERROR("Error mapping page");
