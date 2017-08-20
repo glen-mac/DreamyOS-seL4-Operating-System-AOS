@@ -8,8 +8,8 @@
  * @TAG(NICTA_BSD)
  */
 
-#ifndef NETWORK_H
-#define NETWORK_H
+#ifndef _NETWORK_H_
+#define _NETWORK_H_
 
 #include <sel4/types.h>
 #include <nfs/nfs.h>
@@ -31,9 +31,9 @@ extern void network_init(seL4_CPtr interrupt_ep);
  */
 extern int dma_init(seL4_Word paddr, int sizebits);
 
-/**
+/*
  * Allows the network driver to handle any pending events
  */
 extern void network_irq(void);
 
-#endif
+#endif /* _NETWORK_H_ */

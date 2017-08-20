@@ -40,3 +40,24 @@ int64_t sos_sys_time_stamp(void) {
     return -1;
 }
 
+/*
+ * sys_brk call
+ * @param newbrk: the desired new brk address - if this value is 0, the user
+ * is calling in a fashion similiar to sbrk and wants the current heap brk
+ * value returned, otherwise they want it set (if possible)
+ * @returns: the current brk value (after query or change)
+ */
+seL4_Word sos_sys_brk(seL4_Word newbrk) {
+    int ret_val;
+
+    /* need two registers, one for syscall the other for newbrk */
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 2);
+    seL4_SetTag(tag);
+    seL4_SetMR(0, 2); /* Syscall number */
+    seL4_SetMR(1, newbrk); /* newbrk */
+    seL4_Call(SOS_IPC_EP_CAP, tag);
+
+    ret_val = seL4_GetMR(1); /* Receive back the result */
+    return ret_val; /* could contain newbrk, or the original brk */
+}
+

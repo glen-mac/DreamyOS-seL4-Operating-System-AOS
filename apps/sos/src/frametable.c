@@ -17,7 +17,6 @@
 #include "ut_manager/ut.h"
 #include "mapping.h"
 
-
 /* Macros to go from physical address to frame table index and the reverse */
 #define ADDR_TO_INDEX(paddr) ((paddr - ut_base) >> seL4_PageBits)
 #define INDEX_TO_ADDR(index) (ut_base + (index << seL4_PageBits))
@@ -30,6 +29,7 @@
 #define LOW_WATERMARK 32
 
 static void _frame_free(seL4_Word frame_id);
+static seL4_Word _frame_alloc(seL4_Word *vaddr, seL4_Word nframes);
 static int retype_and_map(seL4_Word paddr, seL4_Word vaddr, seL4_ARM_Page *frame_cap);
 
 /* The frame table is an array of frame entries */
@@ -58,7 +58,7 @@ frame_table_init(seL4_Word paddr, seL4_Word size_in_bits, seL4_Word low, seL4_Wo
     ut_top = high;
     ut_base = low;
 
-    LOG_INFO("frame_table_init: UT memory starts at %x and ends at %x for a size of %x and %lu pages", ut_base, ut_top, ut_top - ut_base, BYTES_TO_4K_PAGES(ut_top - ut_base));
+    LOG_INFO("UT memory starts at %x and ends at %x for a size of %x and %lu pages", ut_base, ut_top, ut_top - ut_base, BYTES_TO_4K_PAGES(ut_top - ut_base));
 
     /* 
      * Set upper bound on frames that can be allocated.
@@ -92,16 +92,16 @@ seL4_Word
 frame_alloc(seL4_Word *vaddr)
 {
     seL4_Word paddr;
-    seL4_ARM_Page frame_cap;
     seL4_Word p_id;
 
-    /* Check if frame_table is initialised */
-    if (!frame_table)
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
         goto frame_alloc_error;
+    }
 
     /* Ensure we aren't exceeding limits */
     if (frame_table_cnt >= frame_table_max) {
-        LOG_INFO("frame limit exceeded");
+        LOG_INFO("frame limit reached");
         goto frame_alloc_error;
     }
 
@@ -112,31 +112,12 @@ frame_alloc(seL4_Word *vaddr)
 
         paddr = INDEX_TO_ADDR(p_id);
         *vaddr = PHYSICAL_VSTART + paddr;
-        goto frame_alloc_return;
-    }
-    /* Else, we need to allocate a frame from the UT Memory pool */
-
-    /* Grab a page sized chunk of untyped memory */
-    if ((paddr = ut_alloc(seL4_PageBits)) == (seL4_Word)NULL)
-        goto frame_alloc_error;
-
-    /* Map the page into SOS virtual address space */
-    *vaddr = PHYSICAL_VSTART + paddr;
-    if (retype_and_map(paddr, *vaddr, &frame_cap) != 0)
-        goto frame_alloc_error;
-
-    /* Offset the paddr to align with our ut block */
-    p_id = ADDR_TO_INDEX(paddr);
-
-    /* Store the metadata in the frame table */
-    assert(frame_table[p_id].cap == (seL4_ARM_Page)NULL);
-    frame_table[p_id].cap = frame_cap;
-    frame_table_cnt++;
-
-    /* Zero out the memory and return the id */
-    frame_alloc_return:
         bzero((void *)(*vaddr), PAGE_SIZE_4K);
         return p_id;
+    }
+
+    /* Else, we need to allocate a frame from the UT Memory pool */
+    return _frame_alloc(vaddr, 1);
 
     /* On error, set the vaddr to null and return -1 */
     frame_alloc_error:
@@ -148,17 +129,16 @@ frame_alloc(seL4_Word *vaddr)
 void
 frame_free(seL4_Word frame_id)
 {
-    /* Check if frame_table is initialised */
-    if (!frame_table)
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
         return;
+    }
 
-    /* Check if address is within frame_table bounds */
     if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
         LOG_ERROR("frame_id: %d out of bounds", frame_id);
         return;
     }
 
-    /* Check if capability exists */
     if (!frame_table[frame_id].cap) {
         LOG_ERROR("capability for frame_id: %d does not exist", frame_id);
         return;
@@ -182,6 +162,85 @@ frame_free(seL4_Word frame_id)
     free_index = LOW_WATERMARK - 1;
 }
 
+seL4_ARM_Page 
+frame_table_get_capability(seL4_Word frame_id)
+{
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
+        return (seL4_ARM_Page)NULL;
+    }
+
+    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
+        LOG_ERROR("frame_id: %d out of bounds", frame_id);
+        return (seL4_ARM_Page)NULL;
+    }
+
+    seL4_ARM_Page cap = frame_table[frame_id].cap;
+    if (!cap) {
+        LOG_ERROR("capability for frame_id: %d does not exist", frame_id);
+        return (seL4_ARM_Page)NULL;
+    }
+
+    return cap;
+}
+
+seL4_Word
+frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr)
+{
+    seL4_Word paddr = sos_vaddr - PHYSICAL_VSTART;
+    return ADDR_TO_INDEX(paddr);
+}
+
+seL4_Word
+multi_frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
+{
+    /* Check if frame_table is initialised */
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
+        *vaddr = (seL4_Word)NULL;
+        return -1;
+    }
+
+    return _frame_alloc(vaddr, nframes);
+}
+
+static seL4_Word
+_frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
+{
+    seL4_Word paddr;
+    seL4_ARM_Page frame_cap;
+    seL4_Word p_id;
+
+    /* Grab a page sized chunk of untyped memory */
+    if ((paddr = ut_alloc(seL4_PageBits + LOG_BASE_2(nframes))) == (seL4_Word)NULL) 
+        goto _frame_alloc_error;
+
+    seL4_Word top_frame_id = ADDR_TO_INDEX(paddr);
+
+    *vaddr = PHYSICAL_VSTART + paddr;
+    for (int i = 0; i < nframes; i++) {
+        if (retype_and_map(paddr, *vaddr + (i * PAGE_SIZE_4K), &frame_cap) != 0)
+            goto _frame_alloc_error;
+
+        /* Offset the paddr to align with our ut block */
+        p_id = ADDR_TO_INDEX(paddr);
+
+        /* Store the metadata in the frame table */
+        assert(frame_table[p_id].cap == (seL4_ARM_Page)NULL);
+        frame_table[p_id].cap = frame_cap;
+        frame_table_cnt++;
+        paddr += PAGE_SIZE_4K;
+    }
+
+    bzero((void *)(*vaddr), PAGE_SIZE_4K * nframes);
+    return top_frame_id;
+
+    /* On error, set the vaddr to null and return -1 */
+    _frame_alloc_error:
+        LOG_ERROR("Unable to allocate frame");
+        *vaddr = (seL4_Word)NULL;
+        return -1;
+}
 
 /*
  * Private function to unmap a page, delete the capability and release memory back to UT manager
@@ -195,7 +254,6 @@ _frame_free(seL4_Word frame_id)
     seL4_ARM_Page frame_cap = frame_table[frame_id].cap;
     frame_table[frame_id].cap = (seL4_ARM_Page)NULL; /* Error guarding */
 
-    /* Ensure this is a frame we have allocated */
     if (!frame_cap) {
         LOG_INFO("capability for %d does not exist", frame_id);
         return;
@@ -220,11 +278,16 @@ _frame_free(seL4_Word frame_id)
 static int
 retype_and_map(seL4_Word paddr, seL4_Word vaddr, seL4_ARM_Page *frame_cap)
 {
-    if (cspace_ut_retype_addr(paddr, seL4_ARM_SmallPageObject, seL4_PageBits, cur_cspace, frame_cap) != 0)
+    if (cspace_ut_retype_addr(paddr, seL4_ARM_SmallPageObject, seL4_PageBits, cur_cspace, frame_cap) != 0) {
+        LOG_ERROR("Retyping to frame failed");
         return 1;
+    }
 
-    if (map_page(*frame_cap, seL4_CapInitThreadPD, vaddr, seL4_AllRights, seL4_ARM_Default_VMAttributes) != 0)
+    seL4_CPtr pt_cap;
+    if (map_page(*frame_cap, seL4_CapInitThreadPD, vaddr, seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap) != 0) {
+        LOG_ERROR("Mapping the page failed");
         return 1;
+    }
 
     return 0;
 }
