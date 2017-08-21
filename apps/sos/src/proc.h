@@ -12,6 +12,7 @@
 
 #include "addrspace.h"
 #include "vm.h"
+#include "file.h"
 
 /* Maximum number of processes to support */
 #define MAX_PROCS 32
@@ -22,6 +23,8 @@ typedef struct {
     seL4_TCB tcb_cap;
 
     addrspace *p_addrspace; /* Process address space */
+
+    fdtable *file_table; /* Open files for a process */
 
     seL4_Word ipc_buffer_addr;  
     seL4_CPtr ipc_buffer_cap;

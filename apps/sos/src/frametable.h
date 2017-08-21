@@ -1,6 +1,8 @@
 /*
  * Frametable
- * Glenn McGuire and Cameron Lonsdale */
+ *
+ * Glenn McGuire & Cameron Lonsdale
+ */
 
 #ifndef _FRAMETABLE_H_
 #define _FRAMETABLE_H_
