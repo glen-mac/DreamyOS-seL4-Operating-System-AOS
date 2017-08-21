@@ -1,6 +1,7 @@
 /*
  * Frametable Implementation
- * Glenn McGuire and Cameron Lonsdale
+ *
+ * Glenn McGuire & Cameron Lonsdale
  */
 
 #include "frametable.h"

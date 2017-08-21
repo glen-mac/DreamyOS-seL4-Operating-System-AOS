@@ -45,6 +45,9 @@ start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     tty_test_process->p_addrspace = as_create();
     assert(tty_test_process->p_addrspace != NULL);
 
+    tty_test_process->file_table = fdtable_create();
+    assert(tty_test_process->file_table != NULL);
+
     /* Create a simple 1 level CSpace */
     tty_test_process->croot = cspace_create(1);
     assert(tty_test_process->croot != NULL);
