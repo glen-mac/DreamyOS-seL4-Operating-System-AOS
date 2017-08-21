@@ -44,13 +44,6 @@ sos_sys_close(int file)
     return -1; 
 }
 
-void
-sos_sys_usleep(int msec)
-{
-    assert(!"You need to implement this");
-    return -1;
-}
-
 int
 sos_getdirent(int pos, char *name, size_t nbyte)
 {
@@ -100,12 +93,25 @@ sos_process_wait(pid_t pid)
     return -1;
 }
 
+void
+sos_sys_usleep(int msec)
+{
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 2);
+    seL4_SetTag(tag);
+    seL4_SetMR(0, SOS_SYS_USLEEP);  /* Syscall number */
+    seL4_SetMR(1, msec);            /* # of msec to sleep */
+    seL4_Call(SOS_IPC_EP_CAP, tag);
+       
+    /* at this point SOS has slept the time period */
+    return;
+}
+
 int64_t
 sos_sys_time_stamp(void)
 {
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
     seL4_SetTag(tag);
-    seL4_SetMR(0, SOS_SYS_TIME); /* Syscall number */
+    seL4_SetMR(0, SOS_SYS_TIME_STAMP); /* Syscall number */
     seL4_Call(SOS_IPC_EP_CAP, tag);
 
     /* Receive back the result */
@@ -128,7 +134,7 @@ seL4_Word sos_sys_brk(seL4_Word newbrk) {
     /* need two registers, one for syscall the other for newbrk */
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 2);
     seL4_SetTag(tag);
-    seL4_SetMR(0, 2); /* Syscall number */
+    seL4_SetMR(0, SOS_SYS_BRK); /* Syscall number */
     seL4_SetMR(1, newbrk); /* newbrk */
     seL4_Call(SOS_IPC_EP_CAP, tag);
 
