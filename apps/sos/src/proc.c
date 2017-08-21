@@ -39,7 +39,7 @@ start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     seL4_UserContext context;
 
     /* These required for loading program sections */
-    char* elf_base;
+    char *elf_base;
     unsigned long elf_size;
 
     tty_test_process->p_addrspace = as_create();
@@ -100,8 +100,7 @@ start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     conditional_panic(err, "Failed to load elf image");
 
     /* Create a stack frame */
-    seL4_Word initial_stack_size = PAGE_SIZE_4K;
-    region *stack = as_create_region(PROCESS_STACK_TOP, 0, seL4_CanRead | seL4_CanWrite);
+    region *stack = as_create_region(PROCESS_STACK_TOP - PAGE_SIZE_4K, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
     as_add_region(curproc->p_addrspace, stack);
     curproc->p_addrspace->region_stack = stack;
     

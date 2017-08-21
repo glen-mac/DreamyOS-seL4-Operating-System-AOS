@@ -105,13 +105,8 @@ load_segment_into_vspace(addrspace *as,
 
         /* Now copy our data into the destination vspace. */
         nbytes = PAGE_SIZE_4K - (dst & PAGE_MASK_4K);
-        if (pos < file_size) {
-            LOG_INFO("%04x %04x %04x %04x", *src, *(src+4), *(src+8), *(src+12));
-            LOG_INFO("%04x %04x %04x %04x", *(src+16), *(src+20), *(src+24), *(src+28));
-            LOG_INFO("");
-
-            memcpy((void*)kdst, (void*)src, MIN(nbytes, file_size - pos));
-        }
+        if (pos < file_size)
+            memcpy((void*)(kdst + (dst & PAGE_MASK_4K)), (void*)src, MIN(nbytes, file_size - pos));
 
         /* Not observable to I-cache yet so flush the frame */
         seL4_Word frame_cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(kdst));
@@ -121,6 +116,7 @@ load_segment_into_vspace(addrspace *as,
         dst += nbytes;
         src += nbytes;
     }
+
     return 0;
 }
 
