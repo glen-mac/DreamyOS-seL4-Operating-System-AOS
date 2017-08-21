@@ -37,6 +37,6 @@ syscall_time_stamp(seL4_CPtr reply_cap) {
     seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);
     timestamp_t ts = time_stamp();
     seL4_SetMR(0, ts >> 32);
-    seL4_SetMR(1, ts & 0xFFFF);
+    seL4_SetMR(1, ts & 0xFFFFFF);
     seL4_Send(reply_cap, reply);
 }
