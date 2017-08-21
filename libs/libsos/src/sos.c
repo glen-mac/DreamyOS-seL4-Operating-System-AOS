@@ -16,28 +16,99 @@
 
 #include <sel4/sel4.h>
 
-int sos_sys_open(const char *path, fmode_t mode) {
+int
+sos_sys_open(const char *path, fmode_t mode)
+{
     assert(!"You need to implement this");
     return -1;
 }
 
-int sos_sys_read(int file, char *buf, size_t nbyte) {
+int
+sos_sys_read(int file, char *buf, size_t nbyte)
+{
     assert(!"You need to implement this");
     return -1;
 }
 
-int sos_sys_write(int file, const char *buf, size_t nbyte) {
+int
+sos_sys_write(int file, const char *buf, size_t nbyte)
+{
     assert(!"You need to implement this");
     return -1;
 }
 
-void sos_sys_usleep(int msec) {
+int
+sos_sys_close(int file)
+{
     assert(!"You need to implement this");
+    return -1; 
 }
 
-int64_t sos_sys_time_stamp(void) {
+void
+sos_sys_usleep(int msec)
+{
     assert(!"You need to implement this");
     return -1;
+}
+
+int
+sos_getdirent(int pos, char *name, size_t nbyte)
+{
+    assert(!"You need to implement this");
+    return -1;
+}
+
+int
+sos_stat(const char *path, sos_stat_t *buf)
+{
+    assert(!"You need to implement this");
+    return -1;
+}
+
+pid_t
+sos_process_create(const char *path)
+{
+    assert(!"You need to implement this");
+    return -1;
+}
+
+int
+sos_process_delete(pid_t pid)
+{
+    assert(!"You need to implement this");
+    return -1;
+}
+
+pid_t
+sos_my_id(void)
+{
+    assert(!"You need to implement this");
+    return -1;
+}
+
+int
+sos_process_status(sos_process_t *processes, unsigned max)
+{
+    assert(!"You need to implement this");
+    return -1;
+}
+
+pid_t
+sos_process_wait(pid_t pid)
+{
+    assert(!"You need to implement this");
+    return -1;
+}
+
+int64_t
+sos_sys_time_stamp(void)
+{
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
+    seL4_SetTag(tag);
+    seL4_SetMR(0, SOS_SYS_TIME); /* Syscall number */
+    seL4_Call(SOS_IPC_EP_CAP, tag);
+
+    return seL4_GetMR(1); /* Receive back the result */
 }
 
 /*
@@ -60,4 +131,3 @@ seL4_Word sos_sys_brk(seL4_Word newbrk) {
     ret_val = seL4_GetMR(1); /* Receive back the result */
     return ret_val; /* could contain newbrk, or the original brk */
 }
-

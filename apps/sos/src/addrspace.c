@@ -75,6 +75,7 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
 int
 as_add_region(addrspace *as, region *new_region)
 {
+    LOG_INFO("Adding region %p %p", new_region->vaddr_start, new_region->vaddr_end);
     if (as->region_list == NULL) {
         as->region_list = new_region;
         goto end_add;
@@ -100,12 +101,16 @@ as_find_region(addrspace *as, seL4_Word vaddr, region **found_region)
 {
     region *curr = as->region_list;
     while (curr != NULL) {
+        LOG_INFO("%p --> %p", curr->vaddr_start, curr->vaddr_end);
+
         if (vaddr >= curr->vaddr_start && vaddr < curr->vaddr_end) {
             *found_region = curr;
+            LOG_INFO("DONE 0");
             return 0;
         }
         curr = curr->next_region;
     }
+    LOG_INFO("DONE 1");
     return 1;
 }
 

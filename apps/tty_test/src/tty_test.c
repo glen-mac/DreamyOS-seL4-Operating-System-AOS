@@ -27,32 +27,34 @@
 #include <sel4/sel4.h>
 #include <utils/page.h>
 
-#include "ttyout.h"
+#include <sos.h>
 
 #define NPAGES 27
 #define TEST_ADDRESS 0x20000000
 
 static void test_m0(void);
 static void test_m3(void);
+static void test_m4(void);
 
 /* 
  * Block a thread forever
  * we do this by making an unimplemented system call.
  */
 static void
-thread_block(void) {
+thread_block(void)
+{
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
     seL4_SetTag(tag);
     seL4_SetMR(0, 999);
-    seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
+    seL4_Call(SOS_IPC_EP_CAP, tag);
 }
 
-int main(void) {
-    /* initialise communication */
-    ttyout_init();
-
-    test_m0();
-    test_m3();
+int
+main(void)
+{
+    // test_m0();
+    // test_m3();
+    test_m4();
     return 0;
 }
 
@@ -80,7 +82,7 @@ test_m0(void)
     seL4_SetMR(0, 1); /* Syscall number */
     seL4_SetMR(1, 99999); /* Number of bytes in the message */
     memcpy(seL4_GetIPCBuffer()->msg + 2, message2, max_msg_size);
-    seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
+    seL4_Call(SOS_IPC_EP_CAP, tag);
     assert((size_t)seL4_GetMR(0) == max_msg_size);
 }
 
@@ -125,3 +127,9 @@ test_m3(void)
     *addr = 5;
 }
 
+static void
+test_m4(void)
+{
+    uint64_t time = sos_sys_time_stamp();
+    printf("time is %llu", time);
+}

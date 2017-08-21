@@ -11,6 +11,7 @@
 #include "mapping.h"
 #include <string.h>
 #include <utils/page.h>
+#include <utils/util.h>
 
 #include <assert.h>
 #include <ut_manager/ut.h>
@@ -28,7 +29,7 @@
 #define TTY_EP_BADGE (101)
 
 void
-start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
+start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
 {
     int err;
 
@@ -100,7 +101,7 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
 
     /* Create a stack frame */
     seL4_Word initial_stack_size = PAGE_SIZE_4K;
-    region *stack = as_create_region(PROCESS_STACK_TOP - initial_stack_size, initial_stack_size, seL4_CanRead | seL4_CanWrite);
+    region *stack = as_create_region(PROCESS_STACK_TOP, 0, seL4_CanRead | seL4_CanWrite);
     as_add_region(curproc->p_addrspace, stack);
     curproc->p_addrspace->region_stack = stack;
     
@@ -117,6 +118,9 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
     /* Start the new process */
     memset(&context, 0, sizeof(context));
     context.pc = elf_getEntryPoint(elf_base);
+
+    LOG_INFO("entry point %p", context.pc);
+
     context.sp = PROCESS_STACK_TOP;
     seL4_TCB_WriteRegisters(tty_test_process->tcb_cap, 1, 0, 2, &context);
 }

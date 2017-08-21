@@ -58,4 +58,4 @@ seL4_Word frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr);
  */
 seL4_Word multi_frame_alloc(seL4_Word *vaddr, seL4_Word nframes);
 
-#endif /* FRAMETABLE_H_ */
+#endif /* _FRAMETABLE_H_ */
