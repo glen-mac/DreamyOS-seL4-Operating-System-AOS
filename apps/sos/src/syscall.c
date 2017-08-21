@@ -37,9 +37,15 @@ handle_syscall(struct serial *serial_port, seL4_Word badge, size_t nwords)
 
     switch (syscall_number) {
         case SOS_SYS_TIME:
-            LOG_INFO("SYS TIME!");
+            LOG_INFO("syscall: thread made sos_time_stamp");
+            
+            reply = seL4_MessageInfo_new(0, 0, 0, 1);
+            timestamp_t ts = time_stamp(void);
+            seL4_SetMR(0, ts >> 32);
+            seL4_SetMR(1, ts & 0xFFFF);
+            seL4_Send(reply_cap, reply);
+            
             break;
-
 
         case SOS_SYSCALL_WRITE:
             LOG_INFO("syscall: thread made sos_write");

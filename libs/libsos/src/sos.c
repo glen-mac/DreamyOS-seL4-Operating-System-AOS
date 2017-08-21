@@ -108,7 +108,11 @@ sos_sys_time_stamp(void)
     seL4_SetMR(0, SOS_SYS_TIME); /* Syscall number */
     seL4_Call(SOS_IPC_EP_CAP, tag);
 
-    return seL4_GetMR(1); /* Receive back the result */
+    /* Receive back the result */
+    uint32_t ts_upper = seL4_GetMR(0);
+    uint32_t ts_lower = seL4_GetMR(1);
+    uint64_t ts = (ts_upper << 32) | ts_lower;
+    return ts; 
 }
 
 /*
