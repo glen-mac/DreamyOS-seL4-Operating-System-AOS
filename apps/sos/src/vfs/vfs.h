@@ -17,9 +17,8 @@ struct vnode;
 typedef struct {
     // int (*vop_open)(vnode *object, int flags_from_open);
     // int (*vop_close)(vnode *vnode);
-
-    int (*vop_read)(struct vnode *file);//, struct uio *uio);
-    int (*vop_write)(struct vnode *file); //, struct uio *uio); /* Might use uio later */
+    int (*vop_read)(struct vnode *node, struct iovec *iov);
+    int (*vop_write)(struct vnode *node, struct iovec *iov);
 
     int (*vop_lookup)(char *pathname, struct vnode **result); /* Lookup for a mount point */
 } vnode_ops;

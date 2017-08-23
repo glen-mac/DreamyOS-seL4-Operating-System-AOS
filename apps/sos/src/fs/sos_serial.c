@@ -19,8 +19,7 @@ static const vnode_ops serial_vnode_ops = {
     //.vop_open = sos_serial_open,
     //.vop_close = sos_serial_close
     //.vop_read = sos_serial_read,
-    //.vop_write = sos_serial_write,
-    //.vop_lookup = NULL,
+    .vop_write = sos_serial_write,
 };
 
 int
@@ -43,4 +42,11 @@ sos_serial_init(void)
     }
 
     return 0;
+}
+
+int
+sos_serial_write(vnode *node, struct iovec *iov)
+{
+    struct serial *port = node->vn_data;
+    return serial_send(port, iov->iov_base, iov->iov_len);
 }

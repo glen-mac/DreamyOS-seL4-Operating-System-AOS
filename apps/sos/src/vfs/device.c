@@ -38,8 +38,10 @@ int
 device_register(char *name, vnode *vn)
 {
     device *new_dev = malloc(sizeof(device));
-    if (!new_dev)
+    if (!new_dev) {
+        LOG_ERROR("malloc error when creating device");
         return 1;
+    }
 
     new_dev->name = name;
     new_dev->vn = vn;
@@ -54,12 +56,7 @@ device_register(char *name, vnode *vn)
 int
 device_lookup(char *name, vnode **ret)
 {
-    LOG_INFO("help");
-
     for (device *curr = devices; curr != NULL; curr = curr->next) {
-        LOG_INFO("looking at %s", name);
-        LOG_INFO("curr dev %p", curr);
-        LOG_INFO("Curr->name, %s", curr->name);
         /* Try Lookup the file in this namespace */
         if (!strcmp(name, curr->name)) {
             *ret = curr->vn;
@@ -67,5 +64,6 @@ device_lookup(char *name, vnode **ret)
         }
     }
 
-    return 1; /* Lookup failed */
+    LOG_INFO("Lookup for %s failed", name);
+    return 1;
 }

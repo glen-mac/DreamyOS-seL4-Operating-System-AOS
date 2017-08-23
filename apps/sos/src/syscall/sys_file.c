@@ -116,6 +116,7 @@ syscall_write(seL4_CPtr reply_cap, void * message)
         return;
     }
 
+    
     // TODO: VOP WRITE
 
     // size_t max_msg_size = (seL4_MsgMaxLength - 2) * sizeof(seL4_Word);

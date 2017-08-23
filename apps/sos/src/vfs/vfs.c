@@ -34,15 +34,16 @@ vfs_init(void)
      * Mount the device name space to the VFS
      */
     vnode *device_mount = malloc(sizeof(vnode));
-    if (!device_mount)
+    if (!device_mount) {
+        LOG_ERROR("malloc failed when creating device namespace");
         return 1;
+    }
 
     device_mount->vn_data = NULL;
     device_mount->vn_ops = &device_vnode_ops;
     vfs_mount(device_mount);
 
     // TODO: mount nfs
-
     return 0;
 }
 
@@ -53,8 +54,10 @@ vfs_mount(vnode *vn)
     for (curr = mount_points; curr != NULL && curr->next != NULL; curr = curr->next);
 
     mount *new_mount = malloc(sizeof(mount));
-    if (!new_mount)
+    if (!new_mount) {
+        LOG_ERROR("malloc error creating mount point");
         return 1;
+    }
 
     new_mount->node = vn;
     new_mount->next = NULL;
@@ -75,13 +78,15 @@ vfs_open(char *path, fmode_t mode, vnode **ret)
     vnode *vn = NULL;
 
     if (mode != O_RDONLY && mode != O_WRONLY && mode != O_RDWR) {
-        LOG_ERROR("what, %d", mode);
+        LOG_ERROR("incorrect mode %d", mode);
         return EINVAL;
     }
 
     // Might have to deal with file creation here for NFS
-    if ((result = vfs_lookup(path, &vn)))
+    if ((result = vfs_lookup(path, &vn))) {
+        LOG_ERROR("vfs_lookup failed");
         return result;
+    }
 
     *ret = vn;
 
@@ -104,15 +109,7 @@ vfs_close(vnode *vn)
 int
 vfs_lookup(char *path, vnode **ret)
 {
-    LOG_INFO("looking up %s", path);
-
     for (mount *curr = mount_points; curr != NULL; curr = curr->next) {
-        LOG_INFO("curr is %p");
-        LOG_INFO("curr->node is %p", curr->node);
-        LOG_INFO("curr->node->vn_ops is %p", curr->node->vn_ops);
-        LOG_INFO("curr->node->vn_ops->vop_lookup is %p", curr->node->vn_ops->vop_lookup);
-        /* Try Lookup the file in this namespace */
-
         if (curr->node->vn_ops->vop_lookup(path, ret) == 0)
             return 0;
     }

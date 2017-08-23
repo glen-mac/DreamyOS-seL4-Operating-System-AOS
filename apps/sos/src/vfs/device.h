@@ -9,6 +9,9 @@
 
 #include "vfs.h"
 
+/* Operations on the deviec namespace */
+extern const vnode_ops device_vnode_ops;
+
 /*
  * Register a device under a name
  * @param name, the name of the device
@@ -25,7 +28,5 @@ int device_register(char *name, vnode *vn);
  * @returns 0 on success, else 1
  */
 int device_lookup(char *name, vnode **ret);
-
-extern const vnode_ops device_vnode_ops;
 
 #endif /* _DEVICE_H_ */
