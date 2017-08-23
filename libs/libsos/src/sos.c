@@ -19,8 +19,15 @@
 int
 sos_sys_open(const char *path, fmode_t mode)
 {
-    assert(!"You need to implement this");
-    return -1;
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 3);
+    seL4_SetTag(tag);
+    seL4_SetMR(0, SOS_SYS_OPEN); /* Syscall number */
+    seL4_SetMR(1, (seL4_Word)path); 
+    seL4_SetMR(2, (seL4_Word)mode); 
+    seL4_Call(SOS_IPC_EP_CAP, tag);
+
+    int ret_val = seL4_GetMR(0); /* Receive back the fd */
+    return ret_val;
 }
 
 int

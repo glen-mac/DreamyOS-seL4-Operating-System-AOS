@@ -9,6 +9,26 @@
 
 #include <sel4/sel4.h>
 
+/*
+ * Two level page table operations
+ */
+
+#define DIRECTORY_SIZE_BITS 10
+#define TABLE_SIZE_BITS 10
+#define CAPS_INDEX_BITS 12
+
+#define DIRECTORY_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS)
+#define TABLE_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS - TABLE_SIZE_BITS)
+#define CAP_OFFSET (seL4_WordBits - CAPS_INDEX_BITS)
+
+#define DIRECTORY_MASK (MASK(DIRECTORY_SIZE_BITS) << DIRECTORY_OFFSET)
+#define TABLE_MASK (MASK(TABLE_SIZE_BITS) << TABLE_OFFSET)
+#define CAP_MASK (MASK(CAPS_INDEX_BITS) << CAP_OFFSET)
+
+#define CAP_INDEX(x) ((x & CAP_MASK) >> CAP_OFFSET)
+#define DIRECTORY_INDEX(x) ((x & DIRECTORY_MASK) >> DIRECTORY_OFFSET)
+#define TABLE_INDEX(x) ((x & TABLE_MASK) >> TABLE_OFFSET)
+
 /* Struct for the top level of the page table */
 typedef struct {
     seL4_Word *directory; /* Virtual address to the top level page directory */

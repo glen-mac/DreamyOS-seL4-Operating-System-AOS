@@ -36,6 +36,8 @@ static void test_m0(void);
 static void test_m3(void);
 static void test_m4(void);
 
+char * file_name = "test_file_name";
+
 /* 
  * Block a thread forever
  * we do this by making an unimplemented system call.
@@ -132,4 +134,6 @@ test_m4(void)
 {
     uint64_t time = sos_sys_time_stamp();
     printf("time is %llu", time);
+
+    open(file_name, 123);
 }

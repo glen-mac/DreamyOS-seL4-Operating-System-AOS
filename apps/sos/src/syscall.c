@@ -29,6 +29,10 @@ handle_syscall(struct serial *serial_port, seL4_Word badge, size_t nwords)
     assert(reply_cap != CSPACE_NULL);
 
     switch (syscall_number) {
+        case SOS_SYS_OPEN:
+            syscall_open(reply_cap);
+            break;
+        
         case SOS_SYS_USLEEP:
             syscall_usleep(reply_cap);
             break;
