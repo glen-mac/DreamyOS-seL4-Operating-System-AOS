@@ -17,14 +17,13 @@ typedef struct {
     off_t fp;
     vnode *vn;
     int mode;
-    size_t refcnt;
 } file;
 
 /*
  * The per-process file descriptor table (FDT).
  */
 typedef struct {
-    seL4_Word *table[PROCESS_MAX_FILES];
+    file *table[PROCESS_MAX_FILES];
 } fdtable;
 
 

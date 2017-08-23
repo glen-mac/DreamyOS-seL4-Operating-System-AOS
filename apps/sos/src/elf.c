@@ -21,7 +21,7 @@
 #include <utils/page.h>
 
 #include "proc.h"
-#include "addrspace.h"
+#include <vm/addrspace.h>
 #include "frametable.h"
 
 #include <vmem_layout.h>

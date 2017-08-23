@@ -8,7 +8,9 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#define FILES_MAX 8192
+#include <sys/panic.h>
+
+#include <utils/util.h>
 
 /*
  * The global open file table (OFT).
@@ -16,33 +18,29 @@
  * The global OFT contains FILES_MAX file structures.
  * The default size is 8192 maximum open files in the system
  */
-static file oft[FILES_MAX];
 
-static ssize_t fdtable_next_unused_index(seL4_Word *table);
-static ssize_t get_empty_filp(file **f);
+static ssize_t fdtable_next_unused_index(file **table);
 
 int
-file_open(char *filename, fmode_t mode, file **oft_file)
+file_open(char *filename, fmode_t mode, file **open_file)
 {
     int result;
 
-    /* 
-     * set file to point to a file structure that has a null vnode 
-     * return the file in a locked state
-     */
-    if (get_empty_filp(oft_file) == -1)
-        /* System out of space for new file. */
-        return ENFILE;
+    /* Since we dont have an open file table, we can just keep creating more files */
+    *open_file = malloc(sizeof(file));
+    if (!open_file)
+        return 1;
 
     vnode *node;
-    if ((result = vfs_open(filename, mode, &node)) != 0)
+    if ((result = vfs_open(filename, mode, &node)) != 0) {
+        free(*open_file);
         return result;
+    }
 
     /* Set up the file entry. */
-    (*oft_file)->vn = node;
-    (*oft_file)->fp = 0;
-    (*oft_file)->mode = mode;
-    (*oft_file)->refcnt = 1;
+    (*open_file)->vn = node;
+    (*open_file)->fp = 0;
+    (*open_file)->mode = mode;
 
     return 0;
 }
@@ -50,10 +48,8 @@ file_open(char *filename, fmode_t mode, file **oft_file)
 void
 file_close(file *f)
 {
-    if (--f->refcnt == 0) {
-        vfs_close(f->vn);
-        f->vn = NULL;
-    }
+    vfs_close(f->vn);
+    f->vn = NULL;
 }
 
 fdtable *
@@ -63,6 +59,10 @@ fdtable_create(void)
 
     if ((fdt = malloc(sizeof(fdtable))) == NULL)
         return NULL;
+
+    // TODO this is needed why??.
+    for (int i = 0; i < PROCESS_MAX_FILES; i++)
+        fdt->table[i] = NULL;
 
     return fdt;
 }
@@ -85,12 +85,12 @@ fdtable_get(fdtable *fdt, int fd, file **f)
 
 
 void
-fdtable_insert(fdtable *fdt, int fd, file *oft_file)
+fdtable_insert(fdtable *fdt, int fd, file *open_file)
 {
-    assert(fd >= 0 && oft_file != NULL);
+    assert(fd >= 0 && open_file != NULL);
     assert(fdt->table[fd] == NULL);
 
-    fdt->table[fd] = oft_file;
+    fdt->table[fd] = open_file;
 }
  
 int
@@ -125,31 +125,14 @@ fdtable_close_fd(fdtable *fdt, int fd, file **oft_file)
  * @returns the next unused index, or -1 if none was found.
  */
 static ssize_t
-fdtable_next_unused_index(seL4_Word *table)
+fdtable_next_unused_index(file **table)
 {
     for (size_t i = 0; i < PROCESS_MAX_FILES; i++) {
-        if (table[i] == NULL)
+        LOG_INFO("Table[%i] is %p", i, table[i]);
+        if (table[i] == NULL) 
             return i;
     }
 
     /* No slots free. */
-    return -1;
-}
-
-/*
- * Find an empty file.
- * Linear scan through all files in the oft
- *
- * @param[out] file structure that is unused
- * @returns 0 on success, -1 on failure
- */
-static ssize_t
-get_empty_filp(file **f)
-{
-    for (unsigned i = 0; i < FILES_MAX; ++i) {
-        *f = &oft[i];
-        if ((*f)->vn == NULL && (*f)->refcnt == 0)
-            return 0;
-    }
     return -1;
 }

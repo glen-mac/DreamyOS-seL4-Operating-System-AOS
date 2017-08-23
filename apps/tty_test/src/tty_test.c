@@ -27,6 +27,8 @@
 #include <sel4/sel4.h>
 #include <utils/page.h>
 
+#include <fcntl.h>
+
 #include <sos.h>
 
 #define NPAGES 27
@@ -135,5 +137,9 @@ test_m4(void)
     uint64_t time = sos_sys_time_stamp();
     printf("time is %llu", time);
 
-    open(file_name, 123);
+    int handle = open("console", O_RDWR);
+    // assert(handle == 0);
+
+    char *test_str = "Basic test string for read/write";
+    int result = sos_sys_write(handle, test_str, strlen(test_str));
 }

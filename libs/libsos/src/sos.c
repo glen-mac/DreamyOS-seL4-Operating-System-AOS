@@ -40,8 +40,16 @@ sos_sys_read(int file, char *buf, size_t nbyte)
 int
 sos_sys_write(int file, const char *buf, size_t nbyte)
 {
-    assert(!"You need to implement this");
-    return -1;
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 3);
+    seL4_SetTag(tag);
+    seL4_SetMR(0, SOS_SYS_WRITE); /* Syscall number */
+    seL4_SetMR(1, (seL4_Word)file); 
+    seL4_SetMR(2, (seL4_Word)buf); 
+    seL4_SetMR(3, (seL4_Word)nbyte); 
+    seL4_Call(SOS_IPC_EP_CAP, tag);
+
+    int ret_val = seL4_GetMR(0); /* Receive nbytes written */
+    return ret_val;
 }
 
 int

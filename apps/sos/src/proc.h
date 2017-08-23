@@ -10,9 +10,9 @@
 #include <sel4/sel4.h>
 #include <cspace/cspace.h>
 
-#include "addrspace.h"
-#include "vm.h"
-#include "file.h"
+#include <vm/addrspace.h>
+#include <vm/vm.h>
+#include <vfs/file.h>
 
 /* Maximum number of processes to support */
 #define MAX_PROCS 32

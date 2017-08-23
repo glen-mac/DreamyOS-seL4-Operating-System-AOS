@@ -14,19 +14,20 @@
 #include <cpio/cpio.h>
 #include <nfs/nfs.h>
 #include <elf/elf.h>
-#include <serial/serial.h>
 #include <clock/clock.h>
 #include <utils/page.h>
 #include <utils/util.h>
 
+#include <fs/sos_serial.h>
 #include "elf.h"
 #include "frametable.h"
 #include "mapping.h"
 #include "network.h"
 #include "proc.h"
-#include "syscall.h"
+#include <syscall/syscall.h>
 #include "ut_manager/ut.h"
-#include "vm.h"
+#include <vm/vm.h>
+#include <vfs/vfs.h>
 #include "vmem_layout.h"
 
 #define verbose 5
@@ -79,11 +80,6 @@ seL4_CPtr _sos_interrupt_ep_cap;
 extern fhandle_t mnt_point;
 
 /*
- * Port for sending data to serial
- */
-struct serial *serial_port;
-
-/*
  * Print the startup logo for the operating system
  */
 void
@@ -132,7 +128,7 @@ event_loop(seL4_CPtr ep)
         } else if (label == seL4_VMFault) {
             vm_fault();
         } else if (label == seL4_NoFault) {
-            handle_syscall(serial_port, badge, seL4_MessageInfo_get_length(message) - 1);
+            handle_syscall(badge, seL4_MessageInfo_get_length(message) - 1);
         } else {
             LOG_INFO("Rootserver got an unknown message");
         }
@@ -190,9 +186,9 @@ sos_driver_init(void)
     /* Initialise the network hardware */
     network_init(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_NETWORK));
 
-    /* Must happen after network initialisation */
-    serial_port = serial_init();
-   
+    /* Intialise the serial device and register it with the VFS */
+    sos_serial_init();
+
     /* Map in the GPT into virtual memory and provide that address to the timer library */
     init_timer(map_device((void *)CLOCK_GPT, CLOCK_GPT_SIZE));
 
@@ -261,6 +257,9 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     err = frame_table_init(frame_table_paddr, frame_table_size_in_bits, low, high);
     conditional_panic(err, "Failed to intiialise frame table\n");
 
+    err = vfs_init();
+    conditional_panic(err, "Failed to virtual file system\n");
+
     sos_ipc_init(ipc_ep, async_ep);
     sos_driver_init();
 }
@@ -292,7 +291,7 @@ main(void)
 
     /* Initialise the operating system */
     sos_init(&_sos_ipc_ep_cap, &_sos_interrupt_ep_cap);
-        
+
     /* Start the user application */
     start_first_process(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap);
 

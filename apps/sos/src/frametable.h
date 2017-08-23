@@ -52,6 +52,8 @@ seL4_ARM_Page frame_table_get_capability(seL4_Word frame_id);
  */
 seL4_Word frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr);
 
+
+seL4_Word frame_table_paddr_to_sos_vaddr(seL4_Word paddr);
 /*
  * Allocate multiple contiguous frames
  * @param[out] kernel vaddr to access the memory

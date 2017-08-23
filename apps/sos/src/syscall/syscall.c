@@ -16,7 +16,7 @@
 #include "sys_vm.h"
 
 void
-handle_syscall(struct serial *serial_port, seL4_Word badge, size_t nwords)
+handle_syscall(seL4_Word badge, size_t nwords)
 {
     seL4_Word syscall_number;
     seL4_CPtr reply_cap;
@@ -28,11 +28,7 @@ handle_syscall(struct serial *serial_port, seL4_Word badge, size_t nwords)
     reply_cap = cspace_save_reply_cap(cur_cspace);
     assert(reply_cap != CSPACE_NULL);
 
-    switch (syscall_number) {
-        case SOS_SYS_OPEN:
-            syscall_open(reply_cap);
-            break;
-        
+    switch (syscall_number) {        
         case SOS_SYS_USLEEP:
             syscall_usleep(reply_cap);
             break;
@@ -41,8 +37,12 @@ handle_syscall(struct serial *serial_port, seL4_Word badge, size_t nwords)
             syscall_time_stamp(reply_cap);
             break;
 
+        case SOS_SYS_OPEN:
+            syscall_open(reply_cap, message);
+            break;
+
         case SOS_SYS_WRITE:
-            syscall_write(reply_cap, message, serial_port);
+            syscall_write(reply_cap, message);
             break;
 
         case SOS_SYS_BRK:

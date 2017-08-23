@@ -165,6 +165,29 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
     return 0;
 }
 
+int
+page_directory_lookup(page_directory *dir, seL4_Word page_id, seL4_CPtr *cap)
+{
+    assert(IS_ALIGNED_4K(page_id));
+
+    seL4_Word directory_index = DIRECTORY_INDEX(page_id);
+    seL4_Word table_index = TABLE_INDEX(page_id);
+
+    if (!dir || !(dir->directory)) {
+        LOG_ERROR("Directory doesnt exist");
+        return 1;
+    }
+
+    seL4_Word *directory = dir->directory;
+    page_table_entry *second_level = (page_table_entry *)directory[directory_index];
+    assert(second_level != NULL);
+    assert(second_level[table_index].page != (seL4_CPtr)NULL);
+
+    *cap = second_level[table_index].page;
+
+    return 0;
+}
+
 
 /* The status of the fault is indicated by bits 12, 10 and 3:0 all strung together */
 static seL4_Word

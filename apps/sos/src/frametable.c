@@ -193,6 +193,13 @@ frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr)
 }
 
 seL4_Word
+frame_table_paddr_to_sos_vaddr(seL4_Word paddr)
+{
+    seL4_Word sos_vaddr = paddr + PHYSICAL_VSTART;
+    return sos_vaddr;
+}
+
+seL4_Word
 multi_frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
 {
     /* Check if frame_table is initialised */

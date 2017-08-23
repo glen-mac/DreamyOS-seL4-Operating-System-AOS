@@ -57,7 +57,18 @@ page_directory *page_directory_create(void);
  * @param vaddr, the virtual address of the page
  * @param sos_cap, the capability of the page created by sos
  * @param kernel_cap, a capability of the page table created by the kernel
+ * @returns 0 on success else 1
  */
 int page_directory_insert(page_directory *directory, seL4_Word vaddr, seL4_CPtr sos_cap, seL4_CPtr kernel_cap);
+
+
+/*
+ * Given a vaddr, retrieve the cap for the page
+ * @param directory, the page directory to insert into
+ * @param vaddr, the virtual address of the page
+ * @param cap, the cap for the page represented by vaddr
+ * @returns 0 on success else 1
+ */
+int page_directory_lookup(page_directory *directory, seL4_Word vaddr, seL4_CPtr *cap);
 
 #endif /* _VM_H_ */
