@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <time.h>
+
 #include <sel4/sel4.h>
 #include <utils/page.h>
 
@@ -134,12 +136,53 @@ test_m3(void)
 static void
 test_m4(void)
 {
-    uint64_t time = sos_sys_time_stamp();
-    printf("time is %llu", time);
+    #define SMALL_BUF_SZ 2
+    #define BUF_SZ NPAGES * PAGE_SIZE_4K
 
-    int handle = open("console", O_RDWR);
-    // assert(handle == 0);
+    char test_str[] = "Basic test string for read/write";
+    char small_buf[SMALL_BUF_SZ];
 
-    char *test_str = "Basic test string for read/write";
-    int result = sos_sys_write(handle, test_str, strlen(test_str));
+    int console_fd = open("console", O_RDWR);
+    assert(console_fd != -1);
+
+    /* test a small string from the code segment */
+    int result = sos_sys_write(console_fd, test_str, strlen(test_str));
+    assert(result == strlen(test_str));
+
+    /* test reading to a small buffer */
+    result = sos_sys_read(console_fd, small_buf, SMALL_BUF_SZ);
+    /* make sure you type in at least SMALL_BUF_SZ */
+    assert(result == SMALL_BUF_SZ);
+
+    /* test reading into a large on-stack buffer */
+    char stack_buf[BUF_SZ];
+    /* for this test you'll need to paste a lot of data into 
+      the console, without newlines */
+
+    result = sos_sys_read(console_fd, &stack_buf, BUF_SZ);
+    assert(result == BUF_SZ);
+
+    result = sos_sys_write(console_fd, &stack_buf, BUF_SZ);
+    assert(result == BUF_SZ);
+
+    /* this call to malloc should trigger an brk */
+    char *heap_buf = malloc(BUF_SZ);
+    assert(heap_buf != NULL);
+
+    /* for this test you'll need to paste a lot of data into
+      the console, without newlines */
+    result = sos_sys_read(console_fd, &heap_buf, BUF_SZ);
+    assert(result == BUF_SZ);
+
+    result = sos_sys_write(console_fd, &heap_buf, BUF_SZ);
+    assert(result == BUF_SZ);
+
+    /* try sleeping */
+    for (int i = 0; i < 5; i++) {
+       time_t prev_seconds = time(NULL);
+       sleep(1);
+       time_t next_seconds = time(NULL);
+       assert(next_seconds > prev_seconds);
+       printf("Tick\n");
+    }
 }
