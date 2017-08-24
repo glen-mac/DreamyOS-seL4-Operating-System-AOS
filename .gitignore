@@ -5,4 +5,4 @@ cscope.out
 /images/
 /null.s
 /null.i
-
+.config*
