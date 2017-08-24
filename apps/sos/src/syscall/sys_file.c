@@ -18,6 +18,27 @@
 #include <serial/serial.h>
 
 void
+syscall_close(seL4_CPtr reply_cap)
+{
+    LOG_INFO("syscall: thread made sos_open");
+    seL4_MessageInfo_t reply;
+
+    int fd = seL4_GetMR(1);
+    int ret_val = 0;
+
+    file * open_file;
+    if (fdtable_close_fd(curproc->file_table, fd, &open_file) != 0) {
+        ret_val = -1;
+        goto message_reply;
+    }
+
+    message_reply:
+        reply = seL4_MessageInfo_new(0, 0, 0, 1);
+        seL4_SetMR(0, ret_val);
+        seL4_Send(reply_cap, reply);
+}
+
+void
 syscall_open(seL4_CPtr reply_cap, void * message)
 {
     LOG_INFO("syscall: thread made sos_open");
@@ -37,33 +58,13 @@ syscall_open(seL4_CPtr reply_cap, void * message)
 
     /* --------------- copy in the path name ----------------- */
     assert(page_directory_lookup(curproc->p_addrspace->directory, page_id, &cap) == 0);
-
-    // /* get the indices for lookup */
-    // seL4_Word directory_index = DIRECTORY_INDEX(page_id);
-    // seL4_Word table_index = TABLE_INDEX(page_id);
-
-    // /* grab the page table directory */
-    // seL4_Word *directory = curproc->p_addrspace->directory;
-
-    // /* get the second level*/
-    // LOG_INFO(">>> directory_index: %x\n", directory_index);
-    // LOG_INFO(">>> table_index: %x\n", table_index);
-
-    // page_table_entry *second_level = (page_table_entry *)directory[directory_index];
-    // assert(second_level[table_index].page != (seL4_CPtr)NULL);
-
     // cap = second_level[table_index].page;
     LOG_INFO("cap is %p", cap);
-
     seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(cap);
-
     LOG_INFO("paddr is %p", paddr_obj.paddr);
-
     seL4_Word kvaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
-
     /* physical addr is the page frame + offset */
     LOG_INFO(">>> open(%s, %d) received on SOS\n", kvaddr, mode);
-
     /* --------------- copy in the path name ----------------- */
 
     /* TODO: grab & check data */
