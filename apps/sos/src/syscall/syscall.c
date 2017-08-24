@@ -44,6 +44,14 @@ handle_syscall(seL4_Word badge, size_t nwords)
             syscall_write(reply_cap);
             break;
 
+        case SOS_SYS_READ:
+            syscall_read(reply_cap);
+            break;
+        
+        case SOS_SYS_CLOSE:
+            syscall_close(reply_cap);
+            break;
+        
         case SOS_SYS_BRK:
             syscall_brk(reply_cap);
             break;

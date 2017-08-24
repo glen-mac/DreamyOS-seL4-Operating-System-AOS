@@ -21,7 +21,7 @@
 void
 syscall_close(seL4_CPtr reply_cap)
 {
-    LOG_INFO("syscall: thread made sos_open");
+    LOG_INFO("syscall: thread made sos_close");
     seL4_MessageInfo_t reply;
 
     int fd = seL4_GetMR(1);
@@ -97,6 +97,38 @@ syscall_open(seL4_CPtr reply_cap)
     return;
 }
 
+void
+syscall_read(seL4_CPtr reply_cap)
+{
+    seL4_MessageInfo_t reply;
+    int result;
+    LOG_INFO("syscall: thread made sos_read");
+
+    int fd = 0; /* HACK */
+
+    file *open_file;
+    if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {
+        LOG_ERROR("TODO: send ftable_get error back");
+        goto message_reply;
+    }
+
+    if (!(open_file->mode == O_RDONLY || open_file->mode == O_RDWR)) {
+        LOG_ERROR("TODO: send permission error back to user");
+        goto message_reply;
+    }
+
+    /*
+    char *string = "test string internal";
+    struct iovec iov = { .iov_base = string, .iov_len = strlen(string) };
+    vnode *vn = open_file->vn;
+    result = vn->vn_ops->vop_write(vn, &iov);
+    */
+
+    message_reply:
+        reply = seL4_MessageInfo_new(0, 0, 0, 1);
+        seL4_SetMR(0, result);
+        seL4_Send(reply_cap, reply);
+}
 
 void
 syscall_write(seL4_CPtr reply_cap)
