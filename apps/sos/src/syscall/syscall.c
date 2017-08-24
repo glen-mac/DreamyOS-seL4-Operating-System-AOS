@@ -6,6 +6,7 @@
 
 #include "proc.h"
 #include "syscall.h"
+#include "picoro.h"
 #include <sos.h>
 #include <cspace/cspace.h>
 #include <utils/util.h>

@@ -5,7 +5,7 @@
  */
 
 #include "sos_serial.h"
-
+#include "picoro.h"
 #include <vfs/vfs.h>
 #include <vfs/device.h>
 
