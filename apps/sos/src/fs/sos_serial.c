@@ -58,11 +58,8 @@ handler(struct serial *serial, char c)
     char *recv_buff = (char *)global_uio->iov_base;
     recv_buff[nbytes_read] = c;
     nbytes_read += 1;
-    if (c == '\n' || nbytes_read == global_uio->iov_len) {
+    if (c == '\n' || nbytes_read == global_uio->iov_len)
         resume(syscall_coro, NULL);
-        LOG_INFO("new line OR nbytes read we must unblock the process");
-        // Todo: go back to the coroutine stopped in sos_serial_read
-    }
 }
 
 int
@@ -78,10 +75,12 @@ sos_serial_read(vnode *node, struct iovec *iov)
     struct serial *port = node->vn_data;
     global_uio = iov;
     serial_register_handler(port, handler);
+    yield(NULL); /* Yield back to event_loop, will be resumed when there is data */
 
-    yield(NULL);
+    int bytes_read = nbytes_read;
+    nbytes_read = 0;
+    global_uio = NULL;
+    serial_deregister_handler(port);
 
-    // TODO: block?, coroutine back to the syscall loop
-
-    return nbytes_read;
+    return bytes_read;
 }

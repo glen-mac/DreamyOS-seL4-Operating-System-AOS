@@ -154,6 +154,10 @@ test_m4(void)
     /* make sure you type in at least SMALL_BUF_SZ */
     assert(result == SMALL_BUF_SZ);
 
+    result = sos_sys_read(console_fd, small_buf, SMALL_BUF_SZ);
+    /* make sure you type in at least SMALL_BUF_SZ */
+    assert(result == SMALL_BUF_SZ);
+
     // /* test reading into a large on-stack buffer */
     // char stack_buf[BUF_SZ];
     // /* for this test you'll need to paste a lot of data into 

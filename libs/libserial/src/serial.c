@@ -45,8 +45,9 @@ serial_recv_handler(void *vSerial, struct udp_pcb *unused0,
         for(q = p; q != NULL; q = q->next){
             char *data = q->payload;
             int i;
-            for(i = 0; i < q->len; i++){
-                serial->fHandler(serial, *data++);
+            for(i = 0; i < q->len; i++) {
+                if (serial->fHandler)
+                    serial->fHandler(serial, *data++);
             }
         }
     }
@@ -127,5 +128,12 @@ serial_register_handler(struct serial *serial,
                         void (*handler)(struct serial *serial, char c))
 {
     serial->fHandler = handler;
+    return 0;
+}
+
+int
+serial_deregister_handler(struct serial *serial)
+{
+    serial->fHandler = NULL;
     return 0;
 }
