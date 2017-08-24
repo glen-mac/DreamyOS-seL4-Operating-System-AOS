@@ -4,8 +4,14 @@
  * Glenn McGuire & Cameron Lonsdale
  */
 
-/* syscall for usleep */
-void syscall_usleep(seL4_CPtr);
+/* 
+ * Syscall for usleep
+ * msg(1) microsecond delay
+ */
+void syscall_usleep(seL4_CPtr reply_cap);
 
-/* syscall for time_stamp */
-void syscall_time_stamp(seL4_CPtr);
+/*
+ * Syscall for time_stamp
+ * returns 64 bit number in two 32 bits words
+ */
+void syscall_time_stamp(seL4_CPtr reply_cap);

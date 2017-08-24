@@ -22,7 +22,6 @@ handle_syscall(seL4_Word badge, size_t nwords)
     seL4_CPtr reply_cap;
 
     syscall_number = seL4_GetMR(0);
-    void *message = seL4_GetIPCBuffer()->msg + 1; /* Skip over syscall word */
 
     /* Save the caller */
     reply_cap = cspace_save_reply_cap(cur_cspace);
@@ -38,11 +37,11 @@ handle_syscall(seL4_Word badge, size_t nwords)
             break;
 
         case SOS_SYS_OPEN:
-            syscall_open(reply_cap, message);
+            syscall_open(reply_cap);
             break;
 
         case SOS_SYS_WRITE:
-            syscall_write(reply_cap, message);
+            syscall_write(reply_cap);
             break;
 
         case SOS_SYS_BRK:
