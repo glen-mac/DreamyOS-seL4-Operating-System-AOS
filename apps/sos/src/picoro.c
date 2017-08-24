@@ -10,6 +10,8 @@
 
 #include "picoro.h"
 
+coro *event_loop_coro = NULL;
+
 /*
  * Each coroutine has a jmp_buf to hold its context when suspended.
  *

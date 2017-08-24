@@ -18,6 +18,7 @@
 #include <utils/page.h>
 #include <utils/util.h>
 
+#include "picoro.h"
 #include <fs/sos_serial.h>
 #include "elf.h"
 #include "frametable.h"
@@ -301,7 +302,8 @@ main(void)
 
     /* Wait on synchronous endpoint for IPC */
     LOG_INFO("SOS entering event loop");
-    event_loop(_sos_ipc_ep_cap);
+    event_loop_coro = coroutine(event_loop);
+    resume(event_loop_coro, _sos_ipc_ep_cap);
 
     panic("should not be reached");
     return 0;
