@@ -30,7 +30,7 @@ syscall_close(seL4_CPtr reply_cap)
     int ret_val;
     int fd = seL4_GetMR(1);
 
-    file * open_file;
+    file *open_file;
     ret_val = fdtable_close_fd(curproc->file_table, fd, &open_file);
 
     reply = seL4_MessageInfo_new(0, 0, 0, 1);
@@ -47,7 +47,7 @@ syscall_open(seL4_CPtr reply_cap)
     seL4_Word path_vptr = seL4_GetMR(1);
     seL4_Word kvaddr = vaddr_to_kvaddr(path_vptr);
     fmode_t mode = seL4_GetMR(2); 
-    LOG_INFO(">>> open(%s, %d) received on SOS\n", kvaddr, mode);
+    LOG_INFO("sycall: open(%s, %d) received on SOS", kvaddr, mode);
 
     /* TODO: grab & check data */
     int result;
@@ -82,26 +82,26 @@ syscall_read(seL4_CPtr reply_cap)
     int result;
     LOG_INFO("syscall: thread made sos_read");
 
-    int fd = 0; /* HACK */
+    seL4_Word fd = seL4_GetMR(1);
+    seL4_Word buf = seL4_GetMR(2);
+    seL4_Word nbytes = seL4_GetMR(3);
+    seL4_Word kvaddr = vaddr_to_kvaddr(buf);
+    LOG_INFO("syscall: read(%d, %p, %d) received on SOS", fd, buf, nbytes);
 
     file *open_file;
     if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {
-        LOG_ERROR("TODO: send ftable_get error back");
+        LOG_ERROR("ftable_get error");
+        result = -1;
         goto message_reply;
     }
 
     if (!(open_file->mode == O_RDONLY || open_file->mode == O_RDWR)) {
-        LOG_ERROR("TODO: send permission error back to user");
+        LOG_ERROR("permission error");
+        result = -1;
         goto message_reply;
     }
 
-    seL4_Word file = seL4_GetMR(1);
-    seL4_Word buf = seL4_GetMR(2);
-    seL4_Word nbyte = seL4_GetMR(3);
-    seL4_Word kvaddr = vaddr_to_kvaddr(buf);
-    LOG_INFO(">>> read(%d, %x, %d) received on SOS\n", file, buf, nbyte);
-
-    struct iovec iov = { .iov_base = kvaddr, .iov_len = nbyte };
+    struct iovec iov = { .iov_base = kvaddr, .iov_len = nbytes };
     vnode *vn = open_file->vn;
     result = vn->vn_ops->vop_read(vn, &iov);
 
@@ -122,7 +122,7 @@ syscall_write(seL4_CPtr reply_cap)
     seL4_Word buf = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
     seL4_Word kvaddr = vaddr_to_kvaddr(buf);
-    LOG_INFO(">>> write(%d, %x, %d) received on SOS\n", fd, buf, nbytes);
+    LOG_INFO("syscall: write(%d, %x, %d)", fd, buf, nbytes);
 
     file *open_file;
     if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {

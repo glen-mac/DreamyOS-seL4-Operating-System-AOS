@@ -23,7 +23,7 @@ int nbytes_read = 0;
 static const vnode_ops serial_vnode_ops = {
     //.vop_open = sos_serial_open,
     //.vop_close = sos_serial_close
-    //.vop_read = sos_serial_read,
+    .vop_read = sos_serial_read,
     .vop_write = sos_serial_write,
 };
 
