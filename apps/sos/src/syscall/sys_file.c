@@ -72,25 +72,24 @@ syscall_open(seL4_CPtr reply_cap)
 
     int fd;
     if ((result = fdtable_get_unused_fd(curproc->file_table, &fd)) != 0) {
-        fd = result;
+        LOG_ERROR("ftable_get_unsued_fd failed: %d", result);
+        result = -1;
         goto message_reply;
-        return;
     }
-
-    LOG_INFO("getting fd %d", fd);
 
     file *open_file;
     if ((result = file_open((char *)kvaddr, mode, &open_file) != 0)) {
-        fd = result;
+        LOG_ERROR("failed to open file: %d", result);
+        result = -1;
         goto message_reply;
-        return;
     }
 
     fdtable_insert(curproc->file_table, fd, open_file);
+    result = fd;
 
     message_reply:
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
-        seL4_SetMR(0, fd);
+        seL4_SetMR(0, result);
         seL4_Send(reply_cap, reply);
 
     return;
@@ -109,11 +108,13 @@ syscall_write(seL4_CPtr reply_cap)
     file *open_file;
     if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {
         LOG_ERROR("TODO: send ftabale_get error back");
+        result = -1;
         goto message_reply;
     }
 
     if (!(open_file->mode == O_WRONLY || open_file->mode == O_RDWR)) {
         LOG_ERROR("TODO: send permission error back to user");
+        result = -1;
         goto message_reply;
     }
 
