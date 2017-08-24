@@ -69,7 +69,6 @@ int as_add_region(addrspace *as, region *new_region);
  */
 int as_find_region(addrspace *as, seL4_Word vaddr, region **found_region);
 
-
 /*
  * Check if the given start and end collide with existing regions in as
  * @param as, the addresspace to search

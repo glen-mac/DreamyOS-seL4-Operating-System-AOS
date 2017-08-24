@@ -17,7 +17,6 @@
 #include <sys/panic.h>
 
 /* Fault handling */
-
 #define INSTRUCTION_FAULT 1
 #define DATA_FAULT 0
 
@@ -30,9 +29,6 @@ static int has_permissions(seL4_Word access_type, seL4_Word permissions);
 #define ACCESS_TYPE_BIT 11
 #define ACCESS_TYPE_MASK BIT(ACCESS_TYPE_BIT)
 #define ACCESS_TYPE(x) ((x & ACCESS_TYPE_MASK) >> ACCESS_TYPE_BIT)
-
-#define ACCESS_READ 0
-#define ACCESS_WRITE 1
 
 /* Fault statuses */
 #define ALIGNMENT_FAULT 0b000001
@@ -180,14 +176,36 @@ page_directory_lookup(page_directory *dir, seL4_Word page_id, seL4_CPtr *cap)
 
     seL4_Word *directory = dir->directory;
     page_table_entry *second_level = (page_table_entry *)directory[directory_index];
-    assert(second_level != NULL);
-    assert(second_level[table_index].page != (seL4_CPtr)NULL);
-
+    if (!second_level || !second_level[table_index].page) {
+        LOG_ERROR("Second level doesnt exist");
+        return 1; 
+    }
     *cap = second_level[table_index].page;
 
     return 0;
 }
 
+int
+vm_try_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
+{   
+    addrspace *as = curproc->p_addrspace;
+
+    /* Try to expand the stack */
+    region *vaddr_region;
+    if (as_find_region(as, vaddr, &vaddr_region) != 0 &&
+        as_region_collision_check(as, PAGE_ALIGN_4K(vaddr), as->region_stack->vaddr_end) == 0) {
+        as->region_stack->vaddr_start = PAGE_ALIGN_4K(vaddr);
+    }
+    
+    /* Check if address belongs to a region and that region has permissions for the access type */
+    if (as_find_region(as, vaddr, &vaddr_region) == 0 && has_permissions(access_type, vaddr_region->permissions)) {
+        // TODO: This can fail, we need to send ENOMEM to the process.
+        assert(sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) == 0);
+        return 0;
+    }
+
+    return 1;
+}
 
 /* The status of the fault is indicated by bits 12, 10 and 3:0 all strung together */
 static seL4_Word

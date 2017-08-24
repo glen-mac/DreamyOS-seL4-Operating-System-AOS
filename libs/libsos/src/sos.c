@@ -146,8 +146,7 @@ sos_sys_time_stamp(void)
     /* Receive back the result */
     uint32_t ts_upper = seL4_GetMR(0);
     uint32_t ts_lower = seL4_GetMR(1);
-    uint64_t ts = (ts_upper << 32) | ts_lower;
-    return ts; 
+    return (uint64_t)ts_lower | ((uint64_t)ts_upper << 32);
 }
 
 /*

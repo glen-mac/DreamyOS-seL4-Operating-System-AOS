@@ -9,10 +9,12 @@
 
 #include <sel4/sel4.h>
 
+#define ACCESS_READ 0
+#define ACCESS_WRITE 1
+
 /*
  * Two level page table operations
  */
-
 #define DIRECTORY_SIZE_BITS 10
 #define TABLE_SIZE_BITS 10
 #define CAPS_INDEX_BITS 12
@@ -70,5 +72,14 @@ int page_directory_insert(page_directory *directory, seL4_Word vaddr, seL4_CPtr 
  * @returns 0 on success else 1
  */
 int page_directory_lookup(page_directory *directory, seL4_Word vaddr, seL4_CPtr *cap);
+
+/*
+ * Given a vaddr, try to map in that page 
+ * @param as, the address space to map into
+ * @param vaddr, the vaddr of the page to map in
+ * @param kvaddr[out], the kvaddr of the frame
+ * @returns 0 on success else 1
+ */
+int vm_try_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr);
 
 #endif /* _VM_H_ */

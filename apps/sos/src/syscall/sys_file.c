@@ -13,13 +13,15 @@
 #include <sys/panic.h>
 #include <sys/uio.h>
 
+#include <vm/vm.h>
+
 #include <sos.h>
 #include <cspace/cspace.h>
 #include <utils/util.h>
 #include <serial/serial.h>
 
 /* helper func to convert a vaddr to kvaddr */
-static seL4_Word vaddr_to_kvaddr(seL4_Word vaddr);
+static seL4_Word vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type);
 
 void
 syscall_close(seL4_CPtr reply_cap)
@@ -45,7 +47,7 @@ syscall_open(seL4_CPtr reply_cap)
     seL4_MessageInfo_t reply;
 
     seL4_Word path_vptr = seL4_GetMR(1);
-    seL4_Word kvaddr = vaddr_to_kvaddr(path_vptr);
+    seL4_Word kvaddr = vaddr_to_kvaddr(path_vptr, ACCESS_READ); /* read from path */
     fmode_t mode = seL4_GetMR(2); 
     LOG_INFO("sycall: open(%s, %d) received on SOS", kvaddr, mode);
 
@@ -85,7 +87,13 @@ syscall_read(seL4_CPtr reply_cap)
     seL4_Word fd = seL4_GetMR(1);
     seL4_Word buf = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
-    seL4_Word kvaddr = vaddr_to_kvaddr(buf);
+    seL4_Word kvaddr = vaddr_to_kvaddr(buf, ACCESS_WRITE); /* reading requires writing to user */
+    if (kvaddr == NULL) {
+        /* Could not translate address */ 
+        result = -1;
+        goto message_reply;
+    }
+
     LOG_INFO("syscall: read(%d, %p, %d) received on SOS", fd, buf, nbytes);
 
     file *open_file;
@@ -121,7 +129,19 @@ syscall_write(seL4_CPtr reply_cap)
     seL4_Word fd = seL4_GetMR(1);
     seL4_Word buf = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
-    seL4_Word kvaddr = vaddr_to_kvaddr(buf);
+    /* This seems to be needed by fflush in order to work properly */
+    if (nbytes == 0) {
+        result = 0;
+        goto message_reply;
+    }
+
+    seL4_Word kvaddr = vaddr_to_kvaddr(buf, ACCESS_READ); /* writing requires reading from user */
+    if (kvaddr == NULL) {
+        /* Could not translate address */ 
+        result = -1;
+        goto message_reply;
+    }
+
     LOG_INFO("syscall: write(%d, %x, %d)", fd, buf, nbytes);
 
     file *open_file;
@@ -148,18 +168,30 @@ syscall_write(seL4_CPtr reply_cap)
 }
 
 static seL4_Word
-vaddr_to_kvaddr(seL4_Word vaddr)
+vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
 {
+    int err;
+
     seL4_Word offset = (vaddr & PAGE_MASK_4K);
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
     seL4_ARM_Page cap;
     LOG_INFO(">>> vptr is %p", vaddr);
     LOG_INFO(">>> offset is %p", offset);
     LOG_INFO(">>> page id is %p", page_id);
-    assert(page_directory_lookup(curproc->p_addrspace->directory, page_id, &cap) == 0);
+
+    seL4_Word kvaddr;
+
+    err = page_directory_lookup(curproc->p_addrspace->directory, page_id, &cap);
+    if (err) {
+        if (vm_try_map(page_id, access_type, kvaddr) != 0);
+            return (seL4_Word)NULL;
+
+        cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(kvaddr));
+    }
+
     LOG_INFO(">>> cap is %p", cap);
     seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(cap);
     LOG_INFO(">>> paddr is %p", paddr_obj.paddr);
-    seL4_Word kvaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
+    kvaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
     return kvaddr;
 }

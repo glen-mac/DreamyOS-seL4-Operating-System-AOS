@@ -37,9 +37,9 @@ syscall_time_stamp(seL4_CPtr reply_cap)
 {
     LOG_INFO("syscall: thread made sos_time_stamp");
 
-    seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);
+    seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 2);
     timestamp_t ts = time_stamp();
-    seL4_SetMR(0, ts >> 32);
-    seL4_SetMR(1, ts & 0xFFFFFF); // TODO: Is this correct?
+    seL4_SetMR(0, (ts & 0xFFFFFFFF00000000L) >> 32);
+    seL4_SetMR(1, ts & 0xFFFFFFFFL);
     seL4_Send(reply_cap, reply);
 }
