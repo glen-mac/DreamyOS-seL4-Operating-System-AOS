@@ -54,28 +54,25 @@ syscall_open(seL4_CPtr reply_cap)
 
     int fd;
     if ((result = fdtable_get_unused_fd(curproc->file_table, &fd)) != 0) {
-        fd = result;
+        result = -1;
         goto message_reply;
-        return;
     }
-
-    LOG_INFO("getting fd %d", fd);
 
     file *open_file;
     if ((result = file_open((char *)kvaddr, mode, &open_file) != 0)) {
-        fd = result;
+        result = -1;
         goto message_reply;
-        return;
     }
 
     fdtable_insert(curproc->file_table, fd, open_file);
+    result = fd;
 
     message_reply:
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
-        seL4_SetMR(0, fd);
+        seL4_SetMR(0, result);
         seL4_Send(reply_cap, reply);
 
-    return;
+    LOG_INFO("result is %d", result);
 }
 
 void
@@ -121,26 +118,26 @@ syscall_write(seL4_CPtr reply_cap)
     int result;
     LOG_INFO("syscall: thread made sos_write");
 
-    int fd = 0; /* HACK */
+    seL4_Word fd = seL4_GetMR(1);
+    seL4_Word buf = seL4_GetMR(2);
+    seL4_Word nbytes = seL4_GetMR(3);
+    seL4_Word kvaddr = vaddr_to_kvaddr(buf);
+    LOG_INFO(">>> write(%d, %x, %d) received on SOS\n", fd, buf, nbytes);
 
     file *open_file;
     if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {
-        LOG_ERROR("TODO: send ftabale_get error back");
+        LOG_ERROR("ftabale_get error");
+        result = -1;
         goto message_reply;
     }
 
     if (!(open_file->mode == O_WRONLY || open_file->mode == O_RDWR)) {
-        LOG_ERROR("TODO: send permission error back to user");
+        LOG_ERROR("permission error %d", open_file->mode);
+        result = -1;
         goto message_reply;
     }
 
-    seL4_Word file = seL4_GetMR(1);
-    seL4_Word buf = seL4_GetMR(2);
-    seL4_Word nbyte = seL4_GetMR(3);
-    seL4_Word kvaddr = vaddr_to_kvaddr(buf);
-    LOG_INFO(">>> write(%d, %x, %d) received on SOS\n", file, buf, nbyte);
-
-    struct iovec iov = { .iov_base = kvaddr, .iov_len = nbyte };
+    struct iovec iov = { .iov_base = kvaddr, .iov_len = nbytes };
     vnode *vn = open_file->vn;
     result = vn->vn_ops->vop_write(vn, &iov);
 

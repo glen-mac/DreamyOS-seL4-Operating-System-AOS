@@ -12,7 +12,8 @@
 #include <utils/util.h>
 
 void
-syscall_brk(seL4_CPtr reply_cap) {
+syscall_brk(seL4_CPtr reply_cap)
+{
     seL4_MessageInfo_t reply;
     
     LOG_INFO("syscall: thread made sos_brk");

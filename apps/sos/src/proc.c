@@ -21,6 +21,8 @@
 #include "elf.h"
 #include <elf/elf.h>
 
+#include <unistd.h>
+#include <fcntl.h>
 
 #define verbose 5
 #include <sys/debug.h>
@@ -116,6 +118,24 @@ start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     /* create region for the ipc buffer */
     region *ipc_region = as_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
     as_add_region(curproc->p_addrspace, ipc_region);
+
+    /* Open stdin, stdout and stderr */
+    file *open_file;
+
+    /* STDIN */
+    err = file_open("console", O_RDONLY, &open_file);
+    conditional_panic(err, "Unable to open stdin");
+    fdtable_insert(tty_test_process->file_table, STDIN_FILENO, open_file);
+
+    /* STDOUT */
+    err = file_open("console", O_WRONLY, &open_file);
+    conditional_panic(err, "Unable to open stdout");
+    fdtable_insert(tty_test_process->file_table, STDOUT_FILENO, open_file);
+
+    /* STDERR */
+    err = file_open("console", O_WRONLY, &open_file);
+    conditional_panic(err, "Unable to open stderr");
+    fdtable_insert(tty_test_process->file_table, STDERR_FILENO, open_file);    
 
     /* Start the new process */
     memset(&context, 0, sizeof(context));
