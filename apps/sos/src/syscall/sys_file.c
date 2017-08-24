@@ -18,25 +18,24 @@
 #include <utils/util.h>
 #include <serial/serial.h>
 
+/* helper func to convert a vaddr to kvaddr */
+static seL4_Word vaddr_to_kvaddr(seL4_Word vaddr);
+
 void
 syscall_close(seL4_CPtr reply_cap)
 {
     LOG_INFO("syscall: thread made sos_close");
     seL4_MessageInfo_t reply;
 
+    int ret_val;
     int fd = seL4_GetMR(1);
-    int ret_val = 0;
 
     file * open_file;
-    if (fdtable_close_fd(curproc->file_table, fd, &open_file) != 0) {
-        ret_val = -1;
-        goto message_reply;
-    }
+    ret_val = fdtable_close_fd(curproc->file_table, fd, &open_file);
 
-    message_reply:
-        reply = seL4_MessageInfo_new(0, 0, 0, 1);
-        seL4_SetMR(0, ret_val);
-        seL4_Send(reply_cap, reply);
+    reply = seL4_MessageInfo_new(0, 0, 0, 1);
+    seL4_SetMR(0, ret_val);
+    seL4_Send(reply_cap, reply);
 }
 
 void
@@ -46,27 +45,9 @@ syscall_open(seL4_CPtr reply_cap)
     seL4_MessageInfo_t reply;
 
     seL4_Word path_vptr = seL4_GetMR(1);
-    seL4_Word offset = (path_vptr & PAGE_MASK_4K);
-    seL4_Word page_id = PAGE_ALIGN_4K(path_vptr);
-
-    seL4_ARM_Page cap;
+    seL4_Word kvaddr = vaddr_to_kvaddr(path_vptr);
     fmode_t mode = seL4_GetMR(2); 
-
-    LOG_INFO(">>> path vptr is %p", path_vptr);
-    LOG_INFO(">>> path offset is %p", offset);
-    LOG_INFO(">>> path page id is %p", page_id);
-    LOG_INFO(">>> open mode is %d", mode);
-
-    /* --------------- copy in the path name ----------------- */
-    assert(page_directory_lookup(curproc->p_addrspace->directory, page_id, &cap) == 0);
-    // cap = second_level[table_index].page;
-    LOG_INFO("cap is %p", cap);
-    seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(cap);
-    LOG_INFO("paddr is %p", paddr_obj.paddr);
-    seL4_Word kvaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
-    /* physical addr is the page frame + offset */
     LOG_INFO(">>> open(%s, %d) received on SOS\n", kvaddr, mode);
-    /* --------------- copy in the path name ----------------- */
 
     /* TODO: grab & check data */
     int result;
@@ -117,12 +98,15 @@ syscall_read(seL4_CPtr reply_cap)
         goto message_reply;
     }
 
-    /*
-    char *string = "test string internal";
-    struct iovec iov = { .iov_base = string, .iov_len = strlen(string) };
+    seL4_Word file = seL4_GetMR(1);
+    seL4_Word buf = seL4_GetMR(2);
+    seL4_Word nbyte = seL4_GetMR(3);
+    seL4_Word kvaddr = vaddr_to_kvaddr(buf);
+    LOG_INFO(">>> read(%d, %x, %d) received on SOS\n", file, buf, nbyte);
+
+    struct iovec iov = { .iov_base = kvaddr, .iov_len = nbyte };
     vnode *vn = open_file->vn;
-    result = vn->vn_ops->vop_write(vn, &iov);
-    */
+    result = vn->vn_ops->vop_read(vn, &iov);
 
     message_reply:
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
@@ -153,19 +137,8 @@ syscall_write(seL4_CPtr reply_cap)
     seL4_Word file = seL4_GetMR(1);
     seL4_Word buf = seL4_GetMR(2);
     seL4_Word nbyte = seL4_GetMR(3);
-    seL4_Word offset = (buf & PAGE_MASK_4K);
-    seL4_Word page_id = PAGE_ALIGN_4K(buf);
-    seL4_ARM_Page cap;
-    /* --------------- copy in the path name ----------------- */
-    assert(page_directory_lookup(curproc->p_addrspace->directory, page_id, &cap) == 0);
-    // cap = second_level[table_index].page;
-    LOG_INFO("cap is %p", cap);
-    seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(cap);
-    LOG_INFO("paddr is %p", paddr_obj.paddr);
-    seL4_Word kvaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
-    /* physical addr is the page frame + offset */
+    seL4_Word kvaddr = vaddr_to_kvaddr(buf);
     LOG_INFO(">>> write(%d, %x, %d) received on SOS\n", file, buf, nbyte);
-    /* --------------- copy in the path name ----------------- */
 
     struct iovec iov = { .iov_base = kvaddr, .iov_len = nbyte };
     vnode *vn = open_file->vn;
@@ -175,4 +148,21 @@ syscall_write(seL4_CPtr reply_cap)
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
         seL4_SetMR(0, result);
         seL4_Send(reply_cap, reply);
+}
+
+static seL4_Word
+vaddr_to_kvaddr(seL4_Word vaddr)
+{
+    seL4_Word offset = (vaddr & PAGE_MASK_4K);
+    seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
+    seL4_ARM_Page cap;
+    LOG_INFO(">>> vptr is %p", vaddr);
+    LOG_INFO(">>> offset is %p", offset);
+    LOG_INFO(">>> page id is %p", page_id);
+    assert(page_directory_lookup(curproc->p_addrspace->directory, page_id, &cap) == 0);
+    LOG_INFO(">>> cap is %p", cap);
+    seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(cap);
+    LOG_INFO(">>> paddr is %p", paddr_obj.paddr);
+    seL4_Word kvaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
+    return kvaddr;
 }
