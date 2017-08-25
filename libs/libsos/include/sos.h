@@ -139,6 +139,15 @@ void sos_sys_usleep(int msec);
 /* Sleeps for the specified number of milliseconds.
  */
 
+/*
+ * sys_brk call
+ * @param newbrk: the desired new brk address - if this value is 0, the user
+ * is calling in a fashion similiar to sbrk and wants the current heap brk
+ * value returned, otherwise they want it set (if possible)
+ * @returns: the current brk value (after query or change)
+ */
+seL4_Word sos_sys_brk(seL4_Word newbrk);
+
 
 /*************************************************************************/
 /*                                   */

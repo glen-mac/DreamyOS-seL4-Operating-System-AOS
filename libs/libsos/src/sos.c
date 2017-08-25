@@ -12,65 +12,85 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <sos.h>
 
 #include <sel4/sel4.h>
 
+/*
+ * Macros to count the number of variadic arguments 
+ * https://stackoverflow.com/questions/11317474/macro-to-count-number-of-arguments
+ */
+#define PP_NARG(...) PP_NARG_(__VA_ARGS__,PP_RSEQ_N())
+#define PP_NARG_(...) PP_ARG_N(__VA_ARGS__)
+#define PP_ARG_N( \
+     _1, _2, _3, _4, _5, _6, _7, _8, _9,_10, \
+    _11,_12,_13,_14,_15,_16,_17,_18,_19,_20, \
+    _21,_22,_23,_24,_25,_26,_27,_28,_29,_30, \
+    _31,_32,_33,_34,_35,_36,_37,_38,_39,_40, \
+    _41,_42,_43,_44,_45,_46,_47,_48,_49,_50, \
+    _51,_52,_53,_54,_55,_56,_57,_58,_59,_60, \
+    _61,_62,_63,  N, ...) N
+#define PP_RSEQ_N() \
+    63,62,61,60,                   \
+    59,58,57,56,55,54,53,52,51,50, \
+    49,48,47,46,45,44,43,42,41,40, \
+    39,38,37,36,35,34,33,32,31,30, \
+    29,28,27,26,25,24,23,22,21,20, \
+    19,18,17,16,15,14,13,12,11,10, \
+     9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+
+#define MAKE_SYSCALL(...) make_syscall(PP_NARG(__VA_ARGS__) - 1, __VA_ARGS__)
+
+/*
+ * Make a syscall to SOS
+ * @param nargs, number of arguments in the variadic arguments
+ * @param syscall_no, the number of the syscall
+ * @param varargs, the varadic arguments for the syscall
+ */
+static void
+make_syscall(const seL4_Word nargs, const seL4_Word syscall_no, ...)
+{
+    va_list arg_list;
+    va_start(arg_list, syscall_no);
+
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1 + nargs);
+    seL4_SetTag(tag);
+    seL4_SetMR(0, syscall_no);
+
+    for (size_t i = 0; i < nargs; ++i)
+        seL4_SetMR(1 + i, (seL4_Word)va_arg(arg_list, seL4_Word));
+
+    va_end(arg_list);
+    seL4_Call(SOS_IPC_EP_CAP, tag);
+}
+
 int
 sos_sys_open(const char *path, fmode_t mode)
 {
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 3);
-    seL4_SetTag(tag);
-    seL4_SetMR(0, SOS_SYS_OPEN); /* Syscall number */
-    seL4_SetMR(1, (seL4_Word)path); 
-    seL4_SetMR(2, (seL4_Word)mode); 
-    seL4_Call(SOS_IPC_EP_CAP, tag);
-
-    int ret_val = seL4_GetMR(0); /* Receive back the fd */
-    return ret_val;
+    MAKE_SYSCALL(SOS_SYS_OPEN, path, mode);
+    return (int)seL4_GetMR(0); /* Receive back the fd */
 }
 
 int
 sos_sys_read(int file, char *buf, size_t nbyte)
 {
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 4);
-    seL4_SetTag(tag);
-    seL4_SetMR(0, SOS_SYS_READ); /* Syscall number */
-    seL4_SetMR(1, (seL4_Word)file); 
-    seL4_SetMR(2, (seL4_Word)buf); 
-    seL4_SetMR(3, (seL4_Word)nbyte); 
-    seL4_Call(SOS_IPC_EP_CAP, tag);
-
-    int ret_val = seL4_GetMR(0); /* Receive nbytes read */
-    return ret_val;
+    MAKE_SYSCALL(SOS_SYS_READ, file, buf, nbyte);
+    return (int)seL4_GetMR(0); /* Receive nbytes read */
 }
 
 int
 sos_sys_write(int file, const char *buf, size_t nbyte)
 {
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 4);
-    seL4_SetTag(tag);
-    seL4_SetMR(0, SOS_SYS_WRITE); /* Syscall number */
-    seL4_SetMR(1, (seL4_Word)file); 
-    seL4_SetMR(2, (seL4_Word)buf); 
-    seL4_SetMR(3, (seL4_Word)nbyte); 
-    seL4_Call(SOS_IPC_EP_CAP, tag);
-
-    int ret_val = seL4_GetMR(0); /* Receive nbytes written */
-    return ret_val;
+    MAKE_SYSCALL(SOS_SYS_WRITE, file, buf, nbyte);
+    return (int)seL4_GetMR(0); /* Receive nbytes written */
 }
 
 int
 sos_sys_close(int file)
 {
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 2);
-    seL4_SetTag(tag);
-    seL4_SetMR(0, SOS_SYS_CLOSE); /* Syscall number */
-    seL4_SetMR(1, (seL4_Word)file); 
-    seL4_Call(SOS_IPC_EP_CAP, tag);
-
-    int ret_val = seL4_GetMR(0); /* -1 on error, 0 on success */
-    return ret_val;
+    MAKE_SYSCALL(SOS_SYS_CLOSE, file);
+    return (int)seL4_GetMR(0); /* -1 on error, 0 on success */
 }
 
 int
@@ -125,23 +145,14 @@ sos_process_wait(pid_t pid)
 void
 sos_sys_usleep(int msec)
 {
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 2);
-    seL4_SetTag(tag);
-    seL4_SetMR(0, SOS_SYS_USLEEP);  /* Syscall number */
-    seL4_SetMR(1, msec);            /* # of msec to sleep */
-    seL4_Call(SOS_IPC_EP_CAP, tag);
-       
-    /* at this point SOS has slept the time period */
-    return;
+    MAKE_SYSCALL(SOS_SYS_USLEEP, msec);
+    return; /* At this point SOS has slept the time period */
 }
 
 int64_t
 sos_sys_time_stamp(void)
 {
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
-    seL4_SetTag(tag);
-    seL4_SetMR(0, SOS_SYS_TIME_STAMP); /* Syscall number */
-    seL4_Call(SOS_IPC_EP_CAP, tag);
+    MAKE_SYSCALL(SOS_SYS_TIME_STAMP);
 
     /* Receive back the result */
     uint32_t ts_upper = seL4_GetMR(0);
@@ -149,23 +160,9 @@ sos_sys_time_stamp(void)
     return (uint64_t)ts_lower | ((uint64_t)ts_upper << 32);
 }
 
-/*
- * sys_brk call
- * @param newbrk: the desired new brk address - if this value is 0, the user
- * is calling in a fashion similiar to sbrk and wants the current heap brk
- * value returned, otherwise they want it set (if possible)
- * @returns: the current brk value (after query or change)
- */
-seL4_Word sos_sys_brk(seL4_Word newbrk) {
-    int ret_val;
-
-    /* need two registers, one for syscall the other for newbrk */
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 2);
-    seL4_SetTag(tag);
-    seL4_SetMR(0, SOS_SYS_BRK); /* Syscall number */
-    seL4_SetMR(1, newbrk); /* newbrk */
-    seL4_Call(SOS_IPC_EP_CAP, tag);
-
-    ret_val = seL4_GetMR(1); /* Receive back the result */
-    return ret_val; /* could contain newbrk, or the original brk */
+seL4_Word
+sos_sys_brk(seL4_Word newbrk)
+{
+    MAKE_SYSCALL(SOS_SYS_USLEEP, newbrk);
+    return seL4_GetMR(1); /* could contain newbrk, or the original brk */
 }

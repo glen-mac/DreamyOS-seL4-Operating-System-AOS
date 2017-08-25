@@ -4,11 +4,12 @@
  * Glenn McGuire & Cameron Lonsdale
  */
 
-#include "proc.h"
-#include "syscall.h"
-#include "picoro.h"
-#include <sos.h>
 #include <cspace/cspace.h>
+
+#include "picoro.h"
+#include "proc.h"
+#include <sos.h>
+#include "syscall.h"
 #include <utils/util.h>
 
 /* include all sys_* wrappers */
@@ -30,7 +31,8 @@ handle_syscall(seL4_Word badge, size_t nwords)
     reply_cap = cspace_save_reply_cap(cur_cspace);
     assert(reply_cap != CSPACE_NULL);
 
-    switch (syscall_number) {        
+    // TODO: Turn this into a jump table
+    switch (syscall_number) {
         case SOS_SYS_USLEEP:
             syscall_usleep(reply_cap);
             break;
@@ -48,15 +50,14 @@ handle_syscall(seL4_Word badge, size_t nwords)
             break;
 
         case SOS_SYS_READ:
-            syscall_coro = coroutine(syscall_read);// *fun(void *arg));
-            resume(syscall_coro, reply_cap);
-            //syscall_read(reply_cap);
+            syscall_coro = coroutine(syscall_read);
+            resume(syscall_coro, reply_cap); /* Run the read handler in a coroutine */
             break;
-        
+
         case SOS_SYS_CLOSE:
             syscall_close(reply_cap);
             break;
-        
+
         case SOS_SYS_BRK:
             syscall_brk(reply_cap);
             break;
