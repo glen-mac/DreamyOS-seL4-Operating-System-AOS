@@ -63,7 +63,6 @@ page_directory *page_directory_create(void);
  */
 int page_directory_insert(page_directory *directory, seL4_Word vaddr, seL4_CPtr sos_cap, seL4_CPtr kernel_cap);
 
-
 /*
  * Given a vaddr, retrieve the cap for the page
  * @param directory, the page directory to insert into

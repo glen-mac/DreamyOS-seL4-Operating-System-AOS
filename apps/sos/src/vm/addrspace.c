@@ -119,3 +119,15 @@ as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end)
 
     return 1;
 }
+
+int
+as_region_permission_check(region *reg, seL4_Word access_type)
+{
+    if (access_type == ACCESS_READ && (reg->permissions & seL4_CanRead))
+        return 1;
+
+    if (access_type == ACCESS_WRITE && (reg->permissions & seL4_CanWrite))
+        return 1;
+
+    return 0;
+}

@@ -78,4 +78,12 @@ int as_find_region(addrspace *as, seL4_Word vaddr, region **found_region);
  */
 int as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end);
 
+/*
+ * Check if the region has correct permissions for a certain type of access
+ * @param reg, the region to check
+ * @param access_type, the type of access
+ * @return 0 on success, else 1
+ */ 
+int as_region_permission_check(region *reg, seL4_Word access_type);
+
 #endif /* _ADDRSPACE_H_ */

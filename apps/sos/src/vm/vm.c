@@ -20,8 +20,6 @@
 #define INSTRUCTION_FAULT 1
 #define DATA_FAULT 0
 
-static int has_permissions(seL4_Word access_type, seL4_Word permissions);
-
 /* 
  * Architecture specifc interpretation of the the fault register
  * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.100511_0401_10_en/ric1447333676062.html
@@ -39,8 +37,6 @@ static int has_permissions(seL4_Word access_type, seL4_Word permissions);
 #define PERMISSION_FAULT_PAGE 0b001111
 
 static seL4_Word get_fault_status(seL4_Word fault_cause);
-
-
 
 void 
 vm_fault(void)
@@ -73,7 +69,7 @@ vm_fault(void)
     }
     
     /* Check if address belongs to a region and that region has permissions for the access type */
-    if (as_find_region(as, fault_addr, &vaddr_region) == 0 && has_permissions(access_type, vaddr_region->permissions)) {
+    if (as_find_region(as, fault_addr, &vaddr_region) == 0 && as_region_permission_check(vaddr_region, access_type)) {
         seL4_Word kvaddr;
 
         // TODO: This can fail, we need to send ENOMEM to the process.
@@ -194,12 +190,14 @@ vm_try_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
     region *vaddr_region;
     if (as_find_region(as, vaddr, &vaddr_region) != 0 &&
         as_region_collision_check(as, PAGE_ALIGN_4K(vaddr), as->region_stack->vaddr_end) == 0) {
+        LOG_INFO("Stack extension");
         as->region_stack->vaddr_start = PAGE_ALIGN_4K(vaddr);
     }
     
     /* Check if address belongs to a region and that region has permissions for the access type */
-    if (as_find_region(as, vaddr, &vaddr_region) == 0 && has_permissions(access_type, vaddr_region->permissions)) {
+    if (as_find_region(as, vaddr, &vaddr_region) == 0 && as_region_permission_check(vaddr_region, access_type)) {
         // TODO: This can fail, we need to send ENOMEM to the process.
+        LOG_INFO("mapping page");
         assert(sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) == 0);
         return 0;
     }
@@ -216,17 +214,4 @@ get_fault_status(seL4_Word fault_cause)
     seL4_Word lower_bits = fault_cause & ((1 << 3) | (1 << 2) | (1 << 1) | (1 << 0));
 
     return (bit_12 << 5) | (bit_10 << 4) | lower_bits;
-}
-
-
-static int
-has_permissions(seL4_Word access_type, seL4_Word permissions)
-{
-    if (access_type == ACCESS_READ && (permissions & seL4_CanRead))
-        return 1;
-
-    if (access_type == ACCESS_WRITE && (permissions & seL4_CanWrite))
-        return 1;
-
-    return 0;
 }

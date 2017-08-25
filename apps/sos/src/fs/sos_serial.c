@@ -99,7 +99,6 @@ sos_serial_read(vnode *node, struct iovec *iov)
         }
     }
 
-    LOG_INFO("bytes read %d", bytes_read);
     if (bytes_read == iov->iov_len)
         goto read_return;
 
@@ -114,6 +113,5 @@ sos_serial_read(vnode *node, struct iovec *iov)
     global_uio = NULL;
 
     read_return:
-        LOG_INFO("bytes read before return is %d", bytes_read);
         return bytes_read;
 }

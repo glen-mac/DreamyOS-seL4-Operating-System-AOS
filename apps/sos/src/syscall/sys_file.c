@@ -34,11 +34,16 @@ syscall_write(seL4_CPtr reply_cap)
     seL4_Word fd = seL4_GetMR(1);
     seL4_Word buf = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
-    /* This seems to be needed by fflush in order to work properly */
+
+    /*
+     * Immediately return if nbytes is 0
+     * This seems to be needed by fflush in order to work properly
+     */
     if (nbytes == 0) {
         result = 0;
         goto message_reply;
     }
+
 
     seL4_Word kvaddr = vaddr_to_kvaddr(buf, ACCESS_READ); /* writing requires reading from user */
     if (kvaddr == NULL) {
@@ -82,12 +87,6 @@ syscall_read(seL4_CPtr reply_cap)
     seL4_Word fd = seL4_GetMR(1);
     seL4_Word buf = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
-    seL4_Word kvaddr = vaddr_to_kvaddr(buf, ACCESS_WRITE); /* reading requires writing to user */
-    if (kvaddr == NULL) {
-        /* Could not translate address */ 
-        result = -1;
-        goto message_reply;
-    }
 
     LOG_INFO("syscall: read(%d, %p, %d) received on SOS", fd, buf, nbytes);
 
@@ -104,13 +103,31 @@ syscall_read(seL4_CPtr reply_cap)
         goto message_reply;
     }
 
-    struct iovec iov = { .iov_base = kvaddr, .iov_len = nbytes };
+    seL4_Word kvaddr;
+    seL4_Word nbytes_remaining = nbytes;
     vnode *vn = open_file->vn;
-    result = vn->vn_ops->vop_read(vn, &iov);
+
+    int bytes_to_read = 0;
+    for (int page = 0; page < BYTES_TO_4K_PAGES(nbytes); page++) {
+        if (!(kvaddr = vaddr_to_kvaddr(buf, ACCESS_WRITE))) {
+            /* Could not translate address */ 
+            result = -1;
+            goto message_reply;
+        }
+
+        bytes_to_read = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
+        LOG_INFO("bytes to read in this round %d", bytes_to_read);
+
+        struct iovec iov = { .iov_base = kvaddr, .iov_len = bytes_to_read };
+        result = vn->vn_ops->vop_read(vn, &iov);
+
+        nbytes_remaining -= result;
+        buf += result;
+    }
 
     message_reply:
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
-        seL4_SetMR(0, result);
+        seL4_SetMR(0, nbytes - nbytes_remaining);
         seL4_Send(reply_cap, reply);
 }
 
@@ -178,21 +195,38 @@ vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
     LOG_INFO(">>> offset is %p", offset);
     LOG_INFO(">>> page id is %p", page_id);
 
+    addrspace *as = curproc->p_addrspace;
+
+    /* Check stack expansion */
+    region *vaddr_region;
+    if (as_find_region(as, vaddr, &vaddr_region) != 0 &&
+        as_region_collision_check(as, PAGE_ALIGN_4K(vaddr), as->region_stack->vaddr_end) == 0) {
+        as->region_stack->vaddr_start = PAGE_ALIGN_4K(vaddr);
+    }
+    
+    /* Check if address belongs to a region and that region has permissions for the access type */
+    if (as_find_region(as, vaddr, &vaddr_region) != 0 ||
+        !as_region_permission_check(vaddr_region, access_type)) {
+        return NULL; /* Invalid region, or incorrect permissions */
+    }
+
+    /* Valid region with valid permissions */
+    /* Check if the page is mapped into physical memory yet */
     seL4_Word kvaddr;
-
-    // check if valid region & check permissions of there region
-
-    // check if its mapped in
     err = page_directory_lookup(curproc->p_addrspace->directory, page_id, &cap);
     if (err) {
-        // else map it in 
-        if (vm_try_map(page_id, access_type, kvaddr) != 0);
+        LOG_ERROR("lookup failed");
+        /* Try to map it in */
+        if (vm_try_map(page_id, access_type, &kvaddr) != 0) {
+            LOG_ERROR("map failed");
             return (seL4_Word)NULL;
+        }
 
         cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(kvaddr));
     }
     seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(cap);
     LOG_INFO(">>> paddr is %p", paddr_obj.paddr);
     kvaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
+    LOG_INFO("kvaddr is %p", kvaddr);
     return kvaddr;
 }
