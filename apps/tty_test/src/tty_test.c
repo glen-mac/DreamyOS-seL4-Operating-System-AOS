@@ -190,4 +190,11 @@ test_m4(void)
        assert(next_seconds > prev_seconds);
        printf("Tick\n");
     }
+    
+    /* Checking permissions */
+    sos_write((seL4_Word *)0x00008000, 10);
+    assert(result == 10);
+
+    sos_read((seL4_Word *)0x00008000, 10);
+    assert(result = -1);    
 }
