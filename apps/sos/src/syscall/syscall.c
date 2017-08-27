@@ -17,7 +17,7 @@
 #include "sys_file.h"
 #include "sys_vm.h"
 
-coro *syscall_coro = NULL;
+coro syscall_coro = NULL;
 
 void
 handle_syscall(seL4_Word badge, size_t nwords)

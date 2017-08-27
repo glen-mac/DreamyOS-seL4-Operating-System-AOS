@@ -11,7 +11,7 @@
 #include <sel4/sel4.h>
 #include <stdlib.h>
 
-extern coro *syscall_coro;
+extern coro syscall_coro;
 
 /*
  * Process a System Call

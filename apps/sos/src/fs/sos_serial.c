@@ -87,8 +87,6 @@ sos_serial_write(vnode *node, struct iovec *iov)
 int
 sos_serial_read(vnode *node, struct iovec *iov)
 {
-    struct serial *port = node->vn_data;
-
     char *user_buf = iov->iov_base;
     int bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->iov_len);
     for (int i = 0; i < bytes_read; ++i) {

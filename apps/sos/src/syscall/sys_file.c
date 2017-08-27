@@ -7,6 +7,7 @@
 #include "syscall.h"
 #include "sys_file.h"
 #include "proc.h"
+#include "frametable.h"
 #include <vfs/file.h>
 #include <fcntl.h>
 
@@ -46,7 +47,7 @@ syscall_write(seL4_CPtr reply_cap)
 
 
     seL4_Word kvaddr = vaddr_to_kvaddr(buf, ACCESS_READ); /* writing requires reading from user */
-    if (kvaddr == NULL) {
+    if (kvaddr == (seL4_Word)NULL) {
         /* Could not translate address */ 
         result = -1;
         goto message_reply;
@@ -82,13 +83,15 @@ syscall_read(seL4_CPtr reply_cap)
 {
     seL4_MessageInfo_t reply;
     int result;
+    seL4_Word kvaddr;
     LOG_INFO("syscall: thread made sos_read");
 
     seL4_Word fd = seL4_GetMR(1);
     seL4_Word buf = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
+    seL4_Word nbytes_remaining = nbytes;
 
-    LOG_INFO("syscall: read(%d, %p, %d) received on SOS", fd, buf, nbytes);
+    LOG_INFO("syscall: read(%d, 0x%x, %d) received on SOS", fd, buf, nbytes);
 
     file *open_file;
     if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {
@@ -103,8 +106,6 @@ syscall_read(seL4_CPtr reply_cap)
         goto message_reply;
     }
 
-    seL4_Word kvaddr;
-    seL4_Word nbytes_remaining = nbytes;
     vnode *vn = open_file->vn;
 
     int bytes_to_read = 0;
@@ -140,7 +141,7 @@ syscall_open(seL4_CPtr reply_cap)
 
     seL4_Word kvaddr = vaddr_to_kvaddr(seL4_GetMR(1), ACCESS_READ); /* read from path */
     fmode_t mode = seL4_GetMR(2);
-    LOG_INFO("sycall: open(%s, %d) received on SOS", kvaddr, mode);
+    LOG_INFO("sycall: open(%s, %d) received on SOS", (char *)kvaddr, mode);
 
     /* TODO: grab & check data */
     int result;
@@ -191,9 +192,9 @@ vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
     seL4_Word offset = (vaddr & PAGE_MASK_4K);
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
     seL4_ARM_Page cap;
-    LOG_INFO(">>> vptr is %p", vaddr);
-    LOG_INFO(">>> offset is %p", offset);
-    LOG_INFO(">>> page id is %p", page_id);
+    LOG_INFO(">>> vptr is 0x%d", vaddr);
+    LOG_INFO(">>> offset is 0x%d", offset);
+    LOG_INFO(">>> page id is 0x%d", page_id);
 
     addrspace *as = curproc->p_addrspace;
 
@@ -207,7 +208,7 @@ vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
     /* Check if address belongs to a region and that region has permissions for the access type */
     if (as_find_region(as, vaddr, &vaddr_region) != 0 ||
         !as_region_permission_check(vaddr_region, access_type)) {
-        return NULL; /* Invalid region, or incorrect permissions */
+        return (seL4_Word)NULL; /* Invalid region, or incorrect permissions */
     }
 
     /* Valid region with valid permissions */
@@ -225,8 +226,8 @@ vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
         cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(kvaddr));
     }
     seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(cap);
-    LOG_INFO(">>> paddr is %p", paddr_obj.paddr);
+    LOG_INFO(">>> paddr is 0x%x", paddr_obj.paddr);
     kvaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
-    LOG_INFO("kvaddr is %p", kvaddr);
+    LOG_INFO("kvaddr is 0x%x", kvaddr);
     return kvaddr;
 }

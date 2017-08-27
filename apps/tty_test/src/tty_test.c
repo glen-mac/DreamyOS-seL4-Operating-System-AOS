@@ -150,9 +150,9 @@ test_m4(void)
     assert(result == strlen(test_str));
 
     // test reading to a small buffer 
-    // result = sos_sys_read(console_fd, small_buf, SMALL_BUF_SZ);
+    result = sos_sys_read(console_fd, small_buf, SMALL_BUF_SZ);
     // /* make sure you type in at least SMALL_BUF_SZ */
-    // assert(result == SMALL_BUF_SZ);
+    assert(result == SMALL_BUF_SZ);
 
     /* test reading into a large on-stack buffer */
     char stack_buf[BUF_SZ];
