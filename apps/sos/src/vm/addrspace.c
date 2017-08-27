@@ -75,7 +75,7 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
 int
 as_add_region(addrspace *as, region *new_region)
 {
-    LOG_INFO("Adding region %p %p", new_region->vaddr_start, new_region->vaddr_end);
+    LOG_INFO("Adding region %p -> %p", (void *)new_region->vaddr_start, (void *)new_region->vaddr_end);
     if (as->region_list == NULL) {
         as->region_list = new_region;
         goto end_add;

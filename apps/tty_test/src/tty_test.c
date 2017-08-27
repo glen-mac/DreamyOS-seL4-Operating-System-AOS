@@ -30,6 +30,7 @@
 #include <utils/page.h>
 
 #include <fcntl.h>
+#include <ttyout.h>
 
 #include <sos.h>
 
@@ -95,8 +96,6 @@ test_m0(void)
 static void
 do_pt_test(char *buf)
 {
-    int i;
-
     /* set */
     for (int i = 0; i < NPAGES; i++) {
 	    buf[i * PAGE_SIZE_4K] = i;
@@ -159,10 +158,10 @@ test_m4(void)
     /* for this test you'll need to paste a lot of data into 
       the console, without newlines */
 
-    result = sos_sys_read(console_fd, &stack_buf, BUF_SZ);
+    result = sos_sys_read(console_fd, stack_buf, BUF_SZ);
     assert(result == BUF_SZ);
 
-    result = sos_sys_write(console_fd, &stack_buf, BUF_SZ);
+    result = sos_sys_write(console_fd, stack_buf, BUF_SZ);
     assert(result == BUF_SZ);
 
     // /* this call to malloc should trigger an brk */

@@ -8,22 +8,22 @@
 #define _VFS_H_
 
 #include <sel4/sel4.h>
+#include <sys/uio.h>
 
 #include <sos.h>
 
-
-struct vnode;
+typedef struct _vnode vnode;
 
 typedef struct {
     // int (*vop_open)(vnode *object, int flags_from_open);
     // int (*vop_close)(vnode *vnode);
-    int (*vop_read)(struct vnode *node, struct iovec *iov);
-    int (*vop_write)(struct vnode *node, struct iovec *iov);
+    int (*vop_read)(vnode *node, struct iovec *iov);
+    int (*vop_write)(vnode *node, struct iovec *iov);
 
-    int (*vop_lookup)(char *pathname, struct vnode **result); /* Lookup for a mount point */
+    int (*vop_lookup)(char *pathname, vnode **result); /* Lookup for a mount point */
 } vnode_ops;
 
-typedef struct {
+typedef struct _vnode {
     void *vn_data; /* Implementation specific data */
     const vnode_ops *vn_ops; /* Operations on a vnode */
 } vnode;

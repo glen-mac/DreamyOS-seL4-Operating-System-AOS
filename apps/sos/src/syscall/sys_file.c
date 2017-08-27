@@ -68,7 +68,7 @@ syscall_write(seL4_CPtr reply_cap)
         goto message_reply;
     }
 
-    struct iovec iov = { .iov_base = kvaddr, .iov_len = nbytes };
+    struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = nbytes };
     vnode *vn = open_file->vn;
     result = vn->vn_ops->vop_write(vn, &iov);
 
@@ -119,7 +119,7 @@ syscall_read(seL4_CPtr reply_cap)
         bytes_to_read = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
         LOG_INFO("bytes to read in this round %d", bytes_to_read);
 
-        struct iovec iov = { .iov_base = kvaddr, .iov_len = bytes_to_read };
+        struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_to_read };
         result = vn->vn_ops->vop_read(vn, &iov);
 
         nbytes_remaining -= result;

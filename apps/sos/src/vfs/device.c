@@ -32,7 +32,7 @@ const vnode_ops device_vnode_ops = {
  * Linked List of registered devices.
  * O(n) lookup, not ideal
  */
-static vnode *devices = NULL;
+static device *devices = NULL;
 
 int
 device_register(char *name, vnode *vn)

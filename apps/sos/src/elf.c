@@ -124,7 +124,10 @@ int
 elf_load(addrspace *as, char *elf_file)
 {
     char *source_addr;
-    unsigned long flags, file_size, segment_size, vaddr = 0;
+    unsigned long flags = 0;
+    unsigned long file_size = 0;
+    unsigned long segment_size = 0;
+    unsigned long vaddr = 0;
     int num_headers;
     int err;
 

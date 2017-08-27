@@ -103,7 +103,7 @@ void
 vfs_close(vnode *vn)
 {
     assert(!"Not implemented");
-    return 1;
+    return;
 }
 
 int

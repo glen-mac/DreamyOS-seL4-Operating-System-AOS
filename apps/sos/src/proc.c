@@ -141,8 +141,6 @@ start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     memset(&context, 0, sizeof(context));
     context.pc = elf_getEntryPoint(elf_base);
 
-    LOG_INFO("entry point %p", context.pc);
-
     context.sp = PROCESS_STACK_TOP;
     seL4_TCB_WriteRegisters(tty_test_process->tcb_cap, 1, 0, 2, &context);
 }
