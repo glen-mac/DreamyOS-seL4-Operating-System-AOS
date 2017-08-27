@@ -80,6 +80,11 @@ seL4_CPtr _sos_interrupt_ep_cap;
  */
 extern fhandle_t mnt_point;
 
+/* 
+ * Syscall coroutine
+ */
+coro syscall_coro = NULL;
+
 /*
  * Print the startup logo for the operating system
  */
@@ -129,7 +134,8 @@ event_loop(seL4_CPtr ep)
         } else if (label == seL4_VMFault) {
             vm_fault();
         } else if (label == seL4_NoFault) {
-            handle_syscall(badge, seL4_MessageInfo_get_length(message) - 1);
+            syscall_coro = coroutine(handle_syscall);
+            resume(syscall_coro, badge); 
         } else {
             LOG_INFO("Rootserver got an unknown message");
         }

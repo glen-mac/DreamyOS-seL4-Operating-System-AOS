@@ -17,7 +17,6 @@
 #include "sys_file.h"
 #include "sys_vm.h"
 
-coro syscall_coro = NULL;
 
 void
 handle_syscall(seL4_Word badge, size_t nwords)
@@ -50,8 +49,7 @@ handle_syscall(seL4_Word badge, size_t nwords)
             break;
 
         case SOS_SYS_READ:
-            syscall_coro = coroutine(syscall_read);
-            resume(syscall_coro, reply_cap); /* Run the read handler in a coroutine */
+            syscall_read(reply_cap);
             break;
 
         case SOS_SYS_CLOSE:
