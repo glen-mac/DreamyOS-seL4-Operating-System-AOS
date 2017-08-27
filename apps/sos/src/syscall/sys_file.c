@@ -109,7 +109,10 @@ syscall_read(seL4_CPtr reply_cap)
     vnode *vn = open_file->vn;
 
     int bytes_to_read = 0;
-    for (int page = 0; page < BYTES_TO_4K_PAGES(nbytes); page++) {
+    LOG_INFO("npages to read %d", BYTES_TO_4K_PAGES(nbytes) + 1);
+    LOG_INFO("nreads %d", BYTES_TO_4K_PAGES(PAGE_ALIGN_4K(buf + nbytes) - PAGE_ALIGN_4K(buf)) + 1);
+
+    for (int page = 0; page < BYTES_TO_4K_PAGES(PAGE_ALIGN_4K(buf + nbytes) - PAGE_ALIGN_4K(buf)) + 1; page++) {
         if (!(kvaddr = vaddr_to_kvaddr(buf, ACCESS_WRITE))) {
             /* Could not translate address */ 
             result = -1;
@@ -121,14 +124,23 @@ syscall_read(seL4_CPtr reply_cap)
 
         struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_to_read };
         result = vn->vn_ops->vop_read(vn, &iov);
+        /* Read a newline so we stop reading */
+        if (result != bytes_to_read) {
+            LOG_INFO("help, result is %d", result);
+            result = nbytes - nbytes_remaining;
+            goto message_reply;
+        }
 
+        LOG_INFO("page %d", page);
         nbytes_remaining -= result;
         buf += result;
     }
 
+    result = nbytes - nbytes_remaining;
+
     message_reply:
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
-        seL4_SetMR(0, nbytes - nbytes_remaining);
+        seL4_SetMR(0, result);
         seL4_Send(reply_cap, reply);
 }
 
@@ -192,9 +204,9 @@ vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
     seL4_Word offset = (vaddr & PAGE_MASK_4K);
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
     seL4_ARM_Page cap;
-    LOG_INFO(">>> vptr is 0x%d", vaddr);
-    LOG_INFO(">>> offset is 0x%d", offset);
-    LOG_INFO(">>> page id is 0x%d", page_id);
+    LOG_INFO(">>> vptr is %p", (void *)vaddr);
+    LOG_INFO(">>> offset is %p", (void *)offset);
+    LOG_INFO(">>> page id is %p", (void *)page_id);
 
     addrspace *as = curproc->p_addrspace;
 
