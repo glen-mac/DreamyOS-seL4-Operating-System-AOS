@@ -135,7 +135,7 @@ event_loop(seL4_CPtr ep)
             vm_fault();
         } else if (label == seL4_NoFault) {
             syscall_coro = coroutine(handle_syscall);
-            resume(syscall_coro, badge); 
+            resume(syscall_coro, badge);
         } else {
             LOG_INFO("Rootserver got an unknown message");
         }

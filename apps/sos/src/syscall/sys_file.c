@@ -31,7 +31,7 @@ syscall_write(seL4_CPtr reply_cap)
     LOG_INFO("syscall: thread made sos_write");
 
     seL4_MessageInfo_t reply;
-
+    seL4_Word kvaddr;
     seL4_Word fd = seL4_GetMR(1);
     seL4_Word buf = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
@@ -42,14 +42,6 @@ syscall_write(seL4_CPtr reply_cap)
      */
     if (nbytes == 0) {
         result = 0;
-        goto message_reply;
-    }
-
-
-    seL4_Word kvaddr = vaddr_to_kvaddr(buf, ACCESS_READ); /* writing requires reading from user */
-    if (kvaddr == (seL4_Word)NULL) {
-        /* Could not translate address */ 
-        result = -1;
         goto message_reply;
     }
 
@@ -68,10 +60,30 @@ syscall_write(seL4_CPtr reply_cap)
         goto message_reply;
     }
 
-    struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = nbytes };
-    vnode *vn = open_file->vn;
-    result = vn->vn_ops->vop_write(vn, &iov);
 
+    vnode *vn = open_file->vn;
+
+    seL4_Word nbytes_remaining = nbytes;
+    seL4_Word bytes_to_write;
+    while (nbytes_remaining != 0) {
+        if (!(kvaddr = vaddr_to_kvaddr(buf, ACCESS_READ))) {
+            /* Could not translate address */ 
+            result = -1;
+            goto message_reply;
+        }
+
+        bytes_to_write = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
+        LOG_INFO("bytes to write in this round %d", bytes_to_write);
+        LOG_INFO("kvaddr is %p", kvaddr);
+
+        struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_to_write };
+        result = vn->vn_ops->vop_write(vn, &iov);
+
+        nbytes_remaining -= result;
+        buf += result;
+    }
+
+    result = nbytes - nbytes_remaining;
     message_reply:
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
         seL4_SetMR(0, result);
@@ -109,10 +121,8 @@ syscall_read(seL4_CPtr reply_cap)
     vnode *vn = open_file->vn;
 
     int bytes_to_read = 0;
-    LOG_INFO("npages to read %d", BYTES_TO_4K_PAGES(nbytes) + 1);
-    LOG_INFO("nreads %d", BYTES_TO_4K_PAGES(PAGE_ALIGN_4K(buf + nbytes) - PAGE_ALIGN_4K(buf)) + 1);
 
-    for (int page = 0; page < BYTES_TO_4K_PAGES(PAGE_ALIGN_4K(buf + nbytes) - PAGE_ALIGN_4K(buf)) + 1; page++) {
+    while (nbytes_remaining != 0) {
         if (!(kvaddr = vaddr_to_kvaddr(buf, ACCESS_WRITE))) {
             /* Could not translate address */ 
             result = -1;
@@ -121,9 +131,11 @@ syscall_read(seL4_CPtr reply_cap)
 
         bytes_to_read = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
         LOG_INFO("bytes to read in this round %d", bytes_to_read);
+        LOG_INFO("kvaddr is %p", kvaddr);
 
         struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_to_read };
         result = vn->vn_ops->vop_read(vn, &iov);
+
         /* Read a newline so we stop reading */
         if (result != bytes_to_read) {
             LOG_INFO("help, result is %d", result);
@@ -131,10 +143,30 @@ syscall_read(seL4_CPtr reply_cap)
             goto message_reply;
         }
 
-        LOG_INFO("page %d", page);
         nbytes_remaining -= result;
         buf += result;
     }
+    // for (int page = 0; page < BYTES_TO_4K_PAGES(PAGE_ALIGN_4K(buf + nbytes) - PAGE_ALIGN_4K(buf)) + 1; page++) {
+    //     if (!(kvaddr = vaddr_to_kvaddr(buf, ACCESS_WRITE))) {
+    //         /* Could not translate address */ 
+    //         result = -1;
+    //         goto message_reply;
+    //     }
+
+
+    //     struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_to_read };
+    //     result = vn->vn_ops->vop_read(vn, &iov);
+    //     /* Read a newline so we stop reading */
+    //     if (result != bytes_to_read) {
+    //         LOG_INFO("help, result is %d", result);
+    //         result = nbytes - nbytes_remaining;
+    //         goto message_reply;
+    //     }
+
+    //     LOG_INFO("page %d", page);
+    //     nbytes_remaining -= result;
+    //     buf += result;
+    // }
 
     result = nbytes - nbytes_remaining;
 

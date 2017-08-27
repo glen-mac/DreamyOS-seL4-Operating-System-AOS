@@ -37,14 +37,20 @@ handler(struct serial *serial, char c)
 {
     /* If a user has registered data, then give it straight to them */
     if (global_uio) {
-        LOG_INFO("%c going into user buffer", c);
+        //LOG_INFO("nbytes_read is %d", nbytes_read);
+        //LOG_INFO("%c going into user buffer", c);
         char *buf = (char *)global_uio->iov_base;
         buf[nbytes_read] = c;
         nbytes_read++;
-        if (c == '\n' || nbytes_read >= global_uio->iov_len)
+        if (c == '\n' || nbytes_read >= global_uio->iov_len) {
+            LOG_INFO("char was %d %c", c, c);
+            LOG_INFO("RESUMED: nbytes read %d, length %d", nbytes_read, global_uio->iov_len);
             resume(syscall_coro, NULL);
+        }
+
     } else if (!ring_buffer_is_full(input_buffer)) {
-        LOG_INFO("%c going into input buffer", c);
+        //LOG_INFO("num items %d", ring_buffer_num_items(input_buffer));
+        //LOG_INFO("%c going into input buffer", c);
         /* Otherwise we buffer it */
         ring_buffer_queue(input_buffer, c);
     }
@@ -89,6 +95,7 @@ sos_serial_read(vnode *node, struct iovec *iov)
 {
     char *user_buf = iov->iov_base;
     int bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->iov_len);
+    LOG_INFO("reading %d bytes from ring buffer %d, %d", bytes_read,ring_buffer_num_items(input_buffer), iov->iov_len);
     for (int i = 0; i < bytes_read; ++i) {
         assert(ring_buffer_dequeue(input_buffer, user_buf + i) == 1);
         if (user_buf[i] == '\n') {
@@ -104,11 +111,14 @@ sos_serial_read(vnode *node, struct iovec *iov)
     nbytes_read = bytes_read;
     global_uio = iov;
 
+    LOG_INFO("before yield");
+
     yield(NULL); /* Yield back to event_loop, will be resumed when there is data */
 
+    LOG_INFO("AFTER YIELD");
+    global_uio = NULL;
     bytes_read = nbytes_read;
     nbytes_read = 0;
-    global_uio = NULL;
 
     read_return:
         return bytes_read;
