@@ -16,10 +16,28 @@
 #include <sys/debug.h>
 #include <sys/panic.h>
 
+/*
+ * Two level page table operations
+ */
+#define DIRECTORY_SIZE_BITS 10
+#define TABLE_SIZE_BITS 10
+#define CAPS_INDEX_BITS 12
+
+#define DIRECTORY_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS)
+#define TABLE_OFFSET (seL4_WordBits - DIRECTORY_SIZE_BITS - TABLE_SIZE_BITS)
+#define CAP_OFFSET (seL4_WordBits - CAPS_INDEX_BITS)
+
+#define DIRECTORY_MASK (MASK(DIRECTORY_SIZE_BITS) << DIRECTORY_OFFSET)
+#define TABLE_MASK (MASK(TABLE_SIZE_BITS) << TABLE_OFFSET)
+#define CAP_MASK (MASK(CAPS_INDEX_BITS) << CAP_OFFSET)
+
+#define CAP_INDEX(x) ((x & CAP_MASK) >> CAP_OFFSET)
+#define DIRECTORY_INDEX(x) ((x & DIRECTORY_MASK) >> DIRECTORY_OFFSET)
+#define TABLE_INDEX(x) ((x & TABLE_MASK) >> TABLE_OFFSET)
+
 /* Fault handling */
 #define INSTRUCTION_FAULT 1
 #define DATA_FAULT 0
-
 /* 
  * Architecture specifc interpretation of the the fault register
  * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.100511_0401_10_en/ric1447333676062.html
@@ -172,12 +190,17 @@ page_directory_lookup(page_directory *dir, seL4_Word page_id, seL4_CPtr *cap)
 
     seL4_Word *directory = dir->directory;
     page_table_entry *second_level = (page_table_entry *)directory[directory_index];
-    if (!second_level || !second_level[table_index].page) {
+    if (!second_level) {
         LOG_ERROR("Second level doesnt exist");
         return 1; 
     }
-    *cap = second_level[table_index].page;
 
+    if (!second_level[table_index].page) {
+        LOG_ERROR("page doesnt exist");
+        return 1; 
+    }
+
+    *cap = second_level[table_index].page;
     return 0;
 }
 
