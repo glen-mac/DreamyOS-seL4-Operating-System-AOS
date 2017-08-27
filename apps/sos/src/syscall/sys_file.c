@@ -21,159 +21,23 @@
 #include <utils/util.h>
 #include <serial/serial.h>
 
+static void syscall_do_read_write(seL4_CPtr reply_cap, seL4_Word access_mode);
+
 /* helper func to convert a vaddr to kvaddr */
 static seL4_Word vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type);
 
 void
 syscall_write(seL4_CPtr reply_cap)
 {
-    int result;
     LOG_INFO("syscall: thread made sos_write");
-
-    seL4_MessageInfo_t reply;
-    seL4_Word kvaddr;
-    seL4_Word fd = seL4_GetMR(1);
-    seL4_Word buf = seL4_GetMR(2);
-    seL4_Word nbytes = seL4_GetMR(3);
-
-    /*
-     * Immediately return if nbytes is 0
-     * This seems to be needed by fflush in order to work properly
-     */
-    if (nbytes == 0) {
-        result = 0;
-        goto message_reply;
-    }
-
-    LOG_INFO("syscall: write(%d, %x, %d)", fd, buf, nbytes);
-
-    file *open_file;
-    if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {
-        LOG_ERROR("ftabale_get error");
-        result = -1;
-        goto message_reply;
-    }
-
-    if (!(open_file->mode == O_WRONLY || open_file->mode == O_RDWR)) {
-        LOG_ERROR("permission error %d", open_file->mode);
-        result = -1;
-        goto message_reply;
-    }
-
-
-    vnode *vn = open_file->vn;
-
-    seL4_Word nbytes_remaining = nbytes;
-    seL4_Word bytes_to_write;
-    while (nbytes_remaining != 0) {
-        if (!(kvaddr = vaddr_to_kvaddr(buf, ACCESS_READ))) {
-            /* Could not translate address */ 
-            result = -1;
-            goto message_reply;
-        }
-
-        bytes_to_write = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
-        LOG_INFO("bytes to write in this round %d", bytes_to_write);
-        LOG_INFO("kvaddr is %p", kvaddr);
-
-        struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_to_write };
-        result = vn->vn_ops->vop_write(vn, &iov);
-
-        nbytes_remaining -= result;
-        buf += result;
-    }
-
-    result = nbytes - nbytes_remaining;
-    message_reply:
-        reply = seL4_MessageInfo_new(0, 0, 0, 1);
-        seL4_SetMR(0, result);
-        seL4_Send(reply_cap, reply);
+    syscall_do_read_write(reply_cap, ACCESS_WRITE);
 }
 
 void
 syscall_read(seL4_CPtr reply_cap)
 {
-    seL4_MessageInfo_t reply;
-    int result;
-    seL4_Word kvaddr;
     LOG_INFO("syscall: thread made sos_read");
-
-    seL4_Word fd = seL4_GetMR(1);
-    seL4_Word buf = seL4_GetMR(2);
-    seL4_Word nbytes = seL4_GetMR(3);
-    seL4_Word nbytes_remaining = nbytes;
-
-    LOG_INFO("syscall: read(%d, 0x%x, %d) received on SOS", fd, buf, nbytes);
-
-    file *open_file;
-    if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {
-        LOG_ERROR("ftable_get error");
-        result = -1;
-        goto message_reply;
-    }
-
-    if (!(open_file->mode == O_RDONLY || open_file->mode == O_RDWR)) {
-        LOG_ERROR("permission error");
-        result = -1;
-        goto message_reply;
-    }
-
-    vnode *vn = open_file->vn;
-
-    int bytes_to_read = 0;
-
-    while (nbytes_remaining != 0) {
-        if (!(kvaddr = vaddr_to_kvaddr(buf, ACCESS_WRITE))) {
-            /* Could not translate address */ 
-            result = -1;
-            goto message_reply;
-        }
-
-        bytes_to_read = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
-        LOG_INFO("bytes to read in this round %d", bytes_to_read);
-        LOG_INFO("kvaddr is %p", kvaddr);
-
-        struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_to_read };
-        result = vn->vn_ops->vop_read(vn, &iov);
-
-        /* Read a newline so we stop reading */
-        if (result != bytes_to_read) {
-            LOG_INFO("help, result is %d", result);
-            result = nbytes - nbytes_remaining;
-            goto message_reply;
-        }
-
-        nbytes_remaining -= result;
-        buf += result;
-    }
-    // for (int page = 0; page < BYTES_TO_4K_PAGES(PAGE_ALIGN_4K(buf + nbytes) - PAGE_ALIGN_4K(buf)) + 1; page++) {
-    //     if (!(kvaddr = vaddr_to_kvaddr(buf, ACCESS_WRITE))) {
-    //         /* Could not translate address */ 
-    //         result = -1;
-    //         goto message_reply;
-    //     }
-
-
-    //     struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_to_read };
-    //     result = vn->vn_ops->vop_read(vn, &iov);
-    //     /* Read a newline so we stop reading */
-    //     if (result != bytes_to_read) {
-    //         LOG_INFO("help, result is %d", result);
-    //         result = nbytes - nbytes_remaining;
-    //         goto message_reply;
-    //     }
-
-    //     LOG_INFO("page %d", page);
-    //     nbytes_remaining -= result;
-    //     buf += result;
-    // }
-
-    result = nbytes - nbytes_remaining;
-
-    message_reply:
-        reply = seL4_MessageInfo_new(0, 0, 0, 1);
-        seL4_SetMR(0, result);
-        seL4_Send(reply_cap, reply);
+    syscall_do_read_write(reply_cap, ACCESS_READ);
 }
 
 void
@@ -228,6 +92,74 @@ syscall_close(seL4_CPtr reply_cap)
     seL4_Send(reply_cap, reply);
 }
 
+static void
+syscall_do_read_write(seL4_CPtr reply_cap, seL4_Word access_mode)
+{
+    seL4_MessageInfo_t reply;
+
+    int result;
+    seL4_Word kvaddr;
+
+    seL4_Word fd = seL4_GetMR(1);
+    seL4_Word buf = seL4_GetMR(2);
+    seL4_Word nbytes = seL4_GetMR(3);
+
+    seL4_Word nbytes_remaining = nbytes;
+
+    LOG_INFO("syscall: %s(%d, %p, %d) received on SOS", access_mode == ACCESS_READ ? "read": "write", fd, (void *)buf, nbytes);
+
+    file *open_file;
+    if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {
+        LOG_ERROR("ftable_get error");
+        result = -1;
+        goto message_reply;
+    }
+
+    if ((access_mode == ACCESS_WRITE && !(open_file->mode == O_WRONLY || open_file->mode == O_RDWR)) ||
+        (access_mode == ACCESS_READ && !(open_file->mode == O_RDONLY || open_file->mode == O_RDWR))) {
+        LOG_ERROR("permission error");
+        result = -1;
+        goto message_reply;
+    }
+
+    vnode *vn = open_file->vn;
+    int bytes_this_round = 0;
+
+    while (nbytes_remaining != 0) {
+        if (!(kvaddr = vaddr_to_kvaddr(buf, !access_mode))) {
+            /* Could not translate address */ 
+            result = -1;
+            goto message_reply;
+        }
+
+        bytes_this_round = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
+        struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_this_round };
+        if (access_mode == ACCESS_READ) {
+            result = vn->vn_ops->vop_read(vn, &iov);
+
+            /* Didnt read enough data, could be packet loss OR newline. Could be a problem in the future idk */
+            if (result != bytes_this_round) {
+                nbytes_remaining -= result;
+                LOG_INFO("Early exit");
+                break;
+            }
+        } else {
+            result = vn->vn_ops->vop_write(vn, &iov);
+        }
+
+        nbytes_remaining -= result;
+        buf += result;
+    }
+
+    result = nbytes - nbytes_remaining;
+
+    message_reply:
+        LOG_INFO("result is %d", result);
+        reply = seL4_MessageInfo_new(0, 0, 0, 1);
+        seL4_SetMR(0, result);
+        seL4_Send(reply_cap, reply);
+}
+
 static seL4_Word
 vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
 {
@@ -236,9 +168,6 @@ vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
     seL4_Word offset = (vaddr & PAGE_MASK_4K);
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
     seL4_ARM_Page cap;
-    LOG_INFO(">>> vptr is %p", (void *)vaddr);
-    LOG_INFO(">>> offset is %p", (void *)offset);
-    LOG_INFO(">>> page id is %p", (void *)page_id);
 
     addrspace *as = curproc->p_addrspace;
 
@@ -270,8 +199,6 @@ vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
         cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(kvaddr));
     }
     seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(cap);
-    LOG_INFO(">>> paddr is 0x%x", paddr_obj.paddr);
     kvaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
-    LOG_INFO("kvaddr is 0x%x", kvaddr);
     return kvaddr;
 }
