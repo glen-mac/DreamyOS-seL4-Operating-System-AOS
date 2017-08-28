@@ -11,6 +11,7 @@
 #include "mapping.h"
 #include <string.h>
 #include <utils/page.h>
+#include <utils/util.h>
 
 #include <assert.h>
 #include <ut_manager/ut.h>
@@ -20,6 +21,8 @@
 #include "elf.h"
 #include <elf/elf.h>
 
+#include <unistd.h>
+#include <fcntl.h>
 
 #define verbose 5
 #include <sys/debug.h>
@@ -28,7 +31,7 @@
 #define TTY_EP_BADGE (101)
 
 void
-start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
+start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
 {
     int err;
 
@@ -38,11 +41,14 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
     seL4_UserContext context;
 
     /* These required for loading program sections */
-    char* elf_base;
+    char *elf_base;
     unsigned long elf_size;
 
     tty_test_process->p_addrspace = as_create();
     assert(tty_test_process->p_addrspace != NULL);
+
+    tty_test_process->file_table = fdtable_create();
+    assert(tty_test_process->file_table != NULL);
 
     /* Create a simple 1 level CSpace */
     tty_test_process->croot = cspace_create(1);
@@ -99,8 +105,7 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
     conditional_panic(err, "Failed to load elf image");
 
     /* Create a stack frame */
-    seL4_Word initial_stack_size = PAGE_SIZE_4K;
-    region *stack = as_create_region(PROCESS_STACK_TOP - initial_stack_size, initial_stack_size, seL4_CanRead | seL4_CanWrite);
+    region *stack = as_create_region(PROCESS_STACK_TOP - PAGE_SIZE_4K, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
     as_add_region(curproc->p_addrspace, stack);
     curproc->p_addrspace->region_stack = stack;
     
@@ -114,9 +119,28 @@ start_first_process(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep)
     region *ipc_region = as_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
     as_add_region(curproc->p_addrspace, ipc_region);
 
+    /* Open stdin, stdout and stderr */
+    file *open_file;
+
+    /* STDIN */
+    err = file_open("console", O_RDONLY, &open_file);
+    conditional_panic(err, "Unable to open stdin");
+    fdtable_insert(tty_test_process->file_table, STDIN_FILENO, open_file);
+
+    /* STDOUT */
+    err = file_open("console", O_WRONLY, &open_file);
+    conditional_panic(err, "Unable to open stdout");
+    fdtable_insert(tty_test_process->file_table, STDOUT_FILENO, open_file);
+
+    /* STDERR */
+    err = file_open("console", O_WRONLY, &open_file);
+    conditional_panic(err, "Unable to open stderr");
+    fdtable_insert(tty_test_process->file_table, STDERR_FILENO, open_file);    
+
     /* Start the new process */
     memset(&context, 0, sizeof(context));
     context.pc = elf_getEntryPoint(elf_base);
+
     context.sp = PROCESS_STACK_TOP;
     seL4_TCB_WriteRegisters(tty_test_process->tcb_cap, 1, 0, 2, &context);
 }

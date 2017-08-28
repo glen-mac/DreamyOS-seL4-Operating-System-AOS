@@ -75,6 +75,7 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
 int
 as_add_region(addrspace *as, region *new_region)
 {
+    LOG_INFO("Adding region %p -> %p", (void *)new_region->vaddr_start, (void *)new_region->vaddr_end);
     if (as->region_list == NULL) {
         as->region_list = new_region;
         goto end_add;
@@ -117,4 +118,16 @@ as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end)
         return 0;
 
     return 1;
+}
+
+int
+as_region_permission_check(region *reg, seL4_Word access_type)
+{
+    if (access_type == ACCESS_READ && (reg->permissions & seL4_CanRead))
+        return 1;
+
+    if (access_type == ACCESS_WRITE && (reg->permissions & seL4_CanWrite))
+        return 1;
+
+    return 0;
 }

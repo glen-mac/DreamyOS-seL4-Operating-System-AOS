@@ -12,7 +12,7 @@
 #define _LIBOS_ELF_H_
 
 #include <sel4/sel4.h>
-#include "addrspace.h"
+#include <vm/addrspace.h>
 
 /*
  * Load an elf binary into an address space

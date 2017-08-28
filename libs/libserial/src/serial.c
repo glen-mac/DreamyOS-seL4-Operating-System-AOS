@@ -35,7 +35,7 @@ struct serial {
     struct udp_pcb *fUpcb;
 };
 
-static void 
+static void
 serial_recv_handler(void *vSerial, struct udp_pcb *unused0, 
                     struct pbuf *p, struct ip_addr *unused1, u16_t unused2)
 {
@@ -45,9 +45,8 @@ serial_recv_handler(void *vSerial, struct udp_pcb *unused0,
         for(q = p; q != NULL; q = q->next){
             char *data = q->payload;
             int i;
-            for(i = 0; i < q->len; i++){
+            for(i = 0; i < q->len; i++)
                 serial->fHandler(serial, *data++);
-            }
         }
     }
     pbuf_free(p);

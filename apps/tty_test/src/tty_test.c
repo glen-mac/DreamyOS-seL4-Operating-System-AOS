@@ -24,35 +24,44 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <time.h>
+
 #include <sel4/sel4.h>
 #include <utils/page.h>
 
-#include "ttyout.h"
+#include <fcntl.h>
+#include <ttyout.h>
+
+#include <sos.h>
 
 #define NPAGES 27
 #define TEST_ADDRESS 0x20000000
 
 static void test_m0(void);
 static void test_m3(void);
+static void test_m4(void);
+
+char *file_name = "test_file_name";
 
 /* 
  * Block a thread forever
  * we do this by making an unimplemented system call.
  */
 static void
-thread_block(void) {
+thread_block(void)
+{
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
     seL4_SetTag(tag);
     seL4_SetMR(0, 999);
-    seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
+    seL4_Call(SOS_IPC_EP_CAP, tag);
 }
 
-int main(void) {
-    /* initialise communication */
-    ttyout_init();
-
-    test_m0();
-    test_m3();
+int
+main(void)
+{
+    // test_m0();
+    // test_m3();
+    test_m4();
     return 0;
 }
 
@@ -80,15 +89,13 @@ test_m0(void)
     seL4_SetMR(0, 1); /* Syscall number */
     seL4_SetMR(1, 99999); /* Number of bytes in the message */
     memcpy(seL4_GetIPCBuffer()->msg + 2, message2, max_msg_size);
-    seL4_Call(SYSCALL_ENDPOINT_SLOT, tag);
+    seL4_Call(SOS_IPC_EP_CAP, tag);
     assert((size_t)seL4_GetMR(0) == max_msg_size);
 }
 
 static void
 do_pt_test(char *buf)
 {
-    int i;
-
     /* set */
     for (int i = 0; i < NPAGES; i++) {
 	    buf[i * PAGE_SIZE_4K] = i;
@@ -125,3 +132,69 @@ test_m3(void)
     *addr = 5;
 }
 
+static void
+test_m4(void)
+{
+    #define SMALL_BUF_SZ 2
+    #define BUF_SZ (2*PAGE_SIZE_4K) // 2 page buffer
+
+    char test_str[] = "Basic test string for read/write\n";
+    char small_buf[SMALL_BUF_SZ];
+
+    int console_fd = open("console", O_RDWR);
+    assert(console_fd != -1);
+
+    /* test a small string from the code segment */
+    int result = sos_sys_write(console_fd, test_str, strlen(test_str));
+    assert(result == strlen(test_str));
+
+    printf("Enter %d bytes\n", SMALL_BUF_SZ);
+
+    /* test reading to a small buffer */
+    result = sos_sys_read(console_fd, small_buf, SMALL_BUF_SZ);
+    /* make sure you type in at least SMALL_BUF_SZ */
+    assert(result == SMALL_BUF_SZ);
+
+    /* test reading into a large on-stack buffer */
+    char stack_buf[BUF_SZ];
+    /* for this test you'll need to paste a lot of data into 
+      the console, without newlines */
+
+    printf("Enter %d bytes for the stack\n", BUF_SZ);
+    result = sos_sys_read(console_fd, stack_buf, BUF_SZ);
+    assert(result == BUF_SZ);
+
+    printf("Now printing %d bytes from the stack\n", BUF_SZ);
+    result = sos_sys_write(console_fd, stack_buf, BUF_SZ);
+    assert(result == BUF_SZ);
+
+    /* this call to malloc should trigger an brk */
+    char *heap_buf = malloc(BUF_SZ);
+    assert(heap_buf != NULL);
+
+    /* for this test you'll need to paste a lot of data into
+       the console, without newlines */
+    printf("Enter %d bytes for the heap\n", BUF_SZ);
+    result = sos_sys_read(console_fd, &heap_buf, BUF_SZ);
+    assert(result == BUF_SZ);
+
+    printf("Now printing %d bytes from the heap\n", BUF_SZ);
+    result = sos_sys_write(console_fd, &heap_buf, BUF_SZ);
+    assert(result == BUF_SZ);
+
+    /* try sleeping */
+    for (int i = 0; i < 5; i++) {
+       time_t prev_seconds = time(NULL);
+       sleep(1);
+       time_t next_seconds = time(NULL);
+       assert(next_seconds > prev_seconds);
+       printf("Tick\n");
+    }
+    
+    /* Checking permissions */
+    sos_write((seL4_Word *)0x00008000, 10);
+    assert(result == 10);
+
+    sos_read((seL4_Word *)0x00008000, 10);
+    assert(result = -1);    
+}

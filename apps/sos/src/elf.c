@@ -21,7 +21,7 @@
 #include <utils/page.h>
 
 #include "proc.h"
-#include "addrspace.h"
+#include <vm/addrspace.h>
 #include "frametable.h"
 
 #include <vmem_layout.h>
@@ -106,7 +106,7 @@ load_segment_into_vspace(addrspace *as,
         /* Now copy our data into the destination vspace. */
         nbytes = PAGE_SIZE_4K - (dst & PAGE_MASK_4K);
         if (pos < file_size)
-            memcpy((void*)kdst, (void*)src, MIN(nbytes, file_size - pos));
+            memcpy((void*)(kdst + (dst & PAGE_MASK_4K)), (void*)src, MIN(nbytes, file_size - pos));
 
         /* Not observable to I-cache yet so flush the frame */
         seL4_Word frame_cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(kdst));
@@ -116,6 +116,7 @@ load_segment_into_vspace(addrspace *as,
         dst += nbytes;
         src += nbytes;
     }
+
     return 0;
 }
 
@@ -123,7 +124,10 @@ int
 elf_load(addrspace *as, char *elf_file)
 {
     char *source_addr;
-    unsigned long flags, file_size, segment_size, vaddr = 0;
+    unsigned long flags = 0;
+    unsigned long file_size = 0;
+    unsigned long segment_size = 0;
+    unsigned long vaddr = 0;
     int num_headers;
     int err;
 
@@ -149,14 +153,14 @@ elf_load(addrspace *as, char *elf_file)
         // TODO: Should probably return error here instead of panicing.
         LOG_INFO("Loading segment %08x-->%08x", (int)vaddr, (int)(vaddr + segment_size));
         err = load_segment_into_vspace(as, source_addr, segment_size, file_size, vaddr,
-                                       get_sel4_rights_from_elf(flags) & seL4_AllRights);
+                                       get_sel4_rights_from_elf(flags));
         conditional_panic(err != 0, "Elf loading failed!\n");
     }
 
     /* Map in the heap region after all other regions were added */
     // TOOD: Might be able to move this into create_proc and just grab the info from the end of LL of regions
     assert(vaddr != 0);
-    seL4_Word heap_loc = PAGE_ALIGN_4K(vaddr + PAGE_SIZE_4K);
+    seL4_Word heap_loc = PAGE_ALIGN_4K(vaddr + segment_size + PAGE_SIZE_4K);
     region *heap = as_create_region(heap_loc, 0, seL4_CanRead | seL4_CanWrite);
     as_add_region(as, heap);
     as->region_heap = heap;

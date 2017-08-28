@@ -21,7 +21,7 @@
 #include "vmem_layout.h"
 #include "proc.h"
 #include "frametable.h"
-#include "vm.h"
+#include <vm/vm.h>
 
 extern const seL4_BootInfo *_boot_info;
 

@@ -14,18 +14,21 @@
 #include <cpio/cpio.h>
 #include <nfs/nfs.h>
 #include <elf/elf.h>
-#include <serial/serial.h>
 #include <clock/clock.h>
 #include <utils/page.h>
 #include <utils/util.h>
 
+#include "picoro.h"
+#include <fs/sos_serial.h>
 #include "elf.h"
 #include "frametable.h"
 #include "mapping.h"
 #include "network.h"
 #include "proc.h"
+#include <syscall/syscall.h>
 #include "ut_manager/ut.h"
-#include "vm.h"
+#include <vm/vm.h>
+#include <vfs/vfs.h>
 #include "vmem_layout.h"
 
 #define verbose 5
@@ -60,14 +63,6 @@ extern char _cpio_archive[];
 
 const seL4_BootInfo *_boot_info;
 
-/*
- * A dummy starting syscall
- */
-// TODO: make these global so user libraries can reference these defines too
-#define SOS_SYSCALL0 0
-#define SOS_SYSCALL_WRITE 1
-#define SOS_SYSCALL_BRK 2
-
 static void sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
 static void sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
 static void sos_driver_init(void);
@@ -85,10 +80,10 @@ seL4_CPtr _sos_interrupt_ep_cap;
  */
 extern fhandle_t mnt_point;
 
-/*
- * Port for sending data to serial
+/* 
+ * Syscall coroutine
  */
-struct serial *serial_port;
+coro syscall_coro = NULL;
 
 /*
  * Print the startup logo for the operating system
@@ -116,93 +111,6 @@ print_startup(void)
 }
 
 /*
- * Process a System Call
- * @param badge, the badge of the capability
- * @param nwords, the size of the message in words (not to be trusted)
- */
-void
-handle_syscall(seL4_Word badge, size_t nwords)
-{
-    seL4_Word syscall_number;
-    seL4_CPtr reply_cap;
-
-    syscall_number = seL4_GetMR(0);
-    void *message = seL4_GetIPCBuffer()->msg + 1; /* Skip over syscall word */
-
-    /* Save the caller */
-    reply_cap = cspace_save_reply_cap(cur_cspace);
-    assert(reply_cap != CSPACE_NULL);
-
-    /* TODO: REFACTOR THESE OUT INTO THEIR OWN FILE */
-    switch (syscall_number) {
-        case SOS_SYSCALL0:
-            LOG_INFO("syscall: thread made syscall 0");
-
-            seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);
-            seL4_SetMR(0, 0);
-            seL4_Send(reply_cap, reply);
-
-            break;
-
-        case SOS_SYSCALL_WRITE:
-            LOG_INFO("syscall: thread made sos_write");
-
-            size_t max_msg_size = (seL4_MsgMaxLength - 2) * sizeof(seL4_Word);
-            size_t nbytes = seL4_GetMR(1);
-
-            if (nbytes > max_msg_size)
-                nbytes = max_msg_size;
-
-            /* Byte string of characters, 4 characters in one word */
-            /* Skip over the nbytes field */
-            char *buffer = (char *)(message + sizeof(seL4_Word));
-
-            /* Send to serial and reply with how many bytes were sent */
-            nbytes = serial_send(serial_port, buffer, nbytes);
-            reply = seL4_MessageInfo_new(0, 0, 0, 1);
-            seL4_SetMR(0, nbytes);
-            seL4_Send(reply_cap, reply);
-
-            break;
-
-        case SOS_SYSCALL_BRK:
-            LOG_INFO("syscall: thread made sos_brk");
-            
-            seL4_Word newbrk = seL4_GetMR(1);
-            seL4_Word * heap_b = &curproc->p_addrspace->region_heap->vaddr_start;
-            seL4_Word * heap_t = &curproc->p_addrspace->region_heap->vaddr_end;
-
-            /* will return status code and addr */
-            reply = seL4_MessageInfo_new(0, 0, 0, 2);
-
-            /* set return value as okay by default */
-            seL4_SetMR(0, 0);
-            
-            /* if we actually desire to change heap brk */
-            if (newbrk) {
-                /* if the newbrk is silly, then we change return value */
-                if (*heap_b > newbrk)
-                    seL4_SetMR(0, 1);
-                /* otherwise we change the brk */
-                else 
-                    *heap_t = newbrk;
-            }
-            
-            seL4_SetMR(1, *heap_t);
-            seL4_Send(reply_cap, reply);
-
-            break;
-
-        default:
-            /* we don't want to reply to an unknown syscall */
-            LOG_INFO("Unknown syscall %d", syscall_number);
-    }
-
-    /* Free the saved reply cap */
-    cspace_free_slot(cur_cspace, reply_cap);
-}
-
-/*
  * Event handler loop
  * @param ep, the endpoint where messages come in
  */
@@ -226,7 +134,8 @@ event_loop(seL4_CPtr ep)
         } else if (label == seL4_VMFault) {
             vm_fault();
         } else if (label == seL4_NoFault) {
-            handle_syscall(badge, seL4_MessageInfo_get_length(message) - 1);
+            syscall_coro = coroutine(handle_syscall);
+            resume(syscall_coro, badge);
         } else {
             LOG_INFO("Rootserver got an unknown message");
         }
@@ -284,9 +193,9 @@ sos_driver_init(void)
     /* Initialise the network hardware */
     network_init(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_NETWORK));
 
-    /* Must happen after network initialisation */
-    serial_port = serial_init();
-   
+    /* Intialise the serial device and register it with the VFS */
+    sos_serial_init();
+
     /* Map in the GPT into virtual memory and provide that address to the timer library */
     init_timer(map_device((void *)CLOCK_GPT, CLOCK_GPT_SIZE));
 
@@ -315,7 +224,7 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     _boot_info = seL4_GetBootInfo();
     conditional_panic(!_boot_info, "Failed to retrieve boot info\n");
     
-    // print_bootinfo(_cpio_archive, _boot_info);
+    print_bootinfo(_cpio_archive, _boot_info);
 
     /* Initialise the untyped sub system and reserve memory for DMA */
     err = ut_table_init(_boot_info);
@@ -355,6 +264,9 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     err = frame_table_init(frame_table_paddr, frame_table_size_in_bits, low, high);
     conditional_panic(err, "Failed to intiialise frame table\n");
 
+    err = vfs_init();
+    conditional_panic(err, "Failed to virtual file system\n");
+
     sos_ipc_init(ipc_ep, async_ep);
     sos_driver_init();
 }
@@ -386,7 +298,7 @@ main(void)
 
     /* Initialise the operating system */
     sos_init(&_sos_ipc_ep_cap, &_sos_interrupt_ep_cap);
-        
+
     /* Start the user application */
     start_first_process(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap);
 
@@ -396,7 +308,8 @@ main(void)
 
     /* Wait on synchronous endpoint for IPC */
     LOG_INFO("SOS entering event loop");
-    event_loop(_sos_ipc_ep_cap);
+    event_loop_coro = coroutine(event_loop);
+    resume(event_loop_coro, _sos_ipc_ep_cap);
 
     panic("should not be reached");
     return 0;

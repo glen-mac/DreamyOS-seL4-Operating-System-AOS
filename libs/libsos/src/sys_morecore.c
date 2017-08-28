@@ -39,13 +39,8 @@ static uintptr_t morecore_top = (uintptr_t) &morecore_area[MORECORE_AREA_BYTE_SI
 long
 sys_brk(va_list ap)
 {
-    uintptr_t ret;
     uintptr_t newbrk = va_arg(ap, uintptr_t);
-
-    ret = sos_sys_brk((seL4_Word)newbrk);
-    printf("sys_brk(%x) return %x\n",newbrk,ret);
-
-    return ret;
+    return sos_sys_brk((seL4_Word)newbrk);
 }
 
 /* Large mallocs will result in muslc calling mmap, so we do a minimal implementation
@@ -53,17 +48,18 @@ sys_brk(va_list ap)
 long
 sys_mmap2(va_list ap)
 {
-    LOG_INFO("SYS_MMAP2 BEING CALLED!!!");
     void *addr = va_arg(ap, void*);
     size_t length = va_arg(ap, size_t);
     int prot = va_arg(ap, int);
     int flags = va_arg(ap, int);
     int fd = va_arg(ap, int);
     off_t offset = va_arg(ap, off_t);
+
     (void)addr;
     (void)prot;
     (void)fd;
     (void)offset;
+
     if (flags & MAP_ANONYMOUS) {
         /* Steal from the top */
         uintptr_t base = morecore_top - length;
@@ -73,6 +69,7 @@ sys_mmap2(va_list ap)
         morecore_top = base;
         return base;
     }
+
     assert(!"not implemented");
     return -ENOMEM;
 }

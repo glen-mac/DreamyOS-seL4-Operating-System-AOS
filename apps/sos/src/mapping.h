@@ -14,7 +14,7 @@
 #include <sel4/sel4.h>
 #include <cspace/cspace.h>
 
-#include "addrspace.h"
+#include <vm/addrspace.h>
 
 /*
  * Maps a page into a page table. 

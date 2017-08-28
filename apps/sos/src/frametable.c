@@ -1,6 +1,7 @@
 /*
  * Frametable Implementation
- * Glenn McGuire and Cameron Lonsdale
+ *
+ * Glenn McGuire & Cameron Lonsdale
  */
 
 #include "frametable.h"
@@ -189,6 +190,13 @@ frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr)
 {
     seL4_Word paddr = sos_vaddr - PHYSICAL_VSTART;
     return ADDR_TO_INDEX(paddr);
+}
+
+seL4_Word
+frame_table_paddr_to_sos_vaddr(seL4_Word paddr)
+{
+    seL4_Word sos_vaddr = paddr + PHYSICAL_VSTART;
+    return sos_vaddr;
 }
 
 seL4_Word

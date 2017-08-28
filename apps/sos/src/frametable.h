@@ -1,6 +1,8 @@
 /*
  * Frametable
- * Glenn McGuire and Cameron Lonsdale */
+ *
+ * Glenn McGuire & Cameron Lonsdale
+ */
 
 #ifndef _FRAMETABLE_H_
 #define _FRAMETABLE_H_
@@ -50,6 +52,8 @@ seL4_ARM_Page frame_table_get_capability(seL4_Word frame_id);
  */
 seL4_Word frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr);
 
+
+seL4_Word frame_table_paddr_to_sos_vaddr(seL4_Word paddr);
 /*
  * Allocate multiple contiguous frames
  * @param[out] kernel vaddr to access the memory
@@ -58,4 +62,4 @@ seL4_Word frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr);
  */
 seL4_Word multi_frame_alloc(seL4_Word *vaddr, seL4_Word nframes);
 
-#endif /* FRAMETABLE_H_ */
+#endif /* _FRAMETABLE_H_ */
