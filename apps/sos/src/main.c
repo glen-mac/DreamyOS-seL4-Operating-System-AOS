@@ -20,6 +20,7 @@
 
 #include "picoro.h"
 #include <fs/sos_serial.h>
+#include <fs/sos_nfs.h>
 #include "elf.h"
 #include "frametable.h"
 #include "mapping.h"
@@ -193,15 +194,19 @@ sos_driver_init(void)
     /* Initialise the network hardware */
     network_init(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_NETWORK));
 
-    /* Intialise the serial device and register it with the VFS */
-    sos_serial_init();
-
     /* Map in the GPT into virtual memory and provide that address to the timer library */
     init_timer(map_device((void *)CLOCK_GPT, CLOCK_GPT_SIZE));
 
     /* Initialise timer with badged capability */
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
+
+    /* Intialise the serial device and register it with the VFS */
+    sos_serial_init();
+
+    /* Initialise the NFS file system and register with the VFS */
+    err = sos_nfs_init();
+    conditional_panic(err, "Failed to mount NFS\n");
 }
 
 /*

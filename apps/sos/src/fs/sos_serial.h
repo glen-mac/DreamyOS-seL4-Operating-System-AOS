@@ -17,7 +17,6 @@
  */
 int sos_serial_init(void);
 
-
 /*
  * Write to the serial device
  * @param node, the vnode of the device

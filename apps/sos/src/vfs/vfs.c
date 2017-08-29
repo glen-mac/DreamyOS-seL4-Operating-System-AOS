@@ -42,8 +42,7 @@ vfs_init(void)
     device_mount->vn_data = NULL;
     device_mount->vn_ops = &device_vnode_ops;
     vfs_mount(device_mount);
-
-    // TODO: mount nfs
+   
     return 0;
 }
 
@@ -102,7 +101,7 @@ vfs_open(char *path, fmode_t mode, vnode **ret)
 void
 vfs_close(vnode *vn)
 {
-    assert(!"Not implemented");
+    free(vn); // Just free it, dont bother storing it anywhere
     return;
 }
 
