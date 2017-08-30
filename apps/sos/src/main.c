@@ -127,11 +127,12 @@ event_loop(seL4_CPtr ep)
         label = seL4_MessageInfo_get_label(message);
         if (badge & IRQ_EP_BADGE) {
             /* Interrupt */
-            if (badge & IRQ_BADGE_NETWORK) {
+            if (badge & IRQ_BADGE_NETWORK)
                 network_irq();
-            } else if (badge & IRQ_BADGE_TIMER) {
+
+            if (badge & IRQ_BADGE_TIMER)
                 timer_interrupt();
-            }
+
         } else if (label == seL4_VMFault) {
             vm_fault();
         } else if (label == seL4_NoFault) {
@@ -309,7 +310,7 @@ main(void)
 
     /* Unit tests */
     // test_m2();
-    // test_m1(); /* After so as to have time to enter event loop */
+    test_m1(); /* After so as to have time to enter event loop */
 
     /* Wait on synchronous endpoint for IPC */
     LOG_INFO("SOS entering event loop");

@@ -58,9 +58,9 @@ seL4_Word *compare_register_ptr;
 seL4_Word *upper_timestamp_register_ptr;
 seL4_Word *counter_register_ptr;
 
-seL4_CPtr irq_handler; /* Global IRQ handler */
-priority_queue *pq; /* timer event pq handler */
-uint32_t timer_started = 0; /* Boolean to state if the timer has started or not */
+static seL4_CPtr irq_handler; /* Global IRQ handler */
+static priority_queue *pq; /* timer event pq handler */
+static uint32_t timer_started = 0; /* Boolean to state if the timer has started or not */
 
 static uint64_t join32to64(uint32_t upper, uint32_t lower);
 static uint32_t add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t repeat, uint32_t uid);

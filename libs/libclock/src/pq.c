@@ -27,7 +27,7 @@ init_pq(void)
  * @returns -1 on error, else a positive uid
  */
 int
-pq_push(priority_queue *pq, uint64_t priority, uint32_t delay, timer_callback_t cb, void *data, uint8_t repeat, uint32_t uid)
+pq_push(priority_queue *pq, uint64_t priority, uint64_t delay, timer_callback_t cb, void *data, uint8_t repeat, uint32_t uid)
 {
     /* Sanity checks */
     if (!pq)
