@@ -36,4 +36,11 @@ int sos_nfs_write(vnode *node, uiovec *iov);
  */
 int sos_nfs_read(vnode *node, uiovec *iov);
 
+/*
+ * Close an NFS file
+ * @param node, the vnode of the file
+ * @returns 0 on success else -1
+ */
+int sos_nfs_close(vnode *node);
+
 #endif /*_SOS_NFS_H_ */

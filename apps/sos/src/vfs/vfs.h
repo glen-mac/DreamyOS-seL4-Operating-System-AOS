@@ -21,8 +21,7 @@ typedef struct {
 typedef struct _vnode vnode;
 
 typedef struct {
-    // int (*vop_open)(vnode *object, int flags_from_open);
-    // int (*vop_close)(vnode *vnode);
+    int (*vop_close)(vnode *vnode);
     int (*vop_read)(vnode *node, uiovec *iov);
     int (*vop_write)(vnode *node, uiovec *iov);
 
@@ -64,7 +63,7 @@ int vfs_open(char *path, fmode_t mode, vnode **ret);
  * calls vop_close on the vnode
  * @param vn, the node
  */
-void vfs_close(vnode *vn); // TODO, RETURN ERROR?
+void vfs_close(vnode *vn);
 
 /*
  * Lookup a path name inside the VFS

@@ -81,7 +81,7 @@ vfs_open(char *path, fmode_t mode, vnode **ret)
         return EINVAL;
     }
 
-    // Might have to deal with file creation here for NFS
+    /* Might create a file, NFS creates a failed lookup file inside its vop_lookup function */
     if ((result = vfs_lookup(path, &vn))) {
         LOG_ERROR("vfs_lookup failed");
         return result;
@@ -101,7 +101,8 @@ vfs_open(char *path, fmode_t mode, vnode **ret)
 void
 vfs_close(vnode *vn)
 {
-    free(vn); // Just free it, dont bother storing it anywhere
+    /* Delegate to the close operation */
+    vn->vn_ops->vop_close(vn);
     return;
 }
 

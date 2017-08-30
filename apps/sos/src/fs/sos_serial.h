@@ -33,4 +33,10 @@ int sos_serial_write(vnode *node, uiovec *iov);
  */
 int sos_serial_read(vnode *node, uiovec *iov);
 
+/*
+ * Close a serial device
+ * @param node, the vnode of the device
+ */
+int sos_serial_close(vnode *node);
+
 #endif /* _SOS_SERIAL_H_ */

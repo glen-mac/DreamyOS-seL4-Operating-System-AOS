@@ -26,8 +26,8 @@ ring_buffer_t *input_buffer = NULL;
  * Operations for a serial vnode
  */
 static const vnode_ops serial_vnode_ops = {
-    //.vop_open = sos_serial_open,
-    //.vop_close = sos_serial_close
+    /* Dont really need open as device vnodes are already open when they are registered */
+    .vop_close = sos_serial_close,
     .vop_read = sos_serial_read,
     .vop_write = sos_serial_write,
 };
@@ -113,4 +113,14 @@ sos_serial_read(vnode *node, uiovec *iov)
 
     read_return:
         return bytes_read;
+}
+
+int
+sos_serial_close(vnode *node)
+{   
+    /* 
+     * We dont want to close the device as that would unintiailise it
+     * The vnode is permanent and lives as a registered device so we dont want to free it
+     */
+    return 0;
 }

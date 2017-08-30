@@ -22,6 +22,7 @@ static const vnode_ops nfs_dir_ops = {
 };
 
 static const vnode_ops nfs_vnode_ops = {
+    .vop_close = sos_nfs_close,
     .vop_read = sos_nfs_read,
     .vop_write = sos_nfs_write,
 };
@@ -48,12 +49,16 @@ sos_nfs_init(void)
 int
 sos_nfs_lookup(char *pathname, vnode **result)
 {
+    vnode *file;
     nfs_lookup(&mnt_point, pathname, sos_nfs_lookup_callback, NULL);
 
-    vnode *file = yield(NULL);
-
-    if (!file)
-        return 1;
+    file = yield(NULL);
+    if (!file) {      
+        LOG_INFO("creating file %s", pathname);
+        const sattr_t file_attr = { .mode = 0664 }; /* Read write for owner and group, read for everyone */
+        nfs_create(&mnt_point, pathname, &file_attr, (nfs_create_cb_t)sos_nfs_lookup_callback, NULL);
+        file = yield(NULL);
+    }
 
     *result = file;
     return 0;
@@ -79,6 +84,20 @@ sos_nfs_read(vnode *node, uiovec *iov)
     return *ret;
 }
 
+int
+sos_nfs_close(vnode *node)
+{
+    /* Free the handle */
+    free(node->vn_data);
+    free(node);
+    return 0;
+}
+
+/*
+ * Callback for the lookup function
+ * NFS tells us if the file exists
+ * We then build a vnode to represent that file
+ */
 nfs_lookup_cb_t
 sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
                                 fhandle_t* fh, fattr_t* fattr)
@@ -101,6 +120,10 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
         resume(syscall_coro, file);
 }
 
+/*
+ * Write callback
+ * Return number of bytes written
+ */
 nfs_write_cb_t
 sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count)
 {
@@ -113,6 +136,10 @@ sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, in
         resume(syscall_coro, &ret_val);
 }
 
+/*
+ * Read callback
+ * Copy the memory into the buffer specified by the iov_base
+ */
 nfs_read_cb_t
 sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data)
 {
