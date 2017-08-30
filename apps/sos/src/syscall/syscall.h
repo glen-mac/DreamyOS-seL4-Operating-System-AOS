@@ -16,8 +16,7 @@ extern coro syscall_coro;
 /*
  * Process a System Call
  * @param badge, the badge of the capability
- * @param nwords, the size of the message in words (not to be trusted)
  */
-void handle_syscall(seL4_Word badge, size_t nwords);
+void handle_syscall(seL4_Word badge);
 
 #endif /* _SYSCALL_H_ */

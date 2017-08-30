@@ -17,51 +17,36 @@
 #include "sys_file.h"
 #include "sys_vm.h"
 
-void
-handle_syscall(seL4_Word badge, size_t nwords)
-{
-    seL4_Word syscall_number;
-    seL4_CPtr reply_cap;
+static void (*syscall_table[])(seL4_CPtr) = {
+    NULL,
+    syscall_write,
+    NULL,
+    syscall_read,
+    NULL,
+    syscall_open,
+    syscall_close,
+    syscall_brk,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    syscall_usleep,
+    syscall_time_stamp
+};
 
-    syscall_number = seL4_GetMR(0);
+void
+handle_syscall(seL4_Word badge)
+{
+    seL4_Word syscall_number = seL4_GetMR(0);
 
     /* Save the caller */
-    reply_cap = cspace_save_reply_cap(cur_cspace);
+    seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
     assert(reply_cap != CSPACE_NULL);
 
-    // TODO: Turn this into a jump table
-    switch (syscall_number) {
-        case SOS_SYS_USLEEP:
-            syscall_usleep(reply_cap);
-            break;
-
-        case SOS_SYS_TIME_STAMP:
-            syscall_time_stamp(reply_cap);
-            break;
-
-        case SOS_SYS_OPEN:
-            syscall_open(reply_cap);
-            break;
-
-        case SOS_SYS_WRITE:
-            syscall_write(reply_cap);
-            break;
-
-        case SOS_SYS_READ:
-            syscall_read(reply_cap);
-            break;
-
-        case SOS_SYS_CLOSE:
-            syscall_close(reply_cap);
-            break;
-
-        case SOS_SYS_BRK:
-            syscall_brk(reply_cap);
-            break;
-
-        default:
-            /* we don't want to reply to an unknown syscall */
-            LOG_INFO("Unknown syscall %d", syscall_number);
+    if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table)) && syscall_table[syscall_number]) {
+        syscall_table[syscall_number](reply_cap);
+    } else {
+        LOG_INFO("Unknown syscall %d", syscall_number);
     }
 
     /* Delete the saved reply cap */
