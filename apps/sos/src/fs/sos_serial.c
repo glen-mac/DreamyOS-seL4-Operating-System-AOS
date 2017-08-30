@@ -17,7 +17,7 @@
 #include <utils/util.h>
 #include "ringbuf.h"
 
-struct iovec *global_uio = NULL;
+uiovec *global_uio = NULL;
 int nbytes_read = 0;
 
 ring_buffer_t *input_buffer = NULL;
@@ -37,10 +37,10 @@ handler(struct serial *serial, char c)
 {
     /* If a user has registered data, then give it straight to them */
     if (global_uio) {
-        char *buf = (char *)global_uio->iov_base;
+        char *buf = (char *)global_uio->uiov_base;
         buf[nbytes_read] = c;
         nbytes_read++;
-        if (c == '\n' || nbytes_read >= global_uio->iov_len) {
+        if (c == '\n' || nbytes_read >= global_uio->uiov_len) {
             LOG_INFO("resuming blocked coro");
             resume(syscall_coro, NULL);
         }
@@ -79,17 +79,17 @@ sos_serial_init(void)
 }
 
 int
-sos_serial_write(vnode *node, struct iovec *iov)
+sos_serial_write(vnode *node, uiovec *iov)
 {
     struct serial *port = node->vn_data;
-    return serial_send(port, iov->iov_base, iov->iov_len);
+    return serial_send(port, iov->uiov_base, iov->uiov_len);
 }
 
 int
-sos_serial_read(vnode *node, struct iovec *iov)
+sos_serial_read(vnode *node, uiovec *iov)
 {
-    char *user_buf = iov->iov_base;
-    int bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->iov_len);
+    char *user_buf = iov->uiov_base;
+    int bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->uiov_len);
     for (int i = 0; i < bytes_read; ++i) {
         assert(ring_buffer_dequeue(input_buffer, user_buf + i) == 1);
         if (user_buf[i] == '\n') {
@@ -98,7 +98,7 @@ sos_serial_read(vnode *node, struct iovec *iov)
         }
     }
 
-    if (bytes_read == iov->iov_len)
+    if (bytes_read == iov->uiov_len)
         goto read_return;
 
     /* Need to read more, this is blocking */

@@ -133,7 +133,12 @@ syscall_do_read_write(seL4_CPtr reply_cap, seL4_Word access_mode)
         }
 
         bytes_this_round = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
-        struct iovec iov = { .iov_base = (char *)kvaddr, .iov_len = bytes_this_round };
+        uiovec iov = {
+            .uiov_base = (char *)kvaddr,
+            .uiov_len = bytes_this_round,
+            .uiov_pos = open_file->fp
+        };
+
         if (access_mode == ACCESS_READ) {
             result = vn->vn_ops->vop_read(vn, &iov);
 
@@ -153,8 +158,11 @@ syscall_do_read_write(seL4_CPtr reply_cap, seL4_Word access_mode)
 
     result = nbytes - nbytes_remaining;
 
+    /* Increment the file pointer */
+    if (result > 0)
+        open_file->fp += result;
+
     message_reply:
-        LOG_INFO("result is %d", result);
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
         seL4_SetMR(0, result);
         seL4_Send(reply_cap, reply);

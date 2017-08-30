@@ -23,7 +23,7 @@ int sos_serial_init(void);
  * @param iov, the io vector
  * @returns nbytes written on success else errno
  */
-int sos_serial_write(vnode *node, struct iovec *iov);
+int sos_serial_write(vnode *node, uiovec *iov);
 
 /*
  * Read from the serial device
@@ -31,6 +31,6 @@ int sos_serial_write(vnode *node, struct iovec *iov);
  * @param iov, the io vector
  * @returns nbytes read on success else errno
  */
-int sos_serial_read(vnode *node, struct iovec *iov);
+int sos_serial_read(vnode *node, uiovec *iov);
 
 #endif /* _SOS_SERIAL_H_ */

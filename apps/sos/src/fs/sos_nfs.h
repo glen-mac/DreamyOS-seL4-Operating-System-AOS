@@ -26,7 +26,7 @@ int sos_nfs_lookup(char *name, vnode **result);
  * @param iov, the io vector
  * @returns nbytes written on success else errno
  */
-int sos_nfs_write(vnode *node, struct iovec *iov);
+int sos_nfs_write(vnode *node, uiovec *iov);
 
 /*
  * Read from an NFS file
@@ -34,6 +34,6 @@ int sos_nfs_write(vnode *node, struct iovec *iov);
  * @param iov, the io vector
  * @returns nbytes read on success else errno
  */
-int sos_nfs_read(vnode *node, struct iovec *iov);
+int sos_nfs_read(vnode *node, uiovec *iov);
 
 #endif /*_SOS_NFS_H_ */

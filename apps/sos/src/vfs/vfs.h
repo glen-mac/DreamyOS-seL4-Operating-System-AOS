@@ -12,13 +12,19 @@
 
 #include <sos.h>
 
+typedef struct {
+	void *uiov_base;
+	size_t uiov_len;
+	size_t uiov_pos;
+} uiovec;
+
 typedef struct _vnode vnode;
 
 typedef struct {
     // int (*vop_open)(vnode *object, int flags_from_open);
     // int (*vop_close)(vnode *vnode);
-    int (*vop_read)(vnode *node, struct iovec *iov);
-    int (*vop_write)(vnode *node, struct iovec *iov);
+    int (*vop_read)(vnode *node, uiovec *iov);
+    int (*vop_write)(vnode *node, uiovec *iov);
 
     int (*vop_lookup)(char *pathname, vnode **result); /* Lookup for a mount point */
 } vnode_ops;

@@ -26,7 +26,6 @@ static const vnode_ops nfs_vnode_ops = {
     .vop_write = sos_nfs_write,
 };
 
-
 static nfs_lookup_cb_t sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
 static nfs_write_cb_t sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count);
 static nfs_read_cb_t sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data);
@@ -61,10 +60,9 @@ sos_nfs_lookup(char *pathname, vnode **result)
 }
 
 int
-sos_nfs_write(vnode *node, struct iovec *iov)
+sos_nfs_write(vnode *node, uiovec *iov)
 {
-    // TODO: Need to pass in offset
-    if (nfs_write(node->vn_data, 0, iov->iov_len, iov->iov_base, sos_nfs_write_callback, NULL) != RPC_OK)
+    if (nfs_write(node->vn_data, iov->uiov_pos, iov->uiov_len, iov->uiov_base, sos_nfs_write_callback, NULL) != RPC_OK)
         return -1;
 
     int *ret = yield(NULL);
@@ -72,10 +70,9 @@ sos_nfs_write(vnode *node, struct iovec *iov)
 }
 
 int
-sos_nfs_read(vnode *node, struct iovec *iov)
+sos_nfs_read(vnode *node, uiovec *iov)
 {
-    // TODO: Need to pass in offset
-    if (nfs_read(node->vn_data, 0, iov->iov_len, sos_nfs_read_callback, (uintptr_t)iov) != RPC_OK)
+    if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)iov) != RPC_OK)
         return -1;
 
     int *ret = yield(NULL);
@@ -95,7 +92,9 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
         goto coro_resume;
     }
 
-    file->vn_data = (void *)fh;
+    file->vn_data = malloc(sizeof(fhandle_t));
+    memcpy(file->vn_data, fh, sizeof(fhandle_t));
+
     file->vn_ops = &nfs_vnode_ops;
 
     coro_resume:
