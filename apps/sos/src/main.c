@@ -203,7 +203,8 @@ sos_driver_init(void)
     conditional_panic(err, "Failed to start the timer\n");
 
     /* Intialise the serial device and register it with the VFS */
-    sos_serial_init();
+    err = sos_serial_init();
+    conditional_panic(err, "Failed to initialise serial driver\n");
 
     /* Initialise the NFS file system and register with the VFS */
     err = sos_nfs_init();
@@ -307,15 +308,14 @@ main(void)
 
     /* Start the user application */
     start_first_process(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap);
-
+    
     /* Unit tests */
     // test_m2();
-    test_m1(); /* After so as to have time to enter event loop */
+    // test_m1(); /* After so as to have time to enter event loop */
 
     /* Wait on synchronous endpoint for IPC */
     LOG_INFO("SOS entering event loop");
-    event_loop_coro = coroutine(event_loop);
-    resume(event_loop_coro, _sos_ipc_ep_cap);
+    event_loop(_sos_ipc_ep_cap);
 
     panic("should not be reached");
     return 0;

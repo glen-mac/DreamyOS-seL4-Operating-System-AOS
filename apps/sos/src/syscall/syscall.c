@@ -17,7 +17,6 @@
 #include "sys_file.h"
 #include "sys_vm.h"
 
-
 void
 handle_syscall(seL4_Word badge, size_t nwords)
 {
@@ -65,6 +64,6 @@ handle_syscall(seL4_Word badge, size_t nwords)
             LOG_INFO("Unknown syscall %d", syscall_number);
     }
 
-    /* Free the saved reply cap */
-    cspace_free_slot(cur_cspace, reply_cap);
+    /* Delete the saved reply cap */
+    cspace_delete_cap(cur_cspace, reply_cap);
 }
