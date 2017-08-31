@@ -24,7 +24,7 @@
 #include <dma.h>
 #include <mapping.h>
 #include <ut_manager/ut.h>
-#include <vmem_layout.h>
+#include <vm/layout.h>
 #include <utils/arith.h>
 
 #define verbose 5

@@ -6,8 +6,8 @@
 
 #include "syscall.h"
 #include "sys_file.h"
-#include "proc.h"
-#include "frametable.h"
+#include <proc/proc.h>
+#include <vm/frametable.h>
 #include <vfs/file.h>
 #include <fcntl.h>
 

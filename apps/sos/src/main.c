@@ -1,5 +1,5 @@
 /*
- * :dreamy: os
+ * Dreamy OS
  *
  * Cameron Lonsdale & Glenn McGuire
  */
@@ -10,8 +10,8 @@
 #include <clock/clock.h>
 #include <cspace/cspace.h>
 #include <cpio/cpio.h>
+#include <dev/sos_serial.h>
 #include <elf/elf.h>
-#include <fs/sos_serial.h>
 #include <fs/sos_nfs.h>
 #include <nfs/nfs.h>
 #include <sys/debug.h>
@@ -21,17 +21,17 @@
 #include <utils/util.h>
 #include <vfs/vfs.h>
 #include <vm/vm.h>
+#include <vm/frametable.h>
 
 #include "elf.h"
-#include "frametable.h"
 #include "mapping.h"
 #include "network.h"
 #include "picoro.h"
-#include "proc.h"
-#include "ut_manager/ut.h"
-#include "vmem_layout.h"
+#include <proc/proc.h>
+#include <ut_manager/ut.h>
+#include <vm/layout.h>
 
-/* For unit tests */
+/* For unit tests: TREMOVE BEFORE FINAL SUBMISSION*/
 #include "tests.h"
 
 /* 

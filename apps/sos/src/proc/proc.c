@@ -16,7 +16,7 @@
 #include <assert.h>
 #include <ut_manager/ut.h>
 #include <sys/panic.h>
-#include "vmem_layout.h"
+#include <vm/layout.h>
 #include <cpio/cpio.h>
 #include "elf.h"
 #include <elf/elf.h>

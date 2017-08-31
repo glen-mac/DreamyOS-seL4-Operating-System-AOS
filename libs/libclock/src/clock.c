@@ -1,5 +1,6 @@
 /*
  * Clock Implementation
+ *
  * Cameron Lonsdale & Glenn McGuire
  *
  */
@@ -57,7 +58,7 @@ static seL4_Word *upper_timestamp_register_ptr;
 static seL4_Word *counter_register_ptr;
 
 static seL4_CPtr irq_handler; /* Global IRQ handler */
-static priority_queue *pq; /* timer event pq handler */
+static priority_queue *pq; /* Timer event pq handler */
 static uint32_t timer_started = 0; /* Boolean to state if the timer has started or not */
 
 static uint64_t join32to64(uint32_t upper, uint32_t lower);
@@ -69,9 +70,9 @@ static void check_for_rollover(void);
  * This is copied from network.c (and modified)
  * TODO: Abstract this out so network.c and clock.c uses the same code?
  *
- * @param int irq, interrupt request id
- * @param seL4_CPtr aep, asynchronous endpoint the interrupt message will be delivered to
- * @param[out] seL4_CPtr *irq_handler_ptr, Capability pointer to describe the interrupt handler
+ * @param irq, interrupt request id
+ * @param aep, asynchronous endpoint the interrupt message will be delivered to
+ * @param[out] irq_handler_ptr, Capability pointer to describe the interrupt handler
  * @returns 0 on success, else -1
  */
 static int

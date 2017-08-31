@@ -84,6 +84,7 @@ sos_unmap_device(void *cookie, void *addr, size_t size)
     return;
 }
 
+// TODO: Can we use the timer here instead
 void 
 sos_usleep(int usecs)
 {

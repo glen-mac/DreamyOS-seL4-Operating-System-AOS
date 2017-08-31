@@ -7,7 +7,7 @@
 #include <cspace/cspace.h>
 
 #include "picoro.h"
-#include "proc.h"
+#include <proc/proc.h>
 #include <sos.h>
 #include "syscall.h"
 #include <utils/util.h>

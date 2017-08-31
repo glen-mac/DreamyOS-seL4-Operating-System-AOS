@@ -6,7 +6,7 @@
 
 #include "syscall.h"
 #include "sys_vm.h"
-#include "proc.h"
+#include <proc/proc.h>
 #include <sos.h>
 #include <cspace/cspace.h>
 #include <utils/util.h>

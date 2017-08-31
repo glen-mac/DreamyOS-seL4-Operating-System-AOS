@@ -19,12 +19,11 @@
 #include <utils/math.h>
 #include <utils/time.h>
 
-#include "frametable.h"
+#include <vm/frametable.h>
 #include "network.h"
 #include "elf.h"
 
 #include "ut_manager/ut.h"
-#include "vmem_layout.h"
 #include "mapping.h"
 
 #include "tests.h"

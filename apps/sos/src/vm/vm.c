@@ -8,7 +8,7 @@
 
 #include "frametable.h"
 #include "mapping.h"
-#include "proc.h"
+#include <proc/proc.h>
 
 #include <utils/util.h>
 

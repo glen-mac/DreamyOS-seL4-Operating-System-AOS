@@ -14,7 +14,7 @@
 #include <utils/util.h>
 #include <utils/time.h>
 
-#include "vmem_layout.h"
+#include <vm/layout.h>
 #include "ut_manager/ut.h"
 #include "mapping.h"
 
