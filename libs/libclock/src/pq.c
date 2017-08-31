@@ -1,12 +1,13 @@
-#include <stdlib.h>
+/*
+ * Prioirty Queue
+ * Glenn McGuire & Cameron Lonsdale
+ */
+
 #include <clock/pq.h>
+#include <stdlib.h>
 
 static void remove_element(priority_queue *pq, uint32_t id);
 
-/* 
- * Initialis the priority queue 
- * @returns pointer to priority queue
- */
 priority_queue *
 init_pq(void)
 {

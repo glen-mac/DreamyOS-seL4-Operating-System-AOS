@@ -1,27 +1,42 @@
+/*
+ * Prioirty Queue
+ * Glenn McGuire & Cameron Lonsdale
+ */
+
+#ifndef _PQ_H_
+#define _PQ_H_
+
 #include <stdlib.h>
 #include <clock/clock.h>
 
 #define PQ_STARTING_SIZE 20
 
-/* individual node */
+/*
+ * Invidivual node in the queue
+ */
 typedef struct {
-    uint64_t priority;          /* the priority of the event */
-    uint64_t delay;             /* the delay of the event */
-    timer_callback_t callback;  /* the callback function pointer */
-    void *data;                 /* the data to provide the cb */
-    uint32_t uid;               /* unique identifier */
-    uint8_t repeat;             /* is this a repeating event? */
+    uint64_t priority; /* The priority of the event */
+    uint64_t delay; /* The delay of the event */
+    timer_callback_t callback; /* The callback function pointer */
+    void *data; /* The data to provide the cb */
+    uint32_t uid; /* Unique identifier */
+    uint8_t repeat; /* Is this a repeating event? */
 } event;
 
-/* pq heap structure */
+/*
+ * Priority Queue heap structure
+ */
 typedef struct {
-    event *events;              /* ptr to an array of events */
-    uint32_t len;               /* the size of the pq being used */
-    uint32_t size;              /* the size of the actual pq */
-    uint32_t counter;           /* unique id counter */
+    event *events; /* Ptr to an array of events */
+    uint32_t len;  /* The size of the pq being used */
+    uint32_t size; /* The size of the actual pq */
+    uint32_t counter; /* Unique id counter */
 } priority_queue;
 
-/* init the priority queue */
+/* 
+ * Initialis the priority queue 
+ * @returns pointer to priority queue
+ */
 priority_queue *init_pq();
 
 /* push a value onto the pq 
@@ -47,3 +62,5 @@ uint64_t pq_time_peek(priority_queue *pq);
 
 /* get next available id and increment struct global counter */
 uint32_t pq_get_next_id(priority_queue *pq);
+
+#endif /* _PQ_H_ */

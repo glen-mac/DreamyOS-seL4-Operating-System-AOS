@@ -102,4 +102,6 @@
         typeof (limit) _limit = (limit); \
         _limit + _op2 > _op1 ? _limit : _op1 - _op2;  })
 
+#define UPPER32BITS(n) ((uint32_t)(n >> sizeof(uint32_t)))
+
 #endif /* _UTILS_ARITH_H */
