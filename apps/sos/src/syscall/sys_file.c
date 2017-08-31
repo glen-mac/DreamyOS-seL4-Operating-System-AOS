@@ -206,21 +206,33 @@ syscall_listdir(seL4_CPtr reply_cap)
 {   
     seL4_MessageInfo_t reply;
 
-    LOG_INFO("syscall: thread made sos_getdirent(0)");
+    LOG_INFO("syscall: thread made sos_getdirent");
 
     int result = -1;
 
-    seL4_Word udir = vaddr_to_kvaddr(seL4_GetMR(1), ACCESS_WRITE);
-    seL4_Word usize = vaddr_to_kvaddr(seL4_GetMR(2), ACCESS_WRITE);
+    seL4_Word pos = seL4_GetMR(1);
+    seL4_Word uname = vaddr_to_kvaddr(seL4_GetMR(2), ACCESS_WRITE);
+    seL4_Word nbytes = seL4_GetMR(3);
 
     char **dir;
     size_t nfiles = 0;
     if (vfs_list(&dir, &nfiles) != 0)
         goto message_reply;
 
-    // TODO Copy out
-    for (int i = 0; i < nfiles; i++)
-        LOG_INFO("%d %s", i, dir[i]);
+    /* 1 past the end so we return 0 */
+    if (pos == nfiles) {
+        result = 0;
+        goto message_reply;
+    }
+
+    /* Invalid directory entry */
+    if (!ISINRANGE(0, pos, nfiles - 1))
+        goto message_reply;
+
+    /* Copy the name into the user process */
+    size_t bytes_returned = MIN(nbytes, strlen(dir[pos]));
+    memcpy(uname, dir[pos], bytes_returned);
+    result = bytes_returned;
 
     message_reply:
         reply = seL4_MessageInfo_new(0, 0, 0, 1);

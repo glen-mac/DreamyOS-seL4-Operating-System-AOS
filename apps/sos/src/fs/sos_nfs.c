@@ -87,6 +87,7 @@ sos_nfs_lookup(char *name, int create_file, vnode **result)
 int
 sos_nfs_list(char ***list, size_t *nfiles)
 {
+    
     *nfiles = 0;
     return 0;
 }

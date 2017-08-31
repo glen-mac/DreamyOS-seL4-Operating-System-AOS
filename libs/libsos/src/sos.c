@@ -96,12 +96,7 @@ sos_sys_close(int file)
 int
 sos_getdirent(int pos, char *name, size_t nbyte)
 {
-    if (pos == 0)
-        MAKE_SYSCALL(SOS_SYS_LISTDIR, NULL); // Syscall to refresh the directory cache
-    // NULL Should be replaced with a pointer to the user level directory cache.
-
-    // TODO: Now access the cache with pos to retrieve the name
-
+    MAKE_SYSCALL(SOS_SYS_GETDIRENT, pos, name, nbyte);
     return (int)seL4_GetMR(0);
 }
 
