@@ -34,6 +34,7 @@ static void (*syscall_table[])(seL4_CPtr) = {
     syscall_usleep,
     syscall_time_stamp,
     syscall_stat,
+    syscall_listdir,
 };
 
 void

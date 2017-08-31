@@ -24,6 +24,7 @@
 
 static const vnode_ops nfs_dir_ops = {
     .vop_lookup = sos_nfs_lookup,
+    .vop_list = sos_nfs_list,
 };
 
 static const vnode_ops nfs_vnode_ops = {
@@ -81,6 +82,14 @@ sos_nfs_lookup(char *name, int create_file, vnode **result)
     }
 
     *result = vn;
+    return 0;
+}
+
+int
+sos_nfs_list(char ***list, size_t *nfiles)
+{
+    
+    *nfiles = 0;
     return 0;
 }
 
