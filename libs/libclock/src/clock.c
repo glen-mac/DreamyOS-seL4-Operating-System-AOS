@@ -363,7 +363,7 @@ check_for_rollover(void)
 {
     if (*status_register_ptr & ROLL_OVER_MASK) {
         /* Overflow wont happen for ~584 years, we plan to finish AOS by then */
-        *upper_timestamp_register_ptr++;
+        *upper_timestamp_register_ptr += 1;
         *status_register_ptr |= ROLL_OVER_MASK; /* Acknowledge a roll over event occured */ 
         LOG_INFO("32-bit timer rollover");
     }
