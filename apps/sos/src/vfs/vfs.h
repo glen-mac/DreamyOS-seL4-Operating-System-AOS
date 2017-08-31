@@ -27,6 +27,7 @@ typedef struct {
     int (*vop_stat)(vnode *node, sos_stat_t *buf);
 
     int (*vop_lookup)(char *name, int create_file, vnode **result); /* Lookup for a mount point */
+    int (*vop_list)(char ***dir, size_t *nfiles); /* list all the files in a mount point */
 } vnode_ops;
 
 typedef struct _vnode {
@@ -84,5 +85,10 @@ int vfs_stat(char *name, sos_stat_t *buf);
  * @returns 0 on success else 1
  */
 int vfs_lookup(char *name, int create_file, vnode **ret);
+
+/*
+ * List all the files in the VFS
+ */
+int vfs_list(char ***dir, size_t *nfiles);
 
 #endif /* _VFS_H_ */

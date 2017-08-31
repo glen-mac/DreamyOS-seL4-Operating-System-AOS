@@ -137,3 +137,30 @@ vfs_lookup(char *name, int create_file, vnode **ret)
 
     return 1; /* Lookup failed */
 }
+
+int
+vfs_list(char ***master_list, size_t *num_files)
+{
+    char **big_list = malloc(sizeof(char *));
+    if (!big_list)
+        return 1;
+
+    char **dir;
+    size_t nfiles = 0;
+
+    for (mount *curr = mount_points; curr != NULL; curr = curr->next) {
+        if (curr->node->vn_ops->vop_list(&dir, &nfiles) != 0)
+            return 1;
+
+        /* Resize list to fit new entries */
+        size_t new_size = (*num_files) + nfiles;
+        big_list = realloc(big_list, sizeof(char *) * new_size);
+        for (int i = 0; i < nfiles; i++)
+            big_list[*num_files + i] = dir[i];
+
+        *num_files = new_size;
+    }
+
+    *master_list = big_list;
+    return 0;
+}

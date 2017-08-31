@@ -21,6 +21,8 @@
 #include <utils/util.h>
 #include <serial/serial.h>
 
+#include <string.h>
+
 static void syscall_do_read_write(seL4_CPtr reply_cap, seL4_Word access_mode);
 
 /* helper func to convert a vaddr to kvaddr */
@@ -195,6 +197,33 @@ syscall_stat(seL4_CPtr reply_cap)
     message_reply:
         free(kstat);
         seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);
+        seL4_SetMR(0, result);
+        seL4_Send(reply_cap, reply);
+}
+
+void
+syscall_listdir(seL4_CPtr reply_cap)
+{   
+    seL4_MessageInfo_t reply;
+
+    LOG_INFO("syscall: thread made sos_getdirent(0)");
+
+    int result = -1;
+
+    seL4_Word udir = vaddr_to_kvaddr(seL4_GetMR(1), ACCESS_WRITE);
+    seL4_Word usize = vaddr_to_kvaddr(seL4_GetMR(2), ACCESS_WRITE);
+
+    char **dir;
+    size_t nfiles = 0;
+    if (vfs_list(&dir, &nfiles) != 0)
+        goto message_reply;
+
+    // TODO Copy out
+    for (int i = 0; i < nfiles; i++)
+        LOG_INFO("%d %s", i, dir[i]);
+
+    message_reply:
+        reply = seL4_MessageInfo_new(0, 0, 0, 1);
         seL4_SetMR(0, result);
         seL4_Send(reply_cap, reply);
 }

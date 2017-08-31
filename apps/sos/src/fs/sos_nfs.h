@@ -26,6 +26,22 @@ int sos_nfs_init(void);
 int sos_nfs_lookup(char *name, int create_file, vnode **result);
 
 /*
+ * List all files
+ * @param[out] list, the list of names
+ * @param[out] nfiles, the number of files
+ * @returns 0 on success, else 1
+ */
+int sos_nfs_list(char ***list, size_t *nfiles);
+
+/*
+ * List all devices
+ * @param[out] list, the list of names
+ * @param[out] nfiles, the number of files listed
+ * @returns 0 on success, else 1
+ */
+int device_list(char ***list, size_t *nfiles);
+
+/*
  * Write to an NFS file
  * @param node, the vnode of the file
  * @param iov, the io vector
