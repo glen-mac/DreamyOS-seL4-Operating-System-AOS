@@ -141,6 +141,7 @@ vfs_lookup(char *name, int create_file, vnode **ret)
 int
 vfs_list(char ***master_list, size_t *num_files)
 {
+    *num_files = 0;
     char **big_list = malloc(sizeof(char *));
     if (!big_list)
         return 1;
@@ -159,6 +160,7 @@ vfs_list(char ***master_list, size_t *num_files)
             big_list[*num_files + i] = dir[i];
 
         *num_files = new_size;
+        free(dir);
     }
 
     *master_list = big_list;

@@ -37,9 +37,15 @@ static nfs_lookup_cb_t sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat st
 static nfs_write_cb_t sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count);
 static nfs_read_cb_t sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data);
 static nfs_getattr_cb_t sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr);
+static nfs_readdir_cb_t sos_nfs_readdir_callback(uintptr_t token, enum nfs_stat status, int num_files, char* file_names[], nfscookie_t nfscookie);
 
 static timer_callback_t sos_nfs_timer_second_stage(uint32_t id, void *data);
 static timer_callback_t sos_nfs_timer_callback(uint32_t id, void *data);
+
+/* Globals to save the directory entries */
+static volatile char **global_dir = NULL;
+static volatile size_t global_size = 0;
+static volatile nfscookie_t global_cookie = 0;
 
 int
 sos_nfs_init(void)
@@ -88,8 +94,33 @@ sos_nfs_lookup(char *name, int create_file, vnode **result)
 int
 sos_nfs_list(char ***list, size_t *nfiles)
 {
-    
     *nfiles = 0;
+
+    char **big_list = malloc(sizeof(char *));
+    if (!big_list)
+        return 1;
+
+    do {
+        if (nfs_readdir(&mnt_point, global_cookie, sos_nfs_readdir_callback, NULL) != RPC_OK)
+            return 1;
+
+        int *ret_val = yield(NULL);
+        if (*ret_val != 0) {
+            free(global_dir);
+            return 1;
+        }
+
+        size_t new_size = (*nfiles) + global_size;
+        big_list = realloc(big_list, sizeof(char *) * new_size);
+        for (int i = 0; i < global_size; i++)
+            big_list[*nfiles + i] = global_dir[i];
+
+        *nfiles = new_size;
+        free(global_dir);
+
+    } while (global_cookie != 0);
+
+    *list = big_list;
     return 0;
 }
 
@@ -158,6 +189,34 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
     coro_resume:
         resume(syscall_coro, vn);
 }
+
+/*
+ * Callback to read directory entries
+ */
+static nfs_readdir_cb_t
+sos_nfs_readdir_callback(uintptr_t token, enum nfs_stat status, int num_files, char* file_names[], nfscookie_t nfscookie)
+{
+    int ret_val = -1;
+    if (status != NFS_OK) {
+        LOG_ERROR("readdir error status: %d", status);
+        goto coro_resume;
+    }
+
+    global_size = num_files;
+    global_dir = malloc(sizeof(char *) * num_files);
+    if (!global_dir)
+        goto coro_resume;
+
+    for (int i = 0; i < num_files; i++)
+        global_dir[i] = strdup(file_names[i]);
+
+    global_cookie = nfscookie;
+
+    ret_val = 0;
+    coro_resume:
+        resume(syscall_coro, &ret_val);
+}
+
 
 /*
  * Write callback
