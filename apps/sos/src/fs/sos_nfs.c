@@ -35,6 +35,7 @@ static const vnode_ops nfs_vnode_ops = {
 static nfs_lookup_cb_t sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
 static nfs_write_cb_t sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count);
 static nfs_read_cb_t sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data);
+static nfs_getattr_cb_t sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr);
 
 static timer_callback_t sos_nfs_timer_second_stage(uint32_t id, void *data);
 static timer_callback_t sos_nfs_timer_callback(uint32_t id, void *data);
@@ -97,6 +98,16 @@ int
 sos_nfs_read(vnode *node, uiovec *iov)
 {
     if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)iov) != RPC_OK)
+        return -1;
+
+    int *ret = yield(NULL);
+    return *ret;
+}
+
+int
+sos_nfs_getattr(vnode *node, sos_stat_t *stat)
+{
+    if (nfs_getattr(node->vn_data, sos_nfs_getattr_callback, (uintptr_t)stat) != RPC_OK)
         return -1;
 
     int *ret = yield(NULL);
@@ -177,6 +188,34 @@ sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int
     coro_resume:
         resume(syscall_coro, &ret_val);
 }
+
+
+/* Get Attributes callback
+ * Copy the attributes of the fattr into the sos_stat_t
+ */
+static nfs_getattr_cb_t
+sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr)
+{
+    int ret_val = -1;
+    if (status != NFS_OK) {
+        LOG_ERROR("getattr error status: %d", status);
+        goto coro_resume;
+    }
+
+    ret_val = 0;
+    /* copy back the stat struct attributes */
+    sos_stat_t *stat = (sos_stat_t *)token;
+    stat->st_type = (st_type_t)fattr->type;
+    stat->st_fmode = (fmode_t)fattr->mode;
+    stat->st_size = (unsigned)fattr->size;
+    /* time conversion */
+    stat->st_ctime = (long)(fattr->ctime.seconds*1000 + fattr->ctime.useconds / 1000);
+    stat->st_atime = (long)(fattr->atime.seconds*1000 + fattr->atime.useconds / 1000);
+
+    coro_resume:
+        resume(syscall_coro, &ret_val);
+}
+
 
 /*
  * Second stage to register the repeating timer 
