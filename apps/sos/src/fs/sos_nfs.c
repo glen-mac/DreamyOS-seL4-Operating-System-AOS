@@ -84,6 +84,7 @@ sos_nfs_lookup(char *name, int create_file, vnode **result)
         nfs_create(&mnt_point, name, &file_attr, (nfs_create_cb_t)sos_nfs_lookup_callback, NULL);
         vn = yield(NULL);
     } else {
+        LOG_ERROR("lookup for %s failed", name);
         return 1; /* Lookup failed */
     }
 
