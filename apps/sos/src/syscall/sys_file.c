@@ -234,6 +234,8 @@ syscall_listdir(seL4_CPtr reply_cap)
     memcpy(uname, dir[pos], bytes_returned);
     result = bytes_returned;
 
+    free(dir);
+
     message_reply:
         reply = seL4_MessageInfo_new(0, 0, 0, 1);
         seL4_SetMR(0, result);

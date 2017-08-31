@@ -31,6 +31,7 @@ static const vnode_ops nfs_vnode_ops = {
     .vop_close = sos_nfs_close,
     .vop_read = sos_nfs_read,
     .vop_write = sos_nfs_write,
+    .vop_stat = sos_nfs_stat
 };
 
 static nfs_lookup_cb_t sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
@@ -75,17 +76,19 @@ sos_nfs_lookup(char *name, int create_file, vnode **result)
     nfs_lookup(&mnt_point, name, sos_nfs_lookup_callback, NULL);
     vn = yield(NULL);
 
-    if (!vn && create_file) {
-        LOG_INFO("creating file %s", name);
-        const sattr_t file_attr = {
-            .mode = 0664, /* Read write for owner and group, read for everyone */
-            // TODO: creation time and stuff
-        };
-        nfs_create(&mnt_point, name, &file_attr, (nfs_create_cb_t)sos_nfs_lookup_callback, NULL);
-        vn = yield(NULL);
-    } else {
-        LOG_ERROR("lookup for %s failed", name);
-        return 1; /* Lookup failed */
+    if (!vn) {
+        if (create_file) {
+            LOG_INFO("creating file %s", name);
+            const sattr_t file_attr = {
+                .mode = 0664, /* Read write for owner and group, read for everyone */
+                // TODO: creation time and stuff
+            };
+            nfs_create(&mnt_point, name, &file_attr, (nfs_create_cb_t)sos_nfs_lookup_callback, NULL);
+            vn = yield(NULL);
+        } else {
+            LOG_ERROR("lookup for %s failed", name);
+            return 1; /* Lookup failed */
+        }
     }
 
     *result = vn;
@@ -146,7 +149,7 @@ sos_nfs_read(vnode *node, uiovec *iov)
 }
 
 int
-sos_nfs_getattr(vnode *node, sos_stat_t *stat)
+sos_nfs_stat(vnode *node, sos_stat_t *stat)
 {
     if (nfs_getattr(node->vn_data, sos_nfs_getattr_callback, (uintptr_t)stat) != RPC_OK)
         return -1;
@@ -174,8 +177,10 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
                                 fhandle_t* fh, fattr_t* fattr)
 {
     vnode *vn = NULL;
-    if (status != NFS_OK)
+    if (status != NFS_OK) {
+        LOG_ERROR("lookup staus %d", status);
         goto coro_resume;
+    }
 
     if ((vn = malloc(sizeof(vnode))) == NULL) {
         LOG_ERROR("malloc failed when creating vnode");
