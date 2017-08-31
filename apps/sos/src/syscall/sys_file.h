@@ -34,3 +34,10 @@ void syscall_read(seL4_CPtr reply_cap);
  * msg(1) fd
  */
 void syscall_close(seL4_CPtr reply_cap);
+
+/*
+ * Syscall to stat to a file
+ * msg(1) name
+ * msg(2) buf_vaddr
+ */
+void syscall_stat(seL4_CPtr reply_cap);

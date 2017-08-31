@@ -168,6 +168,26 @@ syscall_do_read_write(seL4_CPtr reply_cap, seL4_Word access_mode)
         seL4_Send(reply_cap, reply);
 }
 
+void
+syscall_stat(seL4_CPtr reply_cap)
+{
+    int result = -1;
+
+    sos_stat_t *kstat = malloc(sizeof(sos_stat_t));
+    if (!kstat)
+        goto message_reply;
+
+    // call stat with it
+
+    // then copy out to the one specified by the user (using our page boundary special copy)
+
+    message_reply:
+        free(kstat);
+        seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);
+        seL4_SetMR(0, result);
+        seL4_Send(reply_cap, reply);
+}
+
 static seL4_Word
 vaddr_to_kvaddr(seL4_Word vaddr, seL4_Word access_type)
 {

@@ -17,6 +17,7 @@
 #include "sys_file.h"
 #include "sys_vm.h"
 
+/* Currently dependent on syscall numbers ordering, might change this */
 static void (*syscall_table[])(seL4_CPtr) = {
     NULL,
     syscall_write,
@@ -31,7 +32,8 @@ static void (*syscall_table[])(seL4_CPtr) = {
     NULL,
     NULL,
     syscall_usleep,
-    syscall_time_stamp
+    syscall_time_stamp,
+    syscall_stat,
 };
 
 void
@@ -43,12 +45,12 @@ handle_syscall(seL4_Word badge)
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
     assert(reply_cap != CSPACE_NULL);
 
-    if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table)) && syscall_table[syscall_number]) {
+    if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) && syscall_table[syscall_number]) {
         syscall_table[syscall_number](reply_cap);
     } else {
         LOG_INFO("Unknown syscall %d", syscall_number);
     }
 
-    /* Delete the saved reply cap */
-    cspace_delete_cap(cur_cspace, reply_cap);
+    /* Free the saved reply cap */
+    cspace_free_slot(cur_cspace, reply_cap);
 }

@@ -61,20 +61,25 @@ sos_nfs_init(void)
 }
 
 int
-sos_nfs_lookup(char *pathname, vnode **result)
+sos_nfs_lookup(char *name, int create_file, vnode **result)
 {
-    vnode *file;
-    nfs_lookup(&mnt_point, pathname, sos_nfs_lookup_callback, NULL);
+    vnode *vn;
+    nfs_lookup(&mnt_point, name, sos_nfs_lookup_callback, NULL);
+    vn = yield(NULL);
 
-    file = yield(NULL);
-    if (!file) {
-        LOG_INFO("creating file %s", pathname);
-        const sattr_t file_attr = { .mode = 0664 }; /* Read write for owner and group, read for everyone */
-        nfs_create(&mnt_point, pathname, &file_attr, (nfs_create_cb_t)sos_nfs_lookup_callback, NULL);
-        file = yield(NULL);
+    if (!vn && create_file) {
+        LOG_INFO("creating file %s", name);
+        const sattr_t file_attr = {
+            .mode = 0664, /* Read write for owner and group, read for everyone */
+            // TODO: creation time and stuff
+        };
+        nfs_create(&mnt_point, name, &file_attr, (nfs_create_cb_t)sos_nfs_lookup_callback, NULL);
+        vn = yield(NULL);
+    } else {
+        return 1; /* Lookup failed */
     }
 
-    *result = file;
+    *result = vn;
     return 0;
 }
 
@@ -116,22 +121,22 @@ static nfs_lookup_cb_t
 sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
                                 fhandle_t* fh, fattr_t* fattr)
 {
-    vnode *file = NULL;
+    vnode *vn = NULL;
     if (status != NFS_OK)
         goto coro_resume;
 
-    if ((file = malloc(sizeof(vnode))) == NULL) {
-        LOG_ERROR("malloc failed when creating file vnode");
+    if ((vn = malloc(sizeof(vnode))) == NULL) {
+        LOG_ERROR("malloc failed when creating vnode");
         goto coro_resume;
     }
 
-    file->vn_data = malloc(sizeof(fhandle_t));
-    memcpy(file->vn_data, fh, sizeof(fhandle_t));
+    vn->vn_data = malloc(sizeof(fhandle_t));
+    memcpy(vn->vn_data, fh, sizeof(fhandle_t));
 
-    file->vn_ops = &nfs_vnode_ops;
+    vn->vn_ops = &nfs_vnode_ops;
 
     coro_resume:
-        resume(syscall_coro, file);
+        resume(syscall_coro, vn);
 }
 
 /*

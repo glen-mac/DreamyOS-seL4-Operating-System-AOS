@@ -54,7 +54,7 @@ device_register(char *name, vnode *vn)
 }
 
 int
-device_lookup(char *name, vnode **ret)
+device_lookup(char *name, int create_file, vnode **ret)
 {
     for (device *curr = devices; curr != NULL; curr = curr->next) {
         /* Try Lookup the file in this namespace */

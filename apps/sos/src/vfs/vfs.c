@@ -71,7 +71,7 @@ vfs_mount(vnode *vn)
 }
 
 int
-vfs_open(char *path, fmode_t mode, vnode **ret)
+vfs_open(char *name, fmode_t mode, vnode **ret)
 {
     int result;
     vnode *vn = NULL;
@@ -81,20 +81,24 @@ vfs_open(char *path, fmode_t mode, vnode **ret)
         return EINVAL;
     }
 
-    /* Might create a file, NFS creates a failed lookup file inside its vop_lookup function */
-    if ((result = vfs_lookup(path, &vn))) {
+    /*
+     * Might create a file, NFS creates a failed lookup file inside its vop_lookup function
+     * Only create the file if it is opened in write only mode aswell
+     */
+    if ((result = vfs_lookup(name, mode == O_WRONLY? 1: 0, &vn))) {
         LOG_ERROR("vfs_lookup failed");
         return result;
     }
 
-    *ret = vn;
-
     // Not actually necessary now, lookup sort of opens it for us..?
     // We dont share vnodes and have refcount, so this might change? idk
+
+    // TODO: I think we do need vop_open, because we need to update the access time and things for files
 
     // if (vn->vn_ops->vop_open(vn, mode) == 0)
     //     return 0;
 
+    *ret = vn;
     return 0;
 }
 
@@ -107,10 +111,24 @@ vfs_close(vnode *vn)
 }
 
 int
-vfs_lookup(char *path, vnode **ret)
+vfs_stat(char *name)
+{
+    int result;
+    vnode *vn = NULL;
+
+    if ((result = vfs_lookup(name, 0, &vn))) {
+        LOG_ERROR("vfs_lookup failed");
+        return result;
+    }
+
+    vn->vn_ops->vop_stat(vn);
+}
+
+int
+vfs_lookup(char *name, int create_file, vnode **ret)
 {
     for (mount *curr = mount_points; curr != NULL; curr = curr->next) {
-        if (curr->node->vn_ops->vop_lookup(path, ret) == 0)
+        if (curr->node->vn_ops->vop_lookup(name, create_file, ret) == 0)
             return 0;
     }
 

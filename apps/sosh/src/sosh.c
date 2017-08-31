@@ -92,7 +92,10 @@ static int cp(int argc, char **argv) {
     fd = open(file1, O_RDONLY);
     fd_out = open(file2, O_WRONLY);
 
-    assert(fd >= 0);
+    if (fd < 0) {
+        printf("%s: No such file\n", argv[1]);
+        return 1;
+    }
 
     while ((num_read = read(fd, buf, BUF_SIZ)) > 0)
         num_written = write(fd_out, buf, num_read);

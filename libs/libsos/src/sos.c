@@ -96,6 +96,11 @@ sos_sys_close(int file)
 int
 sos_getdirent(int pos, char *name, size_t nbyte)
 {
+    if (pos == 0)
+        MAKE_SYSCALL(SOS_SYS_GETDIRENT, NULL); // Syscall to refresh the directory cache
+    // NULL Should be replaced with a pointer to the user level directory cache.
+
+    // TODO: Now access the cache with pos to retrieve the name
     assert(!"You need to implement this");
     return -1;
 }
@@ -103,8 +108,8 @@ sos_getdirent(int pos, char *name, size_t nbyte)
 int
 sos_stat(const char *path, sos_stat_t *buf)
 {
-    assert(!"You need to implement this");
-    return -1;
+    MAKE_SYSCALL(SOS_SYS_STAT, buf);
+    return (int)seL4_GetMR(0); /* -1 on error, 0 on success */
 }
 
 pid_t

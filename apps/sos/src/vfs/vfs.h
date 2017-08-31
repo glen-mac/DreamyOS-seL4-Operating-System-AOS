@@ -24,8 +24,9 @@ typedef struct {
     int (*vop_close)(vnode *vnode);
     int (*vop_read)(vnode *node, uiovec *iov);
     int (*vop_write)(vnode *node, uiovec *iov);
+    int (*vop_stat)(vnode *node);
 
-    int (*vop_lookup)(char *pathname, vnode **result); /* Lookup for a mount point */
+    int (*vop_lookup)(char *name, int create_file, vnode **result); /* Lookup for a mount point */
 } vnode_ops;
 
 typedef struct _vnode {
@@ -50,13 +51,13 @@ int vfs_mount(vnode *vn);
 /*
  * Open a 'file' in the VFS.
  * Finds in the vnode and calls vop_open.
- * @param path, the path of the file
+ * @param name, the name of the file
  * @param mode, the mode of access
  * @param[out] ret, the returned vnode
  * 
  * @returns 0 on success else 1
  */
-int vfs_open(char *path, fmode_t mode, vnode **ret);
+int vfs_open(char *name, fmode_t mode, vnode **ret);
 
 /*
  * Close a 'file' in the VFS
@@ -66,11 +67,21 @@ int vfs_open(char *path, fmode_t mode, vnode **ret);
 void vfs_close(vnode *vn);
 
 /*
- * Lookup a path name inside the VFS
- * @param path, the name to search
+ * Get the attributes of a file
+ * @param vn, the node
+ * @returns 0 on success, else 1
+ */
+int vfs_stat(char *name);
+
+/*
+ * Lookup a name inside the VFS
+ * @param name, the name to search
+ * @param create_file, flag to specify if a file should be created on lookup fail
+ * This is delegated to the FS to first see this file and support file creation
+ *
  * @param[out] ret, the returned vnode
  * @returns 0 on success else 1
  */
-int vfs_lookup(char *path, vnode **ret);
+int vfs_lookup(char *name, int create_file, vnode **ret);
 
 #endif /* _VFS_H_ */
