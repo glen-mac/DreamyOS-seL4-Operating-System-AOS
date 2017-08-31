@@ -230,7 +230,7 @@ syscall_listdir(seL4_CPtr reply_cap)
         goto message_reply;
 
     /* Copy the name into the user process */
-    size_t bytes_returned = MIN(nbytes, strlen(dir[pos]));
+    size_t bytes_returned = MIN(nbytes, strlen(dir[pos])) + 1;
     memcpy(uname, dir[pos], bytes_returned);
     result = bytes_returned;
 
