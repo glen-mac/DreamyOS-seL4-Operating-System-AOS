@@ -30,6 +30,7 @@ static const vnode_ops serial_vnode_ops = {
     .vop_close = sos_serial_close,
     .vop_read = sos_serial_read,
     .vop_write = sos_serial_write,
+    .vop_stat = sos_serial_stat,
 };
 
 static void
@@ -122,5 +123,18 @@ sos_serial_close(vnode *node)
      * We dont want to close the device as that would unintiailise it
      * The vnode is permanent and lives as a registered device so we dont want to free it
      */
+    return 0;
+}
+
+int
+sos_serial_stat(vnode *node, sos_stat_t *buf)
+{
+    /* Mostly stub data */
+    buf->st_type = ST_SPECIAL;
+    buf->st_fmode = 1;
+    buf->st_size = 2;
+    buf->st_ctime = 3;
+    buf->st_atime = 4;
+
     return 0;
 }

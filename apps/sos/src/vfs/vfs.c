@@ -111,7 +111,7 @@ vfs_close(vnode *vn)
 }
 
 int
-vfs_stat(char *name)
+vfs_stat(char *name, sos_stat_t *buf)
 {
     int result;
     vnode *vn = NULL;
@@ -121,7 +121,10 @@ vfs_stat(char *name)
         return result;
     }
 
-    vn->vn_ops->vop_stat(vn);
+    if (vn->vn_ops->vop_stat(vn, buf) != 0)
+        return 1;
+
+    return 0;
 }
 
 int

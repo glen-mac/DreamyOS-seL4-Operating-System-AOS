@@ -171,16 +171,27 @@ syscall_do_read_write(seL4_CPtr reply_cap, seL4_Word access_mode)
 void
 syscall_stat(seL4_CPtr reply_cap)
 {
+    LOG_INFO("syscall: thread made sos_stat");
+
     int result = -1;
+
+    seL4_Word name = seL4_GetMR(1);
+    seL4_Word stat_buf = seL4_GetMR(2);
+    
+    seL4_Word kname = vaddr_to_kvaddr(name, ACCESS_READ); // TODO: Copy this in, it could cross page boundary, same for open() and others that use name
+    seL4_Word kbuf = vaddr_to_kvaddr(stat_buf, ACCESS_WRITE); // same
 
     sos_stat_t *kstat = malloc(sizeof(sos_stat_t));
     if (!kstat)
         goto message_reply;
 
-    // call stat with it
+    if (vfs_stat((char *)kname, (sos_stat_t *)kstat) != 0)
+        goto message_reply;
 
     // then copy out to the one specified by the user (using our page boundary special copy)
+    memcpy((sos_stat_t *)kbuf, (sos_stat_t *)kstat, sizeof(sos_stat_t)); // fix this
 
+    result = 0;
     message_reply:
         free(kstat);
         seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);

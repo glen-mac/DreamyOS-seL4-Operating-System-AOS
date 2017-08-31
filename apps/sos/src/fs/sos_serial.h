@@ -36,7 +36,16 @@ int sos_serial_read(vnode *node, uiovec *iov);
 /*
  * Close a serial device
  * @param node, the vnode of the device
+ * @returns 0 on success else 1
  */
 int sos_serial_close(vnode *node);
+
+/*
+ * Stat the console
+ * @param node, the vnode of the device
+ * @oaram buf, the stat buffer to write to
+ * @returns 0 on success else 1
+ */
+int sos_serial_stat(vnode *node, sos_stat_t *buf);
 
 #endif /* _SOS_SERIAL_H_ */

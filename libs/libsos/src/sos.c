@@ -106,9 +106,9 @@ sos_getdirent(int pos, char *name, size_t nbyte)
 }
 
 int
-sos_stat(const char *path, sos_stat_t *buf)
+sos_stat(const char *name, sos_stat_t *buf)
 {
-    MAKE_SYSCALL(SOS_SYS_STAT, buf);
+    MAKE_SYSCALL(SOS_SYS_STAT, name, buf);
     return (int)seL4_GetMR(0); /* -1 on error, 0 on success */
 }
 
