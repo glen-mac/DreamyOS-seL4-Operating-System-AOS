@@ -92,9 +92,9 @@ sos_serial_init(void)
     }
 
     stat->st_type = ST_SPECIAL;
-    stat->st_fmode = O_RDWR; /* TODO: how the fuck do we get this correct */
+    stat->st_fmode = FM_READ | FM_WRITE;
     stat->st_size = 0; /* Because theres not really a size */
-    stat->st_ctime = 3;
+    stat->st_ctime = 3; /* TODO: Grab the system timestamp and convert to ms */
     stat->st_atime = 4; /* TODO: update this on open() */
 
     return 0;
