@@ -9,7 +9,6 @@
 
 #include "picoro.h"
 #include <sel4/sel4.h>
-#include <stdlib.h>
 
 extern coro syscall_coro;
 

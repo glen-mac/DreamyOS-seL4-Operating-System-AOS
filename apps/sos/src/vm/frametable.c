@@ -79,8 +79,10 @@ frame_table_init(seL4_Word paddr, seL4_Word size_in_bits, seL4_Word low, seL4_Wo
      * Currently leak capabilities because we do not share or free the frame table.
      */
     for (int i = 0; i < BYTES_TO_4K_PAGES(BIT(size_in_bits)); i++) {
-        if (retype_and_map(paddr, vaddr, &frame_cap) != 0)
+        if (retype_and_map(paddr, vaddr, &frame_cap) != 0) {
+            LOG_ERROR("Frametable mapping failed");
             return 1;
+        }
 
         vaddr += PAGE_SIZE_4K;
         paddr += PAGE_SIZE_4K;
@@ -263,7 +265,7 @@ _frame_free(seL4_Word frame_id)
     frame_table[frame_id].cap = (seL4_ARM_Page)NULL; /* Error guarding */
 
     if (!frame_cap) {
-        LOG_INFO("capability for %d does not exist", frame_id);
+        LOG_ERROR("capability for %d does not exist", frame_id);
         return;
     }
     

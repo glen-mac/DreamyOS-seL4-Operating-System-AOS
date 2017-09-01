@@ -23,15 +23,15 @@
 #include <vm/vm.h>
 #include <vm/frametable.h>
 
-#include "elf.h"
 #include "mapping.h"
 #include "network.h"
 #include "picoro.h"
+#include <proc/elf.h>
 #include <proc/proc.h>
 #include <ut_manager/ut.h>
 #include <vm/layout.h>
 
-/* For unit tests: TREMOVE BEFORE FINAL SUBMISSION*/
+/* For unit tests: REMOVE BEFORE FINAL SUBMISSION */
 #include "tests.h"
 
 /* 

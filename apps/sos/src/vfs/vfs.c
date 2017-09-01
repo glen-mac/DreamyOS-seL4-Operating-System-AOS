@@ -85,7 +85,11 @@ vfs_open(char *name, fmode_t mode, vnode **ret)
      * Might create a file, NFS creates a failed lookup file inside its vop_lookup function
      * Only create the file if it is opened in write only mode aswell
      */
-    if ((result = vfs_lookup(name, mode == O_WRONLY? 1: 0, &vn))) {
+    int create_file = 0;
+    if (mode == O_WRONLY || mode == O_RDWR)
+        create_file = 1;
+
+    if ((result = vfs_lookup(name, create_file, &vn))) {
         LOG_ERROR("vfs_lookup failed");
         return result;
     }

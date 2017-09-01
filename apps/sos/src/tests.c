@@ -21,7 +21,7 @@
 
 #include <vm/frametable.h>
 #include "network.h"
-#include "elf.h"
+#include <proc/elf.h>
 
 #include "ut_manager/ut.h"
 #include "mapping.h"

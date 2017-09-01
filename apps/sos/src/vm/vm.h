@@ -1,7 +1,7 @@
 /*
  * Virtual memory interface
- * Cameron Lonsdale & Glenn McGuire
  *
+ * Cameron Lonsdale & Glenn McGuire
  */
 
 #ifndef _VM_H_
@@ -54,12 +54,20 @@ int page_directory_insert(page_directory *directory, seL4_Word vaddr, seL4_CPtr 
 int page_directory_lookup(page_directory *directory, seL4_Word vaddr, seL4_CPtr *cap);
 
 /*
+ * Given a vaddr, translate it to the sos vaddr of the frame 
+ * @param vaddr, the process virtual address
+ * @param[out] sos_vaddr, the vaddr for the frame so sos can access it
+ * @returns 0 on success else 1
+ */
+int vm_translate(seL4_Word vaddr, seL4_Word *sos_vaddr);
+
+/*
  * Given a vaddr, try to map in that page 
  * @param as, the address space to map into
  * @param vaddr, the vaddr of the page to map in
  * @param kvaddr[out], the kvaddr of the frame
  * @returns 0 on success else 1
  */
-int vm_try_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr);
+int vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr);
 
 #endif /* _VM_H_ */

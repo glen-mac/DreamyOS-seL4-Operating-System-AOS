@@ -4,12 +4,8 @@
  * Glenn McGuire & Cameron Lonsdale
  */
 
-#include <cspace/cspace.h>
-
-#include "picoro.h"
-#include <proc/proc.h>
-#include <sos.h>
 #include "syscall.h"
+#include <cspace/cspace.h>
 #include <utils/util.h>
 
 /* include all sys_* wrappers */
@@ -18,7 +14,7 @@
 #include "sys_vm.h"
 
 /* Currently dependent on syscall numbers ordering, might change this */
-static void (*syscall_table[])(seL4_CPtr) = {
+static seL4_Word (*syscall_table[])(void) = {
     NULL,
     syscall_write,
     NULL,
@@ -46,8 +42,11 @@ handle_syscall(seL4_Word badge)
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
     assert(reply_cap != CSPACE_NULL);
 
-    if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) && syscall_table[syscall_number]) {
-        syscall_table[syscall_number](reply_cap);
+    /* If syscall number is valid and function pointer is not NULL */
+    if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) &&
+        syscall_table[syscall_number]) {
+        seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, syscall_table[syscall_number]());
+        seL4_Send(reply_cap, reply);
     } else {
         LOG_INFO("Unknown syscall %d", syscall_number);
     }

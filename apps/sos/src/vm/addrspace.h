@@ -15,8 +15,8 @@
  * Region structure to specify regions in an address space
  */
 typedef struct region_t {
-    seL4_Word vaddr_start;
-    seL4_Word vaddr_end;
+    seL4_Word start;
+    seL4_Word end;
     seL4_Word permissions;
     struct region_t *next_region;
 } region;

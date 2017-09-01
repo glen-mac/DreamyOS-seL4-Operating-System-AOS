@@ -14,83 +14,42 @@
  *
  *      Description: Simple milestone 0 test.
  *
- *      Author:			Godfrey van der Linden
- *      Original Author:	Ben Leslie
+ *      Author:         Godfrey van der Linden
+ *      Original Author:    Ben Leslie
  *
  ****************************************************************************/
 
 #include <assert.h>
+#include <fcntl.h>
+#include <sel4/sel4.h>
+#include <sos.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <time.h>
-
-#include <sel4/sel4.h>
-#include <utils/page.h>
-
-#include <fcntl.h>
 #include <ttyout.h>
-
-#include <sos.h>
+#include <unistd.h>
+#include <utils/page.h>
 
 #define NPAGES 27
 #define TEST_ADDRESS 0x20000000
 
-static void test_m0(void);
+#define SMALL_BUF_SZ 2
+#define BUF_SZ (2 * PAGE_SIZE_4K) /* 2 page buffer */
+
 static void test_m3(void);
 static void test_m4(void);
+static void thread_block(void);
 
 char *file_name = "test_file_name";
-
-/* 
- * Block a thread forever
- * we do this by making an unimplemented system call.
- */
-static void
-thread_block(void)
-{
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
-    seL4_SetTag(tag);
-    seL4_SetMR(0, 999);
-    seL4_Call(SOS_IPC_EP_CAP, tag);
-}
 
 int
 main(void)
 {
-    // test_m0();
+    printf(">>> tty_test program started <<<\n");
     // test_m3();
     test_m4();
     return 0;
-}
-
-
-static void
-test_m0(void)
-{
-    size_t max_msg_size = (seL4_MsgMaxLength - 2) * sizeof(seL4_Word);
-
-    /* Send a simple message */
-    char *message = "123456\n";
-    size_t bytes_sent = sos_write(message, strlen(message));
-    assert(bytes_sent == strlen(message));
-
-    /* Send a long message that is split into 2 packets */
-    /* One packet of 472 A's, the next with 7 B's and a newline */
-    char *message2 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBB\n";
-    bytes_sent = sos_write(message2, strlen(message2));
-    assert(bytes_sent == strlen(message2));
-
-    /* Checking that SOS validates nbytes sent and clamps the value to max_msg_size */
-    /* Hence, all that should be printed out is all A's, nothing past the end of the buffer */
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, seL4_MsgMaxLength);
-    seL4_SetTag(tag);
-    seL4_SetMR(0, 1); /* Syscall number */
-    seL4_SetMR(1, 99999); /* Number of bytes in the message */
-    memcpy(seL4_GetIPCBuffer()->msg + 2, message2, max_msg_size);
-    seL4_Call(SOS_IPC_EP_CAP, tag);
-    assert((size_t)seL4_GetMR(0) == max_msg_size);
 }
 
 static void
@@ -98,12 +57,12 @@ do_pt_test(char *buf)
 {
     /* set */
     for (int i = 0; i < NPAGES; i++) {
-	    buf[i * PAGE_SIZE_4K] = i;
+        buf[i * PAGE_SIZE_4K] = i;
     }
 
     /* check */
     for (int i = 0; i < NPAGES; i++) {
-	    assert(buf[i * PAGE_SIZE_4K] == i);
+        assert(buf[i * PAGE_SIZE_4K] == i);
     }
 }
 
@@ -127,6 +86,8 @@ test_m3(void)
     do_pt_test(buf2);
     free(buf2);
 
+    printf("M3 Tests passed, Now generating a permissions fault\n");
+
     /* This should generate a permissions fault, we cant write to the code section */
     addr = (seL4_Word *)0x00008000;
     *addr = 5;
@@ -135,8 +96,7 @@ test_m3(void)
 static void
 test_m4(void)
 {
-    #define SMALL_BUF_SZ 2
-    #define BUF_SZ (2*PAGE_SIZE_4K) // 2 page buffer
+    int result;
 
     char test_str[] = "Basic test string for read/write\n";
     char small_buf[SMALL_BUF_SZ];
@@ -145,8 +105,12 @@ test_m4(void)
     assert(console_fd != -1);
 
     /* test a small string from the code segment */
-    int result = sos_sys_write(console_fd, test_str, strlen(test_str));
+    result = sos_sys_write(console_fd, test_str, strlen(test_str));
     assert(result == strlen(test_str));
+
+    /* Write from a non resident buffer, should get mapped int */
+    char non_resident_buffer[BUF_SZ];
+    sos_sys_write(console_fd, non_resident_buffer, BUF_SZ);
 
     printf("Enter %d bytes\n", SMALL_BUF_SZ);
 
@@ -160,11 +124,11 @@ test_m4(void)
     /* for this test you'll need to paste a lot of data into 
       the console, without newlines */
 
-    printf("Enter %d bytes for the stack\n", BUF_SZ);
+    printf("Enter %lu bytes for the stack\n", BUF_SZ);
     result = sos_sys_read(console_fd, stack_buf, BUF_SZ);
     assert(result == BUF_SZ);
 
-    printf("Now printing %d bytes from the stack\n", BUF_SZ);
+    printf("Now printing %lu bytes from the stack\n", BUF_SZ);
     result = sos_sys_write(console_fd, stack_buf, BUF_SZ);
     assert(result == BUF_SZ);
 
@@ -174,12 +138,12 @@ test_m4(void)
 
     /* for this test you'll need to paste a lot of data into
        the console, without newlines */
-    printf("Enter %d bytes for the heap\n", BUF_SZ);
-    result = sos_sys_read(console_fd, &heap_buf, BUF_SZ);
+    printf("Enter %lu bytes for the heap\n", BUF_SZ);
+    result = sos_sys_read(console_fd, heap_buf, BUF_SZ);
     assert(result == BUF_SZ);
 
-    printf("Now printing %d bytes from the heap\n", BUF_SZ);
-    result = sos_sys_write(console_fd, &heap_buf, BUF_SZ);
+    printf("Now printing %lu bytes from the heap\n", BUF_SZ);
+    result = sos_sys_write(console_fd, heap_buf, BUF_SZ);
     assert(result == BUF_SZ);
 
     /* try sleeping */
@@ -190,11 +154,26 @@ test_m4(void)
        assert(next_seconds > prev_seconds);
        printf("Tick\n");
     }
-    
-    /* Checking permissions */
-    sos_write((seL4_Word *)0x00008000, 10);
-    assert(result == 10);
 
-    sos_read((seL4_Word *)0x00008000, 10);
-    assert(result = -1);    
+    /* Checking permissions */
+    result = sos_sys_write(console_fd, (char *)0x10000, 3);
+    assert(result == 3);
+
+    result = sos_sys_read(console_fd, (char *)0x10000, 3);
+    assert(result == -1);
+
+    printf("\nM4 Tests pass\n");
+}
+
+/* 
+ * Block a thread forever
+ * we do this by making an unimplemented system call.
+ */
+static void
+thread_block(void)
+{
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1);
+    seL4_SetTag(tag);
+    seL4_SetMR(0, 999);
+    seL4_Call(SOS_IPC_EP_CAP, tag);
 }

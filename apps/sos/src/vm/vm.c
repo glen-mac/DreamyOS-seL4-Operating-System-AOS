@@ -38,6 +38,7 @@
 /* Fault handling */
 #define INSTRUCTION_FAULT 1
 #define DATA_FAULT 0
+
 /* 
  * Architecture specifc interpretation of the the fault register
  * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.100511_0401_10_en/ric1447333676062.html
@@ -59,14 +60,15 @@ static seL4_Word get_fault_status(seL4_Word fault_cause);
 void 
 vm_fault(void)
 {
-    /* Ordering defined by the kernel */
+    /* Ordering defined by seL4 */
     seL4_Word fault_pc = seL4_GetMR(0);
     seL4_Word fault_addr = seL4_GetMR(1);
     seL4_Word fault_type = seL4_GetMR(2);
     seL4_Word fault_cause = seL4_GetMR(3);
 
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
-    assert(reply_cap != CSPACE_NULL);
+    if (reply_cap == CSPACE_NULL)
+        panic("TODO: kill process? Not sure how this could happen");
 
     seL4_Word access_type = ACCESS_TYPE(fault_cause);
     seL4_Word fault_status = get_fault_status(fault_cause);
@@ -77,25 +79,10 @@ vm_fault(void)
     if (fault_status == PERMISSION_FAULT_PAGE)
         panic("TODO: Kill the process; Incorrect permissions!");
 
-    addrspace *as = curproc->p_addrspace;
+    seL4_Word kvaddr;
+    assert(vm_map(fault_addr, access_type, &kvaddr) == 0);
 
-    /* Try to expand the stack */
-    region *vaddr_region;
-    if (as_find_region(as, fault_addr, &vaddr_region) != 0 &&
-        as_region_collision_check(as, PAGE_ALIGN_4K(fault_addr), as->region_stack->vaddr_end) == 0) {
-        as->region_stack->vaddr_start = PAGE_ALIGN_4K(fault_addr);
-    }
-    
-    /* Check if address belongs to a region and that region has permissions for the access type */
-    if (as_find_region(as, fault_addr, &vaddr_region) == 0 && as_region_permission_check(vaddr_region, access_type)) {
-        seL4_Word kvaddr;
-
-        // TODO: This can fail, we need to send ENOMEM to the process.
-        assert(sos_map_page(PAGE_ALIGN_4K(fault_addr), as, vaddr_region->permissions, &kvaddr) == 0);
-    }
-
-    seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);
-    seL4_SetMR(0, 0);
+    seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 0);
     seL4_Send(reply_cap, reply);
 
     cspace_free_slot(cur_cspace, reply_cap);
@@ -152,8 +139,10 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
     if (!directory[directory_index]) {
         LOG_INFO("Creating second level page table at index %d", directory_index);
         seL4_Word page_table_vaddr;
-        if (frame_alloc(&page_table_vaddr) == -1)
+        if (frame_alloc(&page_table_vaddr) == -1) {
+            LOG_ERROR("Cannot alloc second level");
             return 1;
+        }
 
         directory[directory_index] = page_table_vaddr;
     }
@@ -205,36 +194,55 @@ page_directory_lookup(page_directory *dir, seL4_Word page_id, seL4_CPtr *cap)
 }
 
 int
-vm_try_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
-{   
+vm_translate(seL4_Word vaddr, seL4_Word *sos_vaddr)
+{
+    int err;
+
+    seL4_Word offset = (vaddr & PAGE_MASK_4K);
+    seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
+    seL4_ARM_Page page_cap;
+
+    if ((err = page_directory_lookup(curproc->p_addrspace->directory, page_id, &page_cap)) != 0) {
+        LOG_ERROR("Mapping not found");
+        return err;
+    }
+
+    seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(page_cap);
+    *sos_vaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
+    return 0;
+}
+
+int
+vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
+{
     addrspace *as = curproc->p_addrspace;
 
     /* Try to expand the stack */
     region *vaddr_region;
     if (as_find_region(as, vaddr, &vaddr_region) != 0 &&
-        as_region_collision_check(as, PAGE_ALIGN_4K(vaddr), as->region_stack->vaddr_end) == 0) {
-        LOG_INFO("Stack extension");
-        as->region_stack->vaddr_start = PAGE_ALIGN_4K(vaddr);
+        as_region_collision_check(as, PAGE_ALIGN_4K(vaddr), as->region_stack->end) == 0) {
+        as->region_stack->start = PAGE_ALIGN_4K(vaddr);
+        LOG_INFO("Extended the stack to %p -> %p", (void *)as->region_stack->start, (void *)as->region_stack->end);
     }
     
     /* Check if address belongs to a region and that region has permissions for the access type */
-    if (as_find_region(as, vaddr, &vaddr_region) == 0 && as_region_permission_check(vaddr_region, access_type)) {
-        // TODO: This can fail, we need to send ENOMEM to the process.
-        LOG_INFO("mapping page");
-        assert(sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) == 0);
-        return 0;
+    if (!as_find_region(as, vaddr, &vaddr_region) == 0 ||
+        !as_region_permission_check(vaddr_region, access_type)) {
+        LOG_INFO("Incorrect Permissions");
+        return 1;
     }
 
-    return 1;
+    // TODO: This can fail, we need to send ENOMEM to the process.
+    assert(sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) == 0);
+    return 0;
 }
 
 /* The status of the fault is indicated by bits 12, 10 and 3:0 all strung together */
 static seL4_Word
 get_fault_status(seL4_Word fault_cause)
 {
-    seL4_Word bit_12 = fault_cause & (1 << 12);
-    seL4_Word bit_10 = fault_cause & (1 << 10);
-    seL4_Word lower_bits = fault_cause & ((1 << 3) | (1 << 2) | (1 << 1) | (1 << 0));
-
+    seL4_Word bit_12 = fault_cause & BIT(12);
+    seL4_Word bit_10 = fault_cause & BIT(10);
+    seL4_Word lower_bits = fault_cause & (BIT(3) | BIT(2) | BIT(1) | BIT(0));
     return (bit_12 << 5) | (bit_10 << 4) | lower_bits;
 }

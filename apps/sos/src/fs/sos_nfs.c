@@ -34,17 +34,17 @@ static const vnode_ops nfs_vnode_ops = {
     .vop_stat = sos_nfs_stat
 };
 
-static nfs_lookup_cb_t sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
-static nfs_write_cb_t sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count);
-static nfs_read_cb_t sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data);
-static nfs_getattr_cb_t sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr);
-static nfs_readdir_cb_t sos_nfs_readdir_callback(uintptr_t token, enum nfs_stat status, int num_files, char* file_names[], nfscookie_t nfscookie);
+static void sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
+static void sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count);
+static void sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data);
+static void sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr);
+static void sos_nfs_readdir_callback(uintptr_t token, enum nfs_stat status, int num_files, char* file_names[], nfscookie_t nfscookie);
 
-static timer_callback_t sos_nfs_timer_second_stage(uint32_t id, void *data);
-static timer_callback_t sos_nfs_timer_callback(uint32_t id, void *data);
+static void sos_nfs_timer_second_stage(uint32_t id, void *data);
+static void sos_nfs_timer_callback(uint32_t id, void *data);
 
 /* Globals to save the directory entries */
-static volatile char **global_dir = NULL;
+static char ** volatile global_dir = NULL;
 static volatile size_t global_size = 0;
 static volatile nfscookie_t global_cookie = 0;
 
@@ -73,7 +73,7 @@ int
 sos_nfs_lookup(char *name, int create_file, vnode **result)
 {
     vnode *vn;
-    nfs_lookup(&mnt_point, name, sos_nfs_lookup_callback, NULL);
+    nfs_lookup(&mnt_point, name, sos_nfs_lookup_callback, (uintptr_t)NULL);
     vn = yield(NULL);
 
     if (!vn) {
@@ -83,7 +83,7 @@ sos_nfs_lookup(char *name, int create_file, vnode **result)
                 .mode = 0664, /* Read write for owner and group, read for everyone */
                 // TODO: creation time and stuff
             };
-            nfs_create(&mnt_point, name, &file_attr, (nfs_create_cb_t)sos_nfs_lookup_callback, NULL);
+            nfs_create(&mnt_point, name, &file_attr, sos_nfs_lookup_callback, (uintptr_t)NULL);
             vn = yield(NULL);
         } else {
             LOG_ERROR("lookup for %s failed", name);
@@ -105,7 +105,7 @@ sos_nfs_list(char ***list, size_t *nfiles)
         return 1;
 
     do {
-        if (nfs_readdir(&mnt_point, global_cookie, sos_nfs_readdir_callback, NULL) != RPC_OK)
+        if (nfs_readdir(&mnt_point, global_cookie, sos_nfs_readdir_callback, (uintptr_t)NULL) != RPC_OK)
             return 1;
 
         int *ret_val = yield(NULL);
@@ -131,7 +131,7 @@ sos_nfs_list(char ***list, size_t *nfiles)
 int
 sos_nfs_write(vnode *node, uiovec *iov)
 {
-    if (nfs_write(node->vn_data, iov->uiov_pos, iov->uiov_len, iov->uiov_base, sos_nfs_write_callback, NULL) != RPC_OK)
+    if (nfs_write(node->vn_data, iov->uiov_pos, iov->uiov_len, iov->uiov_base, sos_nfs_write_callback, (uintptr_t)NULL) != RPC_OK)
         return -1;
 
     int *ret = yield(NULL);
@@ -172,7 +172,7 @@ sos_nfs_close(vnode *node)
  * NFS tells us if the file exists
  * We then build a vnode to represent that file
  */
-static nfs_lookup_cb_t
+static void
 sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
                                 fhandle_t* fh, fattr_t* fattr)
 {
@@ -189,7 +189,6 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
 
     vn->vn_data = malloc(sizeof(fhandle_t));
     memcpy(vn->vn_data, fh, sizeof(fhandle_t));
-
     vn->vn_ops = &nfs_vnode_ops;
 
     coro_resume:
@@ -199,7 +198,7 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
 /*
  * Callback to read directory entries
  */
-static nfs_readdir_cb_t
+static void
 sos_nfs_readdir_callback(uintptr_t token, enum nfs_stat status, int num_files, char* file_names[], nfscookie_t nfscookie)
 {
     int ret_val = -1;
@@ -228,7 +227,7 @@ sos_nfs_readdir_callback(uintptr_t token, enum nfs_stat status, int num_files, c
  * Write callback
  * Return number of bytes written
  */
-static nfs_write_cb_t
+static void
 sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count)
 {
     int ret_val = -1;
@@ -246,7 +245,7 @@ sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, in
  * Read callback
  * Copy the memory into the buffer specified by the iov_base
  */
-static nfs_read_cb_t
+static void
 sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data)
 {
     int ret_val = -1;
@@ -267,7 +266,7 @@ sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int
 /* Get Attributes callback
  * Copy the attributes of the fattr into the sos_stat_t
  */
-static nfs_getattr_cb_t
+static void
 sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr)
 {
     int ret_val = -1;
@@ -295,7 +294,7 @@ sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr)
  * Second stage to register the repeating timer 
  * As 100ms delay is not enough for SOS to enter into the event loop
  */
-static timer_callback_t
+static void
 sos_nfs_timer_second_stage(uint32_t id, void *data)
 {
     assert(register_repeating_timer(MILLISECONDS(100), sos_nfs_timer_callback, NULL) != 0);
@@ -304,7 +303,7 @@ sos_nfs_timer_second_stage(uint32_t id, void *data)
 /*
  * Timer callback to call nfs_timeout
  */
-static timer_callback_t
+static void
 sos_nfs_timer_callback(uint32_t id, void *data)
 {
     nfs_timeout();

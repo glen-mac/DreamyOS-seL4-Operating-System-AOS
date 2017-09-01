@@ -4,44 +4,38 @@
  * Glenn McGuire & Cameron Lonsdale
  */
 
-#include "picoro.h"
-#include "syscall.h"
+
 #include "sys_time.h"
 
-#include <sos.h>
-
-#include <cspace/cspace.h>
+#include <clock/clock.h>
+#include "picoro.h"
+#include "syscall.h"
 #include <utils/time.h>
 #include <utils/util.h>
-#include <clock/clock.h>
 
 static void callback_sys_usleep(uint32_t id, void *data);
 
-void
-syscall_usleep(seL4_CPtr reply_cap)
+seL4_Word
+syscall_usleep(void)
 {
-    LOG_INFO("syscall: thread made sos_usleep");
-
     uint32_t ms_delay = seL4_GetMR(1);
-    assert(register_timer(ms_delay * US_IN_MS, callback_sys_usleep, NULL) != 0);
+    LOG_INFO("syscall: thread made sos_usleep(%d)", ms_delay);
+    assert(register_timer(MILLISECONDS(ms_delay), callback_sys_usleep, NULL) != 0);
 
-    /* Unblock the process when timer callback is called */    
+    /* Unblock the process when timer callback is called */ 
     yield(NULL);
-
-    seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 0);
-    seL4_Send(reply_cap, reply); /* Send back to user to unblock the process */
+    return 0;
 }
 
-void
-syscall_time_stamp(seL4_CPtr reply_cap)
+seL4_Word
+syscall_time_stamp(void)
 {
-    LOG_INFO("syscall: thread made sos_time_stamp");
+    LOG_INFO("syscall: thread made sos_time_stamp()");
 
-    seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 2);
     timestamp_t ts = time_stamp();
     seL4_SetMR(0, (ts & 0xFFFFFFFF00000000L) >> 32);
     seL4_SetMR(1, ts & 0xFFFFFFFFL);
-    seL4_Send(reply_cap, reply);
+    return 2;
 }
 
 /*

@@ -17,13 +17,11 @@
 #define DMA_SIZE_BITS       (22)
 #define DMA_VEND            (DMA_VSTART + (1ull << DMA_SIZE_BITS))
 
-
 /* Address where physical addresses will be mapped into virtual memory.
  * Used to provide a 1:1 mapping from virtual to physical for M2 */
 #define PHYSICAL_VSTART     (0x20000000)
 #define PHYSICAL_SIZE_BITS  (30) /* 1 Gigabyte */
 #define PHYSICAL_VEND       (PHYSICAL_VSTART + (1ull << PHYSICAL_SIZE_BITS))
-
 
 /* From this address onwards is where any devices will get mapped in
  * by the map_device function. You should not use any addresses beyond
