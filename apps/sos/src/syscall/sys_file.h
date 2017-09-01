@@ -7,6 +7,8 @@
 #ifndef _SYS_FILE_H_
 #define _SYS_FILE_H_
 
+#include <sel4/sel4.h>
+
 /*
  * Syscall to open a file
  * msg(1) path_vaddr

@@ -115,7 +115,7 @@ vfs_close(vnode *vn)
 }
 
 int
-vfs_stat(char *name, sos_stat_t *buf)
+vfs_stat(char *name, sos_stat_t **buf)
 {
     int result;
     vnode *vn = NULL;

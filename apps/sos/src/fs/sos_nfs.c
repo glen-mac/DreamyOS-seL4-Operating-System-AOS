@@ -149,13 +149,15 @@ sos_nfs_read(vnode *node, uiovec *iov)
 }
 
 int
-sos_nfs_stat(vnode *node, sos_stat_t *stat)
+sos_nfs_stat(vnode *node, sos_stat_t **stat)
 {
-    if (nfs_getattr(node->vn_data, sos_nfs_getattr_callback, (uintptr_t)stat) != RPC_OK)
+    if (nfs_getattr(node->vn_data, sos_nfs_getattr_callback, (uintptr_t)NULL) != RPC_OK)
         return -1;
 
-    int *ret = yield(NULL);
-    return *ret;
+    if ((*stat = yield(NULL)) == NULL)
+        return -1;
+
+    return 0;
 }
 
 int
@@ -269,26 +271,30 @@ sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int
 static void
 sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr)
 {
-    int ret_val = -1;
+    sos_stat_t *stat = NULL;
     if (status != NFS_OK) {
         LOG_ERROR("getattr error status: %d", status);
         goto coro_resume;
     }
 
-    ret_val = 0;
-    /* copy back the stat struct attributes */
-    sos_stat_t *stat = (sos_stat_t *)token;
+    stat = malloc(sizeof(sos_stat_t));
+    if (!stat) {
+        LOG_ERROR("malloc returned NULL");
+        goto coro_resume;
+    }
+
+    /* Copy back the stat struct attributes */
     stat->st_type = (st_type_t)fattr->type;
     stat->st_fmode = (fmode_t)fattr->mode;
     stat->st_size = (unsigned)fattr->size;
+
     /* time conversion */
     stat->st_ctime = (long)(fattr->ctime.seconds*1000 + fattr->ctime.useconds / 1000);
     stat->st_atime = (long)(fattr->atime.seconds*1000 + fattr->atime.useconds / 1000);
 
     coro_resume:
-        resume(syscall_coro, &ret_val);
+        resume(syscall_coro, stat);
 }
-
 
 /*
  * Second stage to register the repeating timer 

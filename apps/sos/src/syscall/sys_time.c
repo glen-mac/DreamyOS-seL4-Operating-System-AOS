@@ -33,8 +33,8 @@ syscall_time_stamp(void)
     LOG_INFO("syscall: thread made sos_time_stamp()");
 
     timestamp_t ts = time_stamp();
-    seL4_SetMR(0, (ts & 0xFFFFFFFF00000000L) >> 32);
-    seL4_SetMR(1, ts & 0xFFFFFFFFL);
+    seL4_SetMR(0, UPPER32BITS(ts));
+    seL4_SetMR(1, LOWER32BITS(ts));
     return 2;
 }
 

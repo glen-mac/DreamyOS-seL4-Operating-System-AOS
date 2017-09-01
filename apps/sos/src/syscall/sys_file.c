@@ -4,15 +4,12 @@
  * Glenn McGuire & Cameron Lonsdale
  */
 
-#include <cspace/cspace.h>
+#include "sys_file.h"
+
 #include <fcntl.h>
 #include <proc/proc.h>
-#include <serial/serial.h>
-#include <sos.h>
 #include <string.h>
 #include "syscall.h"
-#include "sys_file.h"
-#include <sys/panic.h>
 #include <sys/uio.h>
 #include <vfs/file.h>
 #include <vm/frametable.h>
@@ -44,7 +41,7 @@ syscall_open(void)
     // TODO: Hard copy the filename because it might cross a page boundary
     seL4_Word name = vaddr_to_sos_vaddr(seL4_GetMR(1), ACCESS_READ);
     fmode_t mode = seL4_GetMR(2);
-    LOG_INFO("sycall: open(%s, %d) received on SOS", (char *)name, mode);
+    LOG_INFO("sycall: thread made open(%s, %d)", (char *)name, mode);
 
     int result;
 
@@ -167,11 +164,8 @@ syscall_stat(void)
     seL4_Word kname = vaddr_to_sos_vaddr(name, ACCESS_READ); // TODO: Copy this in, it could cross page boundary, same for open() and others that use name
     seL4_Word kbuf = vaddr_to_sos_vaddr(stat_buf, ACCESS_WRITE); // same
 
-    sos_stat_t *kstat = malloc(sizeof(sos_stat_t));
-    if (!kstat)
-        goto message_reply;
-
-    if (vfs_stat((char *)kname, (sos_stat_t *)kstat) != 0)
+    sos_stat_t *kstat;
+    if (vfs_stat((char *)kname, &kstat) != 0)
         goto message_reply;
 
     // then copy out to the one specified by the user (using our page boundary special copy)

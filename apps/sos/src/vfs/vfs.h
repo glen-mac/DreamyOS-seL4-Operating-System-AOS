@@ -24,7 +24,7 @@ typedef struct {
     int (*vop_close)(vnode *vnode);
     int (*vop_read)(vnode *node, uiovec *iov);
     int (*vop_write)(vnode *node, uiovec *iov);
-    int (*vop_stat)(vnode *node, sos_stat_t *buf);
+    int (*vop_stat)(vnode *node, sos_stat_t **buf);
 
     int (*vop_lookup)(char *name, int create_file, vnode **result); /* Lookup for a mount point */
     int (*vop_list)(char ***dir, size_t *nfiles); /* list all the files in a mount point */
@@ -73,7 +73,7 @@ void vfs_close(vnode *vn);
  * @param buf, buffer to store file attributes
  * @returns 0 on success, else 1
  */
-int vfs_stat(char *name, sos_stat_t *buf);
+int vfs_stat(char *name, sos_stat_t **buf);
 
 /*
  * Lookup a name inside the VFS

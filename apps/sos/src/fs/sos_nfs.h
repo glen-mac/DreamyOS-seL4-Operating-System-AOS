@@ -55,7 +55,7 @@ int sos_nfs_read(vnode *node, uiovec *iov);
  * @param stat, the stat struct
  * @returns 0 on success, else 1
  */
-int sos_nfs_stat(vnode *node, sos_stat_t *stat);
+int sos_nfs_stat(vnode *node, sos_stat_t **stat);
 
 /*
  * Close an NFS file

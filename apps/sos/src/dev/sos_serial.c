@@ -5,6 +5,7 @@
  */
 
 #include "sos_serial.h"
+#include <fcntl.h>
 #include "picoro.h"
 #include <vfs/vfs.h>
 #include <vfs/device.h>
@@ -17,10 +18,11 @@
 #include <utils/util.h>
 #include "ringbuf.h"
 
-uiovec *global_uio = NULL;
-int nbytes_read = 0;
+static uiovec * volatile global_uio = NULL;
+static volatile int nbytes_read = 0;
 
-ring_buffer_t *input_buffer = NULL;
+static ring_buffer_t * volatile input_buffer = NULL;
+static sos_stat_t *stat = NULL;
 
 /*
  * Operations for a serial vnode
@@ -41,10 +43,9 @@ handler(struct serial *serial, char c)
         char *buf = (char *)global_uio->uiov_base;
         buf[nbytes_read] = c;
         nbytes_read++;
-        if (c == '\n' || nbytes_read >= global_uio->uiov_len) {
-            LOG_INFO("resuming blocked coro");
+
+        if (c == '\n' || nbytes_read >= global_uio->uiov_len)
             resume(syscall_coro, NULL);
-        }
 
     } else if (!ring_buffer_is_full(input_buffer)) {
         /* Otherwise we buffer it */
@@ -56,25 +57,45 @@ int
 sos_serial_init(void)
 {
     struct serial *port = serial_init();
-    if (!port)
+    if (!port) {
+        LOG_ERROR("serial_init failed");
         return 1;
+    }
 
     vnode *node = malloc(sizeof(vnode));
-    if (!node)
+    if (!node) {
+        LOG_ERROR("malloc returned null");
         return 1;
+    }
 
     node->vn_data = port;
     node->vn_ops = &serial_vnode_ops;
 
     if (device_register("console", node) != 0) {
+        LOG_ERROR("device_register failed");
         free(node);
         return 1;
     }
 
-    input_buffer = malloc(sizeof(ring_buffer_t));
-    ring_buffer_init(input_buffer);
+    if ((input_buffer = malloc(sizeof(ring_buffer_t))) == NULL) {
+        LOG_ERROR("malloc returned null");
+        free(node);
+        return 1;
+    }
 
-    serial_register_handler(port, handler);
+    ring_buffer_init(input_buffer);
+    assert(serial_register_handler(port, handler) == 0);
+
+    if ((stat = malloc(sizeof(sos_stat_t))) == NULL) {
+        LOG_ERROR("malloc returned NULL");
+        return 1;
+    }
+
+    stat->st_type = ST_SPECIAL;
+    stat->st_fmode = O_RDWR; /* TODO: how the fuck do we get this correct */
+    stat->st_size = 0; /* Because theres not really a size */
+    stat->st_ctime = 3;
+    stat->st_atime = 4; /* TODO: update this on open() */
 
     return 0;
 }
@@ -91,6 +112,8 @@ sos_serial_read(vnode *node, uiovec *iov)
 {
     char *user_buf = iov->uiov_base;
     int bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->uiov_len);
+
+    /* Read from the buffer if there are stored bytes */
     for (int i = 0; i < bytes_read; ++i) {
         assert(ring_buffer_dequeue(input_buffer, user_buf + i) == 1);
         if (user_buf[i] == '\n') {
@@ -127,14 +150,8 @@ sos_serial_close(vnode *node)
 }
 
 int
-sos_serial_stat(vnode *node, sos_stat_t *buf)
+sos_serial_stat(vnode *node, sos_stat_t **buf)
 {
-    /* Mostly stub data */
-    buf->st_type = ST_SPECIAL;
-    buf->st_fmode = 1;
-    buf->st_size = 2;
-    buf->st_ctime = 3;
-    buf->st_atime = 4;
-
+    *buf = stat;
     return 0;
 }
