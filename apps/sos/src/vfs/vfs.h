@@ -12,15 +12,22 @@
 
 #include <sos.h>
 
+typedef struct {
+	void *uiov_base;
+	size_t uiov_len;
+	size_t uiov_pos;
+} uiovec;
+
 typedef struct _vnode vnode;
 
 typedef struct {
-    // int (*vop_open)(vnode *object, int flags_from_open);
-    // int (*vop_close)(vnode *vnode);
-    int (*vop_read)(vnode *node, struct iovec *iov);
-    int (*vop_write)(vnode *node, struct iovec *iov);
+    int (*vop_close)(vnode *vnode);
+    int (*vop_read)(vnode *node, uiovec *iov);
+    int (*vop_write)(vnode *node, uiovec *iov);
+    int (*vop_stat)(vnode *node, sos_stat_t **buf);
 
-    int (*vop_lookup)(char *pathname, vnode **result); /* Lookup for a mount point */
+    int (*vop_lookup)(char *name, int create_file, vnode **result); /* Lookup for a mount point */
+    int (*vop_list)(char ***dir, size_t *nfiles); /* list all the files in a mount point */
 } vnode_ops;
 
 typedef struct _vnode {
@@ -45,27 +52,43 @@ int vfs_mount(vnode *vn);
 /*
  * Open a 'file' in the VFS.
  * Finds in the vnode and calls vop_open.
- * @param path, the path of the file
+ * @param name, the name of the file
  * @param mode, the mode of access
  * @param[out] ret, the returned vnode
  * 
  * @returns 0 on success else 1
  */
-int vfs_open(char *path, fmode_t mode, vnode **ret);
+int vfs_open(char *name, fmode_t mode, vnode **ret);
 
 /*
  * Close a 'file' in the VFS
  * calls vop_close on the vnode
  * @param vn, the node
  */
-void vfs_close(vnode *vn); // TODO, RETURN ERROR?
+void vfs_close(vnode *vn);
 
 /*
- * Lookup a path name inside the VFS
- * @param path, the name to search
+ * Get the attributes of a file
+ * @param vn, the node
+ * @param buf, buffer to store file attributes
+ * @returns 0 on success, else 1
+ */
+int vfs_stat(char *name, sos_stat_t **buf);
+
+/*
+ * Lookup a name inside the VFS
+ * @param name, the name to search
+ * @param create_file, flag to specify if a file should be created on lookup fail
+ * This is delegated to the FS to first see this file and support file creation
+ *
  * @param[out] ret, the returned vnode
  * @returns 0 on success else 1
  */
-int vfs_lookup(char *path, vnode **ret);
+int vfs_lookup(char *name, int create_file, vnode **ret);
+
+/*
+ * List all the files in the VFS
+ */
+int vfs_list(char ***dir, size_t *nfiles);
 
 #endif /* _VFS_H_ */

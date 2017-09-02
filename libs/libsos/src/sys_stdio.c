@@ -165,10 +165,6 @@ sys_open(va_list ap)
 long
 sys_close(va_list ap)
 {
-    assert(!"Not implemented");
-    return 0;
-#if 0
     int fd = va_arg(ap, int);
     return sos_sys_close(fd);
-#endif
 }

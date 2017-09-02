@@ -22,9 +22,9 @@
 
 #include "proc.h"
 #include <vm/addrspace.h>
-#include "frametable.h"
+#include <vm/frametable.h>
 
-#include <vmem_layout.h>
+#include <vm/layout.h>
 #include <ut_manager/ut.h>
 #include <mapping.h>
 

@@ -1,5 +1,6 @@
 /*
  * Clock Implementation
+ *
  * Cameron Lonsdale & Glenn McGuire
  *
  */
@@ -24,18 +25,17 @@
 #define GPT_CNT 0x24 /* Counter Register */
 
 #define GPT_PERIPHERAL_CLOCK_FREQUENCY 66; /* Mhz */
-#define ONE_MILLISECOND 1000 /* in micrseconds */
 
 /* Register reset values */
 #define ZERO_RESET_VALUE 0x00000000
 #define MAX_INT_RESET_VALUE 0xFFFFFFFF
 
 /* Bit masks for setting bits in registers */
-#define FREE_RUN_MASK (1 << 9)
-#define PERIPHERAL_CLOCK_MASK (1 << 6)
-#define ENMOD_MODE_MASK (1 << 1)
-#define ROLL_OVER_MASK (1 << 5)
-#define OUTPUT_COMPARE_MASK (1 << 0)
+#define FREE_RUN_MASK BIT(9)
+#define PERIPHERAL_CLOCK_MASK BIT(6)
+#define ENMOD_MODE_MASK BIT(1)
+#define ROLL_OVER_MASK BIT(5)
+#define OUTPUT_COMPARE_MASK BIT(0)
 
 /* Definitions if a timer event is single use or repeating */
 #define REPEAT_EVENT 1
@@ -45,22 +45,21 @@
 #define EVENT_FAIL 0
 #define GEN_UID 0
 
-
 /* Global var for the start of GPT mapped memory */
-void *gpt_virtual = NULL;
+static void *gpt_virtual = NULL;
 
 /* Global vars for the GPT timer registers */
-seL4_Word *control_register_ptr;
-seL4_Word *prescale_register_ptr;
-seL4_Word *interrupt_register_ptr;
-seL4_Word *status_register_ptr;
-seL4_Word *compare_register_ptr;
-seL4_Word *upper_timestamp_register_ptr;
-seL4_Word *counter_register_ptr;
+static seL4_Word *control_register_ptr;
+static seL4_Word *prescale_register_ptr;
+static seL4_Word *interrupt_register_ptr;
+static seL4_Word *status_register_ptr;
+static seL4_Word *compare_register_ptr;
+static seL4_Word *upper_timestamp_register_ptr;
+static seL4_Word *counter_register_ptr;
 
-seL4_CPtr irq_handler; /* Global IRQ handler */
-priority_queue *pq; /* timer event pq handler */
-uint32_t timer_started = 0; /* Boolean to state if the timer has started or not */
+static seL4_CPtr irq_handler; /* Global IRQ handler */
+static priority_queue *pq; /* Timer event pq handler */
+static uint32_t timer_started = 0; /* Boolean to state if the timer has started or not */
 
 static uint64_t join32to64(uint32_t upper, uint32_t lower);
 static uint32_t add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t repeat, uint32_t uid);
@@ -71,9 +70,9 @@ static void check_for_rollover(void);
  * This is copied from network.c (and modified)
  * TODO: Abstract this out so network.c and clock.c uses the same code?
  *
- * @param int irq, interrupt request id
- * @param seL4_CPtr aep, asynchronous endpoint the interrupt message will be delivered to
- * @param[out] seL4_CPtr *irq_handler_ptr, Capability pointer to describe the interrupt handler
+ * @param irq, interrupt request id
+ * @param aep, asynchronous endpoint the interrupt message will be delivered to
+ * @param[out] irq_handler_ptr, Capability pointer to describe the interrupt handler
  * @returns 0 on success, else -1
  */
 static int
@@ -94,10 +93,6 @@ enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr)
     return 0;
 }
 
-/*
- * Initialise the timer.
- * @param void *mapped_vaddr, the address of the memory mapped registers for GPT
- */
 void
 init_timer(void *mapped_vaddr)
 {
@@ -114,12 +109,6 @@ init_timer(void *mapped_vaddr)
     counter_register_ptr = (seL4_Word *)(gpt_virtual + GPT_CNT); 
 }
 
-/*
- * Start the timer.
- * Enable interrupt requests and set GPT registers.
- * @param seL4_CPtr interrupt_ep, badged async endpoint that driver uses for delivering interrupts
- * @returns CLOCK_R_OK iff successful.
- */
 int
 start_timer(seL4_CPtr interrupt_ep)
 {
@@ -128,8 +117,10 @@ start_timer(seL4_CPtr interrupt_ep)
         stop_timer();
 
     /* Set timer interupts to be sent to interrupt_ep, and creates an interrupt capability */
-    if (enable_irq(GPT_IRQ, interrupt_ep, &irq_handler) != 0)
+    if (enable_irq(GPT_IRQ, interrupt_ep, &irq_handler) != 0) {
+        LOG_INFO("enable_irq failed");
         return CLOCK_R_FAIL; /* Operation failed for other reason (IRQ failed setup) */
+    }
 
     /* Reset key registers */
     *control_register_ptr = ZERO_RESET_VALUE;
@@ -158,45 +149,28 @@ start_timer(seL4_CPtr interrupt_ep)
     return CLOCK_R_OK;
 }
 
-/*
- * Register a callback to be called after a given delay
- * @param uint64_t delay, microsecond delay before event
- * @param timer_callback_t callback, function to be run after delay
- * @param void *data, data to be passed to the callback function
- * @return id of the timer event
- */
 uint32_t
 register_timer(uint64_t delay, timer_callback_t callback, void *data)
 {
     return add_event_to_pq(delay, callback, data, SINGLE_EVENT, GEN_UID);
 }
 
-/*
- * Register a repeating callback to be run every delay microseconds
- * @param uint64_t delay, microsecond delay before event
- * @param timer_callback_t callback, function to be run after delay
- * @param void *data, data to be passed to the callback function
- * @return id of the timer event
- */
 uint32_t
 register_repeating_timer(uint64_t delay, timer_callback_t callback, void *data)
 {
     return add_event_to_pq(delay, callback, data, REPEAT_EVENT, GEN_UID);
 }
 
-/*
- * Remove a previously registered callback by its ID
- * @param uint32_t id of the registered timer
- * @return CLOCK_R_OK iff successful.
- */
 int
 remove_timer(uint32_t id)
 {
-    if (!timer_started)
+    if (!timer_started) {
+        LOG_ERROR("Driver uninitialised");
         return CLOCK_R_UINT; /* Driver not initialised */
+    }
 
     if (!pq_remove(pq, id)) {
-        LOG_ERROR("Invalid timer id %d", id);
+        LOG_ERROR("Invalid timer id: %d", id);
         return CLOCK_R_FAIL; /* Operation failed for other reason (invalid id) */
     }
 
@@ -206,13 +180,14 @@ remove_timer(uint32_t id)
     return CLOCK_R_OK;
 }
 
-/*
- * Handle an interrupt message sent to 'interrupt_ep' from start_timer
- * @returns CLOCK_R_OK iff successful
- */
 int
 timer_interrupt(void)
 {
+    if (!timer_started) {
+        LOG_ERROR("Driver uninitialised");
+        return CLOCK_R_UINT; /* Driver not initialised */
+    }
+
     check_for_rollover();
 
     if (*status_register_ptr & OUTPUT_COMPARE_MASK) {
@@ -221,7 +196,7 @@ timer_interrupt(void)
         do {
             event *cur_event = pq_pop(pq);
             if (!cur_event) {
-                LOG_ERROR("Malloc returned null when popping");
+                LOG_ERROR("pq_pop returned null");
                 return CLOCK_R_FAIL; /* This should only happen if malloc returned NULL */
             }
 
@@ -234,7 +209,6 @@ timer_interrupt(void)
 
             free(cur_event);
         } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + MILLISECONDS(1));
-
 
         if (pq_is_empty(pq)) {
             /* We disable compare interrupts because theres no more events */
@@ -249,22 +223,20 @@ timer_interrupt(void)
 
     /* Acknowledge the interrupt so more can happen */
     if (seL4_IRQHandler_Ack(irq_handler) != 0) {
-        LOG_INFO("Interrupt Acknowledge failed");
+        LOG_ERROR("Interrupt Acknowledge failed");
         return CLOCK_R_FAIL; /* Operation failed for other reason (Failed to ack interrupt) */
     }
 
     return CLOCK_R_OK;   
 }
 
-/*
- * Get the present time in microseconds since booting.
- * @returns 64 bit timestamp on success, else negative value
- */
 timestamp_t
 time_stamp(void)
 {
-    if (!timer_started)
+    if (!timer_started) {
+        LOG_ERROR("Driver uninitialised");
         return CLOCK_R_UINT; /* Driver not initialised */
+    }
 
     /*
      * There can be a race condition here where between reading the lower and upper 32 bits
@@ -276,7 +248,6 @@ time_stamp(void)
      * 2. We read lower bits first (close to 0xFFFFFFFF), then upper ticks over before we read. 
      * And we see a value that is very far into the future.
      */
-
     timestamp_t first = (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
     timestamp_t second = (timestamp_t)join32to64(*upper_timestamp_register_ptr, *counter_register_ptr);
 
@@ -289,9 +260,7 @@ time_stamp(void)
     }
 
     /* If the upper 32 bits mismatch then a rollover occured and its POSSIBLE the condition (2) is met */
-    uint32_t first_upper = (first >> sizeof(uint32_t));
-    uint32_t second_upper = (second >> sizeof(uint32_t));
-    if (first_upper != second_upper) {
+    if (UPPER32BITS(first) != UPPER32BITS(second)) {
         /* This timestamp shold not be incorrect as we just had the race condition */
         check_for_rollover();
         LOG_INFO("64-bit timer race condition detected");
@@ -302,10 +271,6 @@ time_stamp(void)
     return second;
 }
 
-/*
- * Stop clock driver operation.
- * @returns CLOCK_R_OK iff successful.
- */
 int
 stop_timer(void)
 {
@@ -313,10 +278,16 @@ stop_timer(void)
     *control_register_ptr &= ~1;
 
     /* Clear the handler */
-    seL4_IRQHandler_Clear(irq_handler);
+    if (seL4_IRQHandler_Clear(irq_handler) != 0) {
+        LOG_ERROR("Failed to clear timer IRQ");
+        return CLOCK_R_FAIL;
+    }
 
     /* Delete the capability from the cspace */
-    cspace_delete_cap(cur_cspace, irq_handler);
+    if (cspace_delete_cap(cur_cspace, irq_handler) != CSPACE_NOERROR) {
+        LOG_ERROR("Failed to delete irq cap");
+        return CLOCK_R_FAIL;
+    }
 
     /* Remove all upcoming events from the queue */
     pq_purge(pq);
@@ -326,26 +297,43 @@ stop_timer(void)
     return CLOCK_R_OK;
 }
 
-/* Joins two 32 bit numbers into a 64 bit number and returns upper:lower */
+/*
+ * Joins two 32 bit numbers into a 64 bit number
+ * @param upper, the upper 32 bits
+ * @param lower, the lower 32 bits
+ * @returns 64 bit number upper:lower
+ */
 static inline uint64_t
 join32to64(uint32_t upper, uint32_t lower)
 {
-    return (uint64_t)lower | ((uint64_t)upper << 32);
+    return (uint64_t)lower | ((uint64_t)upper << sizeof(uint32_t));
 }
 
-/* adds an event to the PQ */
+/* 
+ * Add an event to the PQ
+ * @param delay, the microsecond delay until the event
+ * @param callback, the callback to run at the event
+ * @param data, the data to provide to the callback
+ * @param repeat, flag to specify if the event is repeating
+ * @param uid, unique id of the event
+ * @returns CLOCK_R_OK on failure, else positive id
+ */
 static uint32_t
 add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t repeat, uint32_t uid)
 {
     uint32_t id;
 
-    if (!timer_started)
+    if (!timer_started) {
+        LOG_ERROR("Driver uninitialised");
         return CLOCK_R_OK; /* Return 0 on failure */
+    }
 
+    /* If the event will happen within 1ms, just execute the event, as we might miss it */
     if (delay < MILLISECONDS(1)) {
-        id = pq_get_next_id(pq);
-        if (!id)
+        if ((id = pq_get_next_id(pq)) == 0) {
+            LOG_ERROR("pq_get_next_id returned invalid id");
             return EVENT_FAIL;
+        }
 
         if (callback) 
             callback(id, data);
@@ -356,10 +344,8 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
     if (pq_is_empty(pq))
         *interrupt_register_ptr |= OUTPUT_COMPARE_MASK; /* Output compare channel 1 enabled */
 
-    id = pq_push(pq, time_stamp() + delay, delay, callback, data, repeat, uid);
-
     /* If there was an issue pushing event, terminate early */
-    if (!id)  {
+    if ((id = pq_push(pq, time_stamp() + delay, delay, callback, data, repeat, uid)) == 0) {
         LOG_ERROR("Error pushing event to the queue");
         return EVENT_FAIL;
     }
@@ -370,7 +356,9 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
     return id;
 }
 
-/* Check if a rollover interrupt occured */
+/*
+ * Check if a rollover interrupt occured
+ */
 static void
 check_for_rollover(void)
 {

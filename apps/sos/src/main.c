@@ -1,59 +1,61 @@
 /*
- * Copyright 2014, NICTA
+ * Dreamy OS
  *
- * This software may be distributed and modified according to the terms of
- * the BSD 2-Clause license. Note that NO WARRANTY is provided.
- * See "LICENSE_BSD2.txt" for details.
- *
- * @TAG(NICTA_BSD)
+ * Cameron Lonsdale & Glenn McGuire
  */
 
-#include <autoconf.h>
+#define verbose 5
 
+#include <autoconf.h>
+#include <clock/clock.h>
 #include <cspace/cspace.h>
 #include <cpio/cpio.h>
-#include <nfs/nfs.h>
+#include <dev/sos_serial.h>
 #include <elf/elf.h>
-#include <clock/clock.h>
-#include <utils/page.h>
-#include <utils/util.h>
-
-#include "picoro.h"
-#include <fs/sos_serial.h>
-#include "elf.h"
-#include "frametable.h"
-#include "mapping.h"
-#include "network.h"
-#include "proc.h"
-#include <syscall/syscall.h>
-#include "ut_manager/ut.h"
-#include <vm/vm.h>
-#include <vfs/vfs.h>
-#include "vmem_layout.h"
-
-#define verbose 5
+#include <fs/sos_nfs.h>
+#include <nfs/nfs.h>
 #include <sys/debug.h>
 #include <sys/panic.h>
+#include <syscall/syscall.h>
+#include <utils/page.h>
+#include <utils/util.h>
+#include <vfs/vfs.h>
+#include <vm/vm.h>
+#include <vm/frametable.h>
 
-/* For unit tests */
+#include "mapping.h"
+#include "network.h"
+#include "picoro.h"
+#include <proc/elf.h>
+#include <proc/proc.h>
+#include <ut_manager/ut.h>
+#include <vm/layout.h>
+
+/* For unit tests: REMOVE BEFORE FINAL SUBMISSION */
 #include "tests.h"
 
-/* This is the index where a clients syscall enpoint will
- * be stored in the clients cspace. */
-#define USER_EP_CAP          (1)
+/* 
+ * This is the index where a clients syscall enpoint will
+ * be stored in the clients cspace.
+ */
+#define USER_EP_CAP (1)
 
-/* To differencient between async and and sync IPC, we assign a
+/* 
+ * To differencient between async and and sync IPC, we assign a
  * badge to the async endpoint. The badge that we receive will
  * be the bitwise 'OR' of the async endpoint badge and the badges
- * of all pending notifications. */
-#define IRQ_EP_BADGE         (1 << (seL4_BadgeBits - 1))
+ * of all pending notifications.
+ */
+#define IRQ_EP_BADGE (1 << (seL4_BadgeBits - 1))
 
-/* All badged IRQs set high bet, then we use uniq bits to
- * distinguish interrupt sources */
+/* 
+ * All badged IRQs set high bet, then we use uniq bits to
+ * distinguish interrupt sources
+ */
 #define IRQ_BADGE_NETWORK (1 << 0)
 #define IRQ_BADGE_TIMER (1 << 1)
 
-#define TTY_NAME             CONFIG_SOS_STARTUP_APP
+#define TTY_NAME CONFIG_SOS_STARTUP_APP
 
 /*
  * The linker will link this symbol to the start address
@@ -63,27 +65,24 @@ extern char _cpio_archive[];
 
 const seL4_BootInfo *_boot_info;
 
-static void sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
-static void sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
-static void sos_driver_init(void);
-
-static seL4_CPtr badge_irq_ep(seL4_CPtr ep, seL4_Word badge);
-
 /*
  * End point capabilities
  */
 seL4_CPtr _sos_ipc_ep_cap;
 seL4_CPtr _sos_interrupt_ep_cap;
 
-/*
- * NFS mount point
- */
-extern fhandle_t mnt_point;
-
 /* 
  * Syscall coroutine
  */
 coro syscall_coro = NULL;
+
+/*
+ * Private functions
+ */
+static void sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
+static void sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep);
+static void sos_driver_init(void);
+static seL4_CPtr badge_irq_ep(seL4_CPtr ep, seL4_Word badge);
 
 /*
  * Print the startup logo for the operating system
@@ -115,7 +114,7 @@ print_startup(void)
  * @param ep, the endpoint where messages come in
  */
 void
-event_loop(seL4_CPtr ep)
+event_loop(const seL4_CPtr ep)
 {
     seL4_Word badge;
     seL4_Word label;
@@ -126,11 +125,13 @@ event_loop(seL4_CPtr ep)
         label = seL4_MessageInfo_get_label(message);
         if (badge & IRQ_EP_BADGE) {
             /* Interrupt */
-            if (badge & IRQ_BADGE_NETWORK) {
+            if (badge & IRQ_BADGE_NETWORK)
                 network_irq();
-            } else if (badge & IRQ_BADGE_TIMER) {
+
+            /* Needs to be an if, interrupts can group together */
+            if (badge & IRQ_BADGE_TIMER)
                 timer_interrupt();
-            }
+
         } else if (label == seL4_VMFault) {
             vm_fault();
         } else if (label == seL4_NoFault) {
@@ -159,25 +160,19 @@ sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     /* Create an Async endpoint for interrupts */
     aep_addr = ut_alloc(seL4_EndpointBits);
     conditional_panic(!aep_addr, "No memory for async endpoint");
-    err = cspace_ut_retype_addr(aep_addr,
-                                seL4_AsyncEndpointObject,
-                                seL4_EndpointBits,
-                                cur_cspace,
-                                async_ep);
+    err = cspace_ut_retype_addr(aep_addr, seL4_AsyncEndpointObject, seL4_EndpointBits, cur_cspace, async_ep);
     conditional_panic(err, "Failed to allocate c-slot for Interrupt endpoint");
 
     /* Bind the Async endpoint to our TCB */
     err = seL4_TCB_BindAEP(seL4_CapInitThreadTCB, *async_ep);
     conditional_panic(err, "Failed to bind ASync EP to TCB");
 
+    // TODO: Will each process need its own endpoint?
+
     /* Create an endpoint for user application IPC */
     ep_addr = ut_alloc(seL4_EndpointBits);
     conditional_panic(!ep_addr, "No memory for endpoint");
-    err = cspace_ut_retype_addr(ep_addr, 
-                                seL4_EndpointObject,
-                                seL4_EndpointBits,
-                                cur_cspace,
-                                ipc_ep);
+    err = cspace_ut_retype_addr(ep_addr, seL4_EndpointObject, seL4_EndpointBits, cur_cspace, ipc_ep);
     conditional_panic(err, "Failed to allocate c-slot for IPC endpoint");
 }
 
@@ -193,15 +188,20 @@ sos_driver_init(void)
     /* Initialise the network hardware */
     network_init(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_NETWORK));
 
-    /* Intialise the serial device and register it with the VFS */
-    sos_serial_init();
-
     /* Map in the GPT into virtual memory and provide that address to the timer library */
     init_timer(map_device((void *)CLOCK_GPT, CLOCK_GPT_SIZE));
 
     /* Initialise timer with badged capability */
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
+
+    /* Intialise the serial device and register it with the VFS */
+    err = sos_serial_init();
+    conditional_panic(err, "Failed to initialise serial driver\n");
+
+    /* Initialise the NFS file system and register with the VFS */
+    err = sos_nfs_init();
+    conditional_panic(err, "Failed to mount NFS\n");
 }
 
 /*
@@ -217,7 +217,6 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     seL4_Word high;
     int err;
 
-    LOG_INFO("SOS Starting");
     print_startup();
 
     /* Retrieve boot info from seL4 */
@@ -245,6 +244,7 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     seL4_Word n_pages = BYTES_TO_4K_PAGES(high - low);
     seL4_Word frame_table_size_in_bits = LOG_BASE_2(nearest_power_of_two(sizeof(frame_entry) * n_pages));
     seL4_Word frame_table_paddr = ut_steal_mem(frame_table_size_in_bits);
+    conditional_panic(frame_table_paddr == (seL4_Word)NULL, "Failed to reserve frametable memory\n");
 
     /* Resize memory after we just stole from it */
     ut_find_memory(&low, &high);
@@ -264,10 +264,14 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     err = frame_table_init(frame_table_paddr, frame_table_size_in_bits, low, high);
     conditional_panic(err, "Failed to intiialise frame table\n");
 
+    /* Initialise IPC endpoints */
+    sos_ipc_init(ipc_ep, async_ep);
+
+    /* Initialise the virtual file system */
     err = vfs_init();
     conditional_panic(err, "Failed to virtual file system\n");
 
-    sos_ipc_init(ipc_ep, async_ep);
+    /* Initialise drivers: Must happen after vfs_init as devices are registered */
     sos_driver_init();
 }
 
@@ -278,9 +282,12 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
  * @return badged capability
  */
 static inline 
-seL4_CPtr badge_irq_ep(seL4_CPtr ep, seL4_Word badge)
+seL4_CPtr badge_irq_ep(const seL4_CPtr ep, const seL4_Word badge)
 {
-    seL4_CPtr badged_cap = cspace_mint_cap(cur_cspace, cur_cspace, ep, seL4_AllRights, seL4_CapData_Badge_new(badge | IRQ_EP_BADGE));
+    seL4_CPtr badged_cap = cspace_mint_cap(
+        cur_cspace, cur_cspace, ep, 
+        seL4_AllRights, seL4_CapData_Badge_new(badge | IRQ_EP_BADGE)
+    );
     conditional_panic(!badged_cap, "Failed to allocate badged cap");
 
     return badged_cap;
@@ -301,15 +308,14 @@ main(void)
 
     /* Start the user application */
     start_first_process(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap);
-
+    
     /* Unit tests */
     // test_m2();
     // test_m1(); /* After so as to have time to enter event loop */
 
     /* Wait on synchronous endpoint for IPC */
     LOG_INFO("SOS entering event loop");
-    event_loop_coro = coroutine(event_loop);
-    resume(event_loop_coro, _sos_ipc_ep_cap);
+    event_loop(_sos_ipc_ep_cap);
 
     panic("should not be reached");
     return 0;

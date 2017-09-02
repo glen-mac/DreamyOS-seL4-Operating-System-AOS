@@ -25,7 +25,8 @@ typedef struct dev {
 
 
 const vnode_ops device_vnode_ops = {
-    .vop_lookup = device_lookup
+    .vop_lookup = device_lookup,
+    .vop_list = device_list
 };
 
 /*
@@ -54,7 +55,7 @@ device_register(char *name, vnode *vn)
 }
 
 int
-device_lookup(char *name, vnode **ret)
+device_lookup(char *name, int create_file, vnode **ret)
 {
     for (device *curr = devices; curr != NULL; curr = curr->next) {
         /* Try Lookup the file in this namespace */
@@ -66,4 +67,23 @@ device_lookup(char *name, vnode **ret)
 
     LOG_INFO("Lookup for %s failed", name);
     return 1;
+}
+
+int
+device_list(char ***list, size_t *nfiles)
+{
+    for (device *curr = devices; curr != NULL; curr = curr->next)
+        (*nfiles)++;
+
+    char **dir = malloc(sizeof(char *) * (*nfiles));
+    if (!dir)
+        return 1;
+
+    int i = 0;
+    for (device *curr = devices; curr != NULL; curr = curr->next) {
+        dir[i++] = devices->name;
+    }
+
+    *list = dir;
+    return 0;
 }

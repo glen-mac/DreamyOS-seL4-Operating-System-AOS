@@ -96,15 +96,15 @@ sos_sys_close(int file)
 int
 sos_getdirent(int pos, char *name, size_t nbyte)
 {
-    assert(!"You need to implement this");
-    return -1;
+    MAKE_SYSCALL(SOS_SYS_GETDIRENT, pos, name, nbyte);
+    return (int)seL4_GetMR(0);
 }
 
 int
-sos_stat(const char *path, sos_stat_t *buf)
+sos_stat(const char *name, sos_stat_t *buf)
 {
-    assert(!"You need to implement this");
-    return -1;
+    MAKE_SYSCALL(SOS_SYS_STAT, name, buf);
+    return (int)seL4_GetMR(0); /* -1 on error, 0 on success */
 }
 
 pid_t

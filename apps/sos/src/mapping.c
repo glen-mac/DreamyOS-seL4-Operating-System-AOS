@@ -18,9 +18,9 @@
 #include <utils/util.h>
 #include <ut_manager/ut.h>
 
-#include "vmem_layout.h"
-#include "proc.h"
-#include "frametable.h"
+#include <proc/proc.h>
+#include <vm/layout.h>
+#include <vm/frametable.h>
 #include <vm/vm.h>
 
 extern const seL4_BootInfo *_boot_info;

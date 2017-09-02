@@ -47,7 +47,6 @@ static int cat(int argc, char **argv) {
     char buf[BUF_SIZ];
     int num_read, stdout_fd, num_written = 0;
 
-
     if (argc != 2) {
         printf("Usage: cat filename\n");
         return 1;
@@ -56,9 +55,12 @@ static int cat(int argc, char **argv) {
     printf("<%s>\n", argv[1]);
 
     fd = open(argv[1], O_RDONLY);
-    stdout_fd = open("console", O_WRONLY);
+    if (fd < 0) {
+        printf("%s: No such file\n", argv[1]);
+        return 1;
+    }
 
-    assert(fd >= 0);
+    stdout_fd = open("console", O_WRONLY);
 
     while ((num_read = read(fd, buf, BUF_SIZ)) > 0)
         num_written = write(stdout_fd, buf, num_read);
@@ -66,7 +68,7 @@ static int cat(int argc, char **argv) {
     close(stdout_fd);
 
     if (num_read == -1 || num_written == -1) {
-        printf("error on write\n");
+        printf("error on write, %d, %d\n", num_read, num_written);
         return 1;
     }
 
@@ -90,7 +92,10 @@ static int cp(int argc, char **argv) {
     fd = open(file1, O_RDONLY);
     fd_out = open(file2, O_WRONLY);
 
-    assert(fd >= 0);
+    if (fd < 0) {
+        printf("%s: No such file\n", argv[1]);
+        return 1;
+    }
 
     while ((num_read = read(fd, buf, BUF_SIZ)) > 0)
         num_written = write(fd_out, buf, num_read);

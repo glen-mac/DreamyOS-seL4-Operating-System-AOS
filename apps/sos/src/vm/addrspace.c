@@ -66,8 +66,8 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
         return NULL;
     }
 
-    new_region->vaddr_start = start;
-    new_region->vaddr_end = start + size;
+    new_region->start = start;
+    new_region->end = start + size;
     new_region->permissions = permissions;
     return new_region;
 }
@@ -75,7 +75,7 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
 int
 as_add_region(addrspace *as, region *new_region)
 {
-    LOG_INFO("Adding region %p -> %p", (void *)new_region->vaddr_start, (void *)new_region->vaddr_end);
+    LOG_INFO("Adding region %p -> %p", (void *)new_region->start, (void *)new_region->end);
     if (as->region_list == NULL) {
         as->region_list = new_region;
         goto end_add;
@@ -101,7 +101,7 @@ as_find_region(addrspace *as, seL4_Word vaddr, region **found_region)
 {
     region *curr = as->region_list;
     while (curr != NULL) {
-        if (vaddr >= curr->vaddr_start && vaddr < curr->vaddr_end) {
+        if (vaddr >= curr->start && vaddr < curr->end) {
             *found_region = curr;
             return 0;
         }
@@ -114,7 +114,7 @@ int
 as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end)
 {
     // TODO: Refactor this to check the addr doesnt collide with any other regions
-    if (start >= as->region_heap->vaddr_end && start < as->region_stack->vaddr_start)
+    if (start >= as->region_heap->end && start < as->region_stack->start)
         return 0;
 
     return 1;

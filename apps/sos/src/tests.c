@@ -19,12 +19,11 @@
 #include <utils/math.h>
 #include <utils/time.h>
 
-#include "frametable.h"
+#include <vm/frametable.h>
 #include "network.h"
-#include "elf.h"
+#include <proc/elf.h>
 
 #include "ut_manager/ut.h"
-#include "vmem_layout.h"
 #include "mapping.h"
 
 #include "tests.h"
@@ -52,15 +51,26 @@ test_m1(void)
     register_timer(SECONDS(1), callback2, NULL);
 
     /* Several non repeating timers */
-    register_timer(SECONDS(1), callback3, NULL); // 2
-    register_timer(SECONDS(2), callback3, NULL); // 3
-    register_timer(SECONDS(3), callback3, NULL); // 4
-    register_timer(SECONDS(3), callback3, NULL); // 5
-    register_timer(SECONDS(2), callback3, NULL); // 6
-    register_timer(SECONDS(1), callback3, NULL); // 7
+    int id1 = register_timer(SECONDS(1), callback3, NULL); // 2
+    assert(id1 != 0);
 
-    remove_timer(3);
-    remove_timer(6);
+    int id2 = register_timer(SECONDS(2), callback3, NULL); // 3
+    assert(id2 != 0);
+
+    int id3 = register_timer(SECONDS(3), callback3, NULL); // 4
+    assert(id3 != 0);
+
+    int id4 = register_timer(SECONDS(3), callback3, NULL); // 5
+    assert(id4 != 0);
+
+    int id5 = register_timer(SECONDS(2), callback3, NULL); // 6
+    assert(id5 != 0);
+
+    int id6 = register_timer(SECONDS(1), callback3, NULL); // 7
+    assert(id6 != 0);
+
+    remove_timer(id2);
+    remove_timer(id5);
 
     register_timer(SECONDS(1), callback4, NULL);
     register_timer(SECONDS(2), callback4, NULL);

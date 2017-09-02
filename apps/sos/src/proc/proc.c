@@ -16,7 +16,7 @@
 #include <assert.h>
 #include <ut_manager/ut.h>
 #include <sys/panic.h>
-#include "vmem_layout.h"
+#include <vm/layout.h>
 #include <cpio/cpio.h>
 #include "elf.h"
 #include <elf/elf.h>
@@ -108,13 +108,14 @@ start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     region *stack = as_create_region(PROCESS_STACK_TOP - PAGE_SIZE_4K, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
     as_add_region(curproc->p_addrspace, stack);
     curproc->p_addrspace->region_stack = stack;
-    
+
     /* Map in the IPC buffer for the thread */
     seL4_CPtr pt_cap;
     err = map_page(tty_test_process->ipc_buffer_cap, tty_test_process->p_addrspace->vspace,
                    PROCESS_IPC_BUFFER,
                    seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap);
     conditional_panic(err, "Unable to map IPC buffer for user app");
+
     /* create region for the ipc buffer */
     region *ipc_region = as_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
     as_add_region(curproc->p_addrspace, ipc_region);
@@ -140,7 +141,7 @@ start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     /* Start the new process */
     memset(&context, 0, sizeof(context));
     context.pc = elf_getEntryPoint(elf_base);
-
     context.sp = PROCESS_STACK_TOP;
+
     seL4_TCB_WriteRegisters(tty_test_process->tcb_cap, 1, 0, 2, &context);
 }

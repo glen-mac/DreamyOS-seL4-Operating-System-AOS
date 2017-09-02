@@ -4,12 +4,8 @@
  * Glenn McGuire & Cameron Lonsdale
  */
 
-#include <cspace/cspace.h>
-
-#include "picoro.h"
-#include "proc.h"
-#include <sos.h>
 #include "syscall.h"
+#include <cspace/cspace.h>
 #include <utils/util.h>
 
 /* include all sys_* wrappers */
@@ -17,52 +13,42 @@
 #include "sys_file.h"
 #include "sys_vm.h"
 
+/* Currently dependent on syscall numbers ordering, might change this */
+static seL4_Word (*syscall_table[])(void) = {
+    NULL,
+    syscall_write,
+    NULL,
+    syscall_read,
+    NULL,
+    syscall_open,
+    syscall_close,
+    syscall_brk,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    syscall_usleep,
+    syscall_time_stamp,
+    syscall_stat,
+    syscall_listdir,
+};
 
 void
-handle_syscall(seL4_Word badge, size_t nwords)
+handle_syscall(seL4_Word badge)
 {
-    seL4_Word syscall_number;
-    seL4_CPtr reply_cap;
-
-    syscall_number = seL4_GetMR(0);
+    seL4_Word syscall_number = seL4_GetMR(0);
 
     /* Save the caller */
-    reply_cap = cspace_save_reply_cap(cur_cspace);
+    seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
     assert(reply_cap != CSPACE_NULL);
 
-    // TODO: Turn this into a jump table
-    switch (syscall_number) {
-        case SOS_SYS_USLEEP:
-            syscall_usleep(reply_cap);
-            break;
-
-        case SOS_SYS_TIME_STAMP:
-            syscall_time_stamp(reply_cap);
-            break;
-
-        case SOS_SYS_OPEN:
-            syscall_open(reply_cap);
-            break;
-
-        case SOS_SYS_WRITE:
-            syscall_write(reply_cap);
-            break;
-
-        case SOS_SYS_READ:
-            syscall_read(reply_cap);
-            break;
-
-        case SOS_SYS_CLOSE:
-            syscall_close(reply_cap);
-            break;
-
-        case SOS_SYS_BRK:
-            syscall_brk(reply_cap);
-            break;
-
-        default:
-            /* we don't want to reply to an unknown syscall */
-            LOG_INFO("Unknown syscall %d", syscall_number);
+    /* If syscall number is valid and function pointer is not NULL */
+    if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) &&
+        syscall_table[syscall_number]) {
+        seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, syscall_table[syscall_number]());
+        seL4_Send(reply_cap, reply);
+    } else {
+        LOG_INFO("Unknown syscall %d", syscall_number);
     }
 
     /* Free the saved reply cap */

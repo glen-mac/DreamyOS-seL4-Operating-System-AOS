@@ -22,7 +22,7 @@
 /*
  * Return codes for driver functions
  */
-#define CLOCK_R_OK     0        /* success */
+#define CLOCK_R_OK   (0)        /* success */
 #define CLOCK_R_UINT (-1)       /* driver not initialised */
 #define CLOCK_R_CNCL (-2)       /* operation cancelled (driver stopped) */
 #define CLOCK_R_FAIL (-3)       /* operation failed for other reason */
@@ -30,56 +30,60 @@
 typedef int64_t timestamp_t;
 typedef void (*timer_callback_t)(uint32_t id, void *data);
 
-/* 
- * Set the virtual address for the memory mapped timer 
+/*
+ * Initialise the timer.
+ * @param mapped_vaddr, the address of the memory mapped registers for GPT
  */
 void init_timer(void *vaddr);
 
 /*
- * Initialise driver. Performs implicit stop_timer() if already initialised.
- *    interrupt_ep:       A (possibly badged) async endpoint that the driver
-                          should use for deliverying interrupts to
- *
- * Returns CLOCK_R_OK iff successful.
+ * Start the timer.
+ * Enable interrupt requests and set GPT registers.
+ * @param interrupt_ep, badged async endpoint that driver uses for delivering interrupts
+ * @returns CLOCK_R_OK iff successful
  */
 int start_timer(seL4_CPtr interrupt_ep);
 
 /*
  * Register a callback to be called after a given delay
- *    delay:  Delay time in microseconds before callback is invoked
- *    callback: Function to be called
- *    data: Custom data to be passed to callback function
- *
- * Returns 0 on failure, otherwise an unique ID for this timeout
+ * @param uint64_t delay, microsecond delay before event
+ * @param timer_callback_t callback, function to be run after delay
+ * @param void *data, data to be passed to the callback function
+ * @return id of the timer event
  */
 uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data);
+
+/*
+ * Register a repeating callback to be run every delay microseconds
+ * @param uint64_t delay, microsecond delay before event
+ * @param timer_callback_t callback, function to be run after delay
+ * @param void *data, data to be passed to the callback function
+ * @return id of the timer event
+ */
 uint32_t register_repeating_timer(uint64_t delay, timer_callback_t callback, void *data);
 
 /*
  * Remove a previously registered callback by its ID
- *    id: Unique ID returned by register_time
- * Returns CLOCK_R_OK iff successful.
+ * @param uint32_t id of the registered timer
+ * @return CLOCK_R_OK iff successful.
  */
 int remove_timer(uint32_t id);
 
 /*
  * Handle an interrupt message sent to 'interrupt_ep' from start_timer
- *
- * Returns CLOCK_R_OK iff successful
+ * @returns CLOCK_R_OK iff successful
  */
 int timer_interrupt(void);
 
 /*
- * Returns present time in microseconds since booting.
- *
- * Returns a negative value if failure.
+ * Get the present time in microseconds since booting.
+ * @returns 64 bit timestamp on success, else negative value
  */
 timestamp_t time_stamp(void);
 
 /*
  * Stop clock driver operation.
- *
- * Returns CLOCK_R_OK iff successful.
+ * @returns CLOCK_R_OK iff successful.
  */
 int stop_timer(void);
 
