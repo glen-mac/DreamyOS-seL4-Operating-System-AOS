@@ -129,6 +129,7 @@ syscall_do_read_write(seL4_Word access_mode)
             /* Didnt read enough data, could be packet loss OR newline. Could be a problem in the future idk */
             if (result != bytes_this_round) {
                 nbytes_remaining -= result;
+                open_file->fp += result;
                 LOG_INFO("Early exit");
                 break;
             }
@@ -138,14 +139,10 @@ syscall_do_read_write(seL4_Word access_mode)
 
         nbytes_remaining -= result;
         buf += result;
+        open_file->fp += result;
     }
 
     result = nbytes - nbytes_remaining;
-
-    /* Increment the file pointer */
-    if (result > 0)
-        open_file->fp += result;
-
     message_reply:
         seL4_SetMR(0, result);
         return 1;
