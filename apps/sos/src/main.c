@@ -24,6 +24,7 @@
 #include <vm/frametable.h>
 #include <vm/pager.h>
 
+#include "event.h"
 #include "mapping.h"
 #include "network.h"
 #include "picoro.h"
@@ -41,21 +42,6 @@
  */
 #define USER_EP_CAP (1)
 
-/* 
- * To differencient between async and and sync IPC, we assign a
- * badge to the async endpoint. The badge that we receive will
- * be the bitwise 'OR' of the async endpoint badge and the badges
- * of all pending notifications.
- */
-#define IRQ_EP_BADGE (1 << (seL4_BadgeBits - 1))
-
-/* 
- * All badged IRQs set high bet, then we use uniq bits to
- * distinguish interrupt sources
- */
-#define IRQ_BADGE_NETWORK (1 << 0)
-#define IRQ_BADGE_TIMER (1 << 1)
-
 #define TTY_NAME CONFIG_SOS_STARTUP_APP
 
 /*
@@ -71,11 +57,6 @@ const seL4_BootInfo *_boot_info;
  */
 seL4_CPtr _sos_ipc_ep_cap;
 seL4_CPtr _sos_interrupt_ep_cap;
-
-/* 
- * Syscall coroutine
- */
-coro syscall_coro = NULL;
 
 /*
  * Private functions
@@ -109,41 +90,6 @@ print_startup(void)
     dprintf(0, "                                                AOS 2017                                \n");
     dprintf(0, "\n\n\n\n");
 }
-
-/*
- * Event handler loop
- * @param ep, the endpoint where messages come in
- */
-void
-event_loop(const seL4_CPtr ep)
-{
-    seL4_Word badge;
-    seL4_Word label;
-    seL4_MessageInfo_t message;
-
-    while (TRUE) {
-        message = seL4_Wait(ep, &badge);
-        label = seL4_MessageInfo_get_label(message);
-        if (badge & IRQ_EP_BADGE) {
-            /* Interrupt */
-            if (badge & IRQ_BADGE_NETWORK)
-                network_irq();
-
-            /* Needs to be an if, interrupts can group together */
-            if (badge & IRQ_BADGE_TIMER)
-                timer_interrupt();
-
-        } else if (label == seL4_VMFault) {
-            vm_fault();
-        } else if (label == seL4_NoFault) {
-            syscall_coro = coroutine(handle_syscall);
-            resume(syscall_coro, badge);
-        } else {
-            LOG_INFO("Rootserver got an unknown message");
-        }
-    }
-}
-
 
 /*
  * Initialise the IPC endpoints for SOS to talk to other 
@@ -195,14 +141,6 @@ sos_driver_init(void)
     /* Initialise timer with badged capability */
     err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
-
-    /* Intialise the serial device and register it with the VFS */
-    err = sos_serial_init();
-    conditional_panic(err, "Failed to initialise serial driver\n");
-
-    /* Initialise the NFS file system and register with the VFS */
-    err = sos_nfs_init();
-    conditional_panic(err, "Failed to mount NFS\n");
 }
 
 /*
@@ -272,8 +210,15 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     err = vfs_init();
     conditional_panic(err, "Failed to initialise virtual file system\n");
 
-    /* Initialise drivers: Must happen after vfs_init as devices are registered */
     sos_driver_init();
+
+    /* Intialise the serial device and register it with the VFS */
+    err = sos_serial_init();
+    conditional_panic(err, "Failed to initialise serial driver\n");
+
+    /* Initialise the NFS file system and register with the VFS */
+    err = sos_nfs_init();
+    conditional_panic(err, "Failed to mount NFS\n");
 
     /* Must happen after NFS is initialised because it creates pagefile */
     err = init_pager();

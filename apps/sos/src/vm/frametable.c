@@ -281,6 +281,43 @@ frame_table_set_chance(seL4_Word frame_id, enum chance_type chance)
     return 0;
 }
 
+int
+frame_table_set_page_id(seL4_Word frame_id, seL4_Word pid, seL4_Word page_id)
+{
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
+        return -1;
+    }
+
+    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
+        LOG_ERROR("frame_id: %d out of bounds", frame_id);
+        return -1;
+    }
+
+    /* With this implementation, we cannot support shared memory */
+    frame_table[frame_id].pid = pid;
+    frame_table[frame_id].page_id = page_id;
+    return 0;
+}
+
+int
+frame_table_get_page_id(seL4_Word frame_id, seL4_Word *pid, seL4_Word *page_id)
+{
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
+        return -1;
+    }
+
+    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
+        LOG_ERROR("frame_id: %d out of bounds", frame_id);
+        return -1;
+    }
+
+    *pid = frame_table[frame_id].pid;
+    *page_id = frame_table[frame_id].page_id;
+    return 0;
+}
+
 static seL4_Word
 _frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
 {

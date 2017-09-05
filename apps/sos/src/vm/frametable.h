@@ -15,6 +15,9 @@ typedef struct {
     seL4_CPtr cap; /* The cap for the frame */
     seL4_Word vaddr; /* the vaddr that this frame corresponds to in PROC AS */
     enum chance_type chance;
+    // If we want to support shared memory, we need a linked list of these */
+    seL4_Word pid; /* ID of the process this page is mapped into */
+    seL4_Word page_id; /* Page id of the process vaddr this page is mapped into */
 } frame_entry;
 
 /*
@@ -99,5 +102,22 @@ int frame_table_get_chance(seL4_Word frame_id, enum chance_type *chance);
  * @returns 0 on success else -1
  */
 int frame_table_set_chance(seL4_Word frame_id, enum chance_type chance);
+
+/*
+ * Set the process page id associated with this frame
+ * @param frame_id, id of the frame
+ * @param pid, the process id
+ * @param page_id, id of the page
+ */
+int frame_table_set_page_id(seL4_Word frame_id, seL4_Word pid, seL4_Word page_id);
+
+/*
+ * Get the pid and page_id where this frame is mapped into 
+ * @param frame_id, id of the frame
+ * @param[out] pid, pid of the process
+ * @param[out] page_id, id of the page
+ * @returns 0 on success else 1
+ */
+int frame_table_set_get_id(seL4_Word frame_id, seL4_Word *pid, seL4_Word *page_id);
 
 #endif /* _FRAMETABLE_H_ */

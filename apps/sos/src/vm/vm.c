@@ -106,13 +106,21 @@ page_directory_create(void)
         free(top_level);
         return (page_directory *)NULL;
     }
+    /* Prevent the page table from being paged */
+    // TODO: TURN THIS ON ONCE CODE BREAKS TO SEE IF IT WORKS
+    // assert(frame_table_set_chance(frame_id, PINNED) == 0);
 
-    if (multi_frame_alloc(&kernel_cap_table_vaddr, BIT(seL4_PageDirBits - seL4_PageBits)) == -1) {
+    seL4_Word nframes = BIT(seL4_PageDirBits - seL4_PageBits);
+    if ((frame_id = multi_frame_alloc(&kernel_cap_table_vaddr, nframes)) == -1) {
         LOG_ERROR("Cannot alloc multi frames for cap table");
         frame_free(frame_id);
         free(top_level);
         return (page_directory *)NULL;
     }
+    /* Prevent the cap table from being paged */
+    // TODO: TURN THIS ON ONCE CODE BREAKS TO SEE IF IT WORKS
+    // for (seL4_Word i = 0; i < nframes; i++)
+    //     assert(frame_table_set_chance(frame_id + i, PINNED) == 0);
 
     top_level->directory = (seL4_Word *)directory_vaddr;
     top_level->kernel_page_table_caps = (seL4_CPtr *)kernel_cap_table_vaddr;

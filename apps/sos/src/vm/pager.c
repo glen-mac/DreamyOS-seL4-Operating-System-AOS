@@ -6,18 +6,42 @@
 
 #include "pager.h"
 #include "frametable.h"
+#include "event.h"
+#include "picoro.h"
+
+#include <nfs/nfs.h>
+#include "network.h"
 
 #include <sys/panic.h>
 #include <utils/util.h>
+#include <string.h>
 
 /* Variable to represent where we are up to in our search for a victim page */
 static volatile seL4_Word current_page = 0;
 
+static fhandle_t pagefile_handle;
+
+static void pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
+
 int
 init_pager(void)
 {
-    // Create pagefile
-    
+    LOG_INFO("init pager");
+    const sattr_t file_attr = {
+        .mode = 0664, /* Read write for owner and group, read for everyone */
+        // TODO: creation time and stuff
+    };
+
+    if (nfs_create(&mnt_point, "pagefile", &file_attr, pagefile_create_callback, (uintptr_t)NULL) != RPC_OK)
+        return 1;
+
+    /*
+     * Need to receive network interrupt to get the callback 
+     * TODO: Could this fuck us up somewhere? hope not
+     */
+    resume(coroutine(event_loop), _sos_ipc_ep_cap);
+
+    LOG_INFO("resuming sos initialisation");
 
     // Create pagefile metadata
 
@@ -86,8 +110,6 @@ evict_frame(seL4_Word frame_id)
     /* cap variable to use for unmapping */
     seL4_CPtr pt_cap; 
 
-    // 1. Unmap from process addrspace so it causes a fault next time
-    // We're going to need to store the vaddr in the frame table entry
     /* get the vaddr for the frame entry so we know what to unmap */
     seL4_Word vaddr = frame_table_get_vaddr(frame_id);
     /* set pt_cap with the cap used to map in the frame in the vAS */
@@ -112,4 +134,13 @@ evict_frame(seL4_Word frame_id)
     frame_free(frame_id);
 
     return 0;
+}
+
+static void
+pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr)
+{
+    LOG_INFO("pagefile created");
+    assert(status == NFS_OK);
+    memcpy(&pagefile_handle, fh, sizeof(fhandle_t));
+    yield(NULL);
 }
