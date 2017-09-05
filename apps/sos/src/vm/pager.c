@@ -11,6 +11,9 @@
 
 #include <nfs/nfs.h>
 #include "network.h"
+#include <vm/vm.h>
+#include <proc/proc.h>
+#include <cspace/cspace.h>
 
 #include <sys/panic.h>
 #include <utils/util.h>
@@ -36,14 +39,12 @@ init_pager(void)
         return 1;
 
     seL4_Word badge;
-    seL4_Word label;
     seL4_MessageInfo_t message;
 
     /* Spin until the pager is initialised */
     LOG_INFO("Spinning until pager is initialised");
     while (pager_initialised == FALSE) {
         message = seL4_Wait(_sos_ipc_ep_cap, &badge);
-        label = seL4_MessageInfo_get_label(message);
         if (badge & IRQ_EP_BADGE && badge & IRQ_BADGE_NETWORK)
             network_irq();
     }
@@ -117,11 +118,20 @@ evict_frame(seL4_Word frame_id)
     /* cap variable to use for unmapping */
     seL4_CPtr pt_cap; 
 
-    /* get the vaddr for the frame entry so we know what to unmap */
-    seL4_Word vaddr = frame_table_get_vaddr(frame_id);
-    /* set pt_cap with the cap used to map in the frame in the vAS */
-    assert(page_directory_lookup(cur_proc->p_addrspace->directory, vaddr, &pt_cap) == 0);
-    /* unmap the page from the proc vAS */
+    /* Get the page id and pid of the process where this frame is mapped into*/
+    seL4_Word pid;
+    seL4_Word page_id;
+    assert(frame_table_get_page_id(frame_id, &pid, &page_id) == 0);
+
+    LOG_INFO("pid is %d; page_id is %d", pid, page_id);
+
+    /* Get the page cap for the process */
+    // TODO: Instead of curproc, index into the proc array with pid
+    assert(page_directory_lookup(curproc->p_addrspace->directory, page_id, &pt_cap) == 0);
+
+    LOG_INFO("pt_cap is %d", pt_cap);
+
+    /* Unmap the page from the process so we get a fault access */
     seL4_ARM_Page_Unmap(pt_cap);
     cspace_delete_cap(cur_cspace, pt_cap);
 
@@ -133,7 +143,7 @@ evict_frame(seL4_Word frame_id)
     // get a fault handle for that page we are currently evicting. I think we need a big lock around paging.
     // We can only page 1 thing at a time, if we get an event which tries to page something in, we check the lock and 
     // reschedule that coro for later once the lock has been free'd (paged successful to disk for example)
-    yield(NULL);
+    // yield(NULL);
 
     // 4. Then need to unmap the vaddr from sos
     // maybe a linked list of mapped address so we can loop and unMap them ?

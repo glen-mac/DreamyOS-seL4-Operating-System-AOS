@@ -190,22 +190,6 @@ frame_table_get_capability(seL4_Word frame_id)
     return frame_table[frame_id].cap;
 }
 
-
-seL4_Word
-frame_table_get_vaddr(seL4_Word frame_id)
-    if (!frame_table) {
-        LOG_ERROR("frame_table uninitialised");
-        return (seL4_ARM_Page)NULL;
-    }
-
-    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
-        LOG_ERROR("frame_id: %d out of bounds", frame_id);
-        return (seL4_ARM_Page)NULL;
-    }
-
-    return frame_table[frame_id].vaddr;
-}
-
 seL4_Word
 frame_table_sos_vaddr_to_index(seL4_Word sos_vaddr)
 {
@@ -260,6 +244,11 @@ frame_table_get_chance(seL4_Word frame_id, enum chance_type *chance)
         return -1;
     }
 
+    if (!frame_table[frame_id].cap) {
+        LOG_ERROR("frame is invalid");
+        return -1;
+    }
+
     *chance = frame_table[frame_id].chance;
     return 0;
 }
@@ -274,6 +263,11 @@ frame_table_set_chance(seL4_Word frame_id, enum chance_type chance)
 
     if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
         LOG_ERROR("frame_id: %d out of bounds", frame_id);
+        return -1;
+    }
+
+    if (!frame_table[frame_id].cap) {
+        LOG_ERROR("frame is invalid");
         return -1;
     }
 
@@ -294,6 +288,11 @@ frame_table_set_page_id(seL4_Word frame_id, seL4_Word pid, seL4_Word page_id)
         return -1;
     }
 
+    if (!frame_table[frame_id].cap) {
+        LOG_ERROR("frame is invalid");
+        return -1;
+    }
+
     /* With this implementation, we cannot support shared memory */
     frame_table[frame_id].pid = pid;
     frame_table[frame_id].page_id = page_id;
@@ -310,6 +309,11 @@ frame_table_get_page_id(seL4_Word frame_id, seL4_Word *pid, seL4_Word *page_id)
 
     if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
         LOG_ERROR("frame_id: %d out of bounds", frame_id);
+        return -1;
+    }
+
+    if (!frame_table[frame_id].cap) {
+        LOG_ERROR("frame is invalid");
         return -1;
     }
 

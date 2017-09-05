@@ -7,7 +7,7 @@
 #include "event.h"
 
 #include "picoro.h"
-
+#include <vm/vm.h>
 #include <clock/clock.h>
 #include <cspace/cspace.h>
 #include <sys/debug.h>
