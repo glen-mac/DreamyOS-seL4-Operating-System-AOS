@@ -22,6 +22,7 @@
 #include <vfs/vfs.h>
 #include <vm/vm.h>
 #include <vm/frametable.h>
+#include <vm/pager.h>
 
 #include "mapping.h"
 #include "network.h"
@@ -269,10 +270,14 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
 
     /* Initialise the virtual file system */
     err = vfs_init();
-    conditional_panic(err, "Failed to virtual file system\n");
+    conditional_panic(err, "Failed to initialise virtual file system\n");
 
     /* Initialise drivers: Must happen after vfs_init as devices are registered */
     sos_driver_init();
+
+    /* Must happen after NFS is initialised because it creates pagefile */
+    err = init_pager();
+    conditional_panic(err, "Failed to initialise demand pager\n");
 }
 
 /*
@@ -312,6 +317,7 @@ main(void)
     /* Unit tests */
     // test_m2();
     // test_m1(); /* After so as to have time to enter event loop */
+    // test_m6();
 
     /* Wait on synchronous endpoint for IPC */
     LOG_INFO("SOS entering event loop");
