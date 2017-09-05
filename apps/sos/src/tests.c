@@ -184,6 +184,24 @@ test_m2(void)
     dprintf(0, "All tests pass, you are awesome! :)\n");
 }
 
+void
+test_m6(void)
+{
+    seL4_Word vaddr;
+    while (1) {
+        /* Allocate a page */
+        frame_alloc(&vaddr);
+        if (!vaddr) {
+            printf("Out of memory!\n");
+            break;
+        }
+
+        /* Test you can touch the page */
+        *(seL4_Word *)vaddr = 0x37;
+        assert(*(seL4_Word *)vaddr == 0x37);
+    }
+}
+
 void callback1(uint32_t id, void *data) {
     dprintf(0, "100ms Callback, id:%d, time: %lld\n", id, time_stamp());
     dprintf(0, "registered callback: %d\n", register_timer(100000, callback1, NULL));

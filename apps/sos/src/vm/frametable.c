@@ -5,6 +5,7 @@
  */
 
 #include "frametable.h"
+#include "pager.h"
 
 #include <assert.h>
 #include <strings.h>
@@ -105,7 +106,7 @@ frame_alloc(seL4_Word *vaddr)
     /* Ensure we aren't exceeding limits */
     if (frame_table_cnt >= frame_table_max) {
         LOG_INFO("frame limit reached");
-        goto frame_alloc_error;
+        goto frame_alloc_page;
     }
 
     /* If there are free frames in the buffer */
@@ -116,11 +117,18 @@ frame_alloc(seL4_Word *vaddr)
         paddr = INDEX_TO_ADDR(p_id);
         *vaddr = PHYSICAL_VSTART + paddr;
         bzero((void *)(*vaddr), PAGE_SIZE_4K);
+        frame_table[p_id].chance = FIRST_CHANCE; /* Reset the chance */
         return p_id;
     }
 
     /* Else, we need to allocate a frame from the UT Memory pool */
-    return _frame_alloc(vaddr, 1);
+    /* If we are out of memory, try paging to disk */
+    if ((p_id = _frame_alloc(vaddr, 1)) != -1)
+        return p_id;
+
+    frame_alloc_page:
+        LOG_INFO("frame_alloc failed, trying to page");
+        return try_paging(vaddr); /* Will return -1 if this fails */
 
     /* On error, set the vaddr to null and return -1 */
     frame_alloc_error:
@@ -178,13 +186,7 @@ frame_table_get_capability(seL4_Word frame_id)
         return (seL4_ARM_Page)NULL;
     }
 
-    seL4_ARM_Page cap = frame_table[frame_id].cap;
-    if (!cap) {
-        LOG_ERROR("capability for frame_id: %d does not exist", frame_id);
-        return (seL4_ARM_Page)NULL;
-    }
-
-    return cap;
+    return frame_table[frame_id].cap;
 }
 
 seL4_Word
@@ -214,6 +216,54 @@ multi_frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
     return _frame_alloc(vaddr, nframes);
 }
 
+int
+frame_table_get_limits(seL4_Word *lower, seL4_Word *upper)
+{
+    /* Check if frame_table is initialised */
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
+        return -1;
+    }
+
+    *lower = 0;
+    *upper = ADDR_TO_INDEX(ut_top);
+    return 0;
+}
+
+int
+frame_table_get_chance(seL4_Word frame_id, enum chance_type *chance)
+{
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
+        return -1;
+    }
+
+    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
+        LOG_ERROR("frame_id: %d out of bounds", frame_id);
+        return -1;
+    }
+
+    *chance = frame_table[frame_id].chance;
+    return 0;
+}
+
+int
+frame_table_set_chance(seL4_Word frame_id, enum chance_type chance)
+{
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
+        return -1;
+    }
+
+    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
+        LOG_ERROR("frame_id: %d out of bounds", frame_id);
+        return -1;
+    }
+
+    frame_table[frame_id].chance = chance;
+    return 0;
+}
+
 static seL4_Word
 _frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
 {
@@ -237,7 +287,10 @@ _frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
 
         /* Store the metadata in the frame table */
         assert(frame_table[p_id].cap == (seL4_ARM_Page)NULL);
+        assert(frame_table[p_id].chance == FIRST_CHANCE);
+
         frame_table[p_id].cap = frame_cap;
+        frame_table[p_id].chance = FIRST_CHANCE; /* Reset the chance */
         frame_table_cnt++;
         paddr += PAGE_SIZE_4K;
     }
@@ -263,6 +316,7 @@ _frame_free(seL4_Word frame_id)
 
     seL4_ARM_Page frame_cap = frame_table[frame_id].cap;
     frame_table[frame_id].cap = (seL4_ARM_Page)NULL; /* Error guarding */
+    frame_table[frame_id].chance = FIRST_CHANCE; /* Reset the chance */
 
     if (!frame_cap) {
         LOG_ERROR("capability for %d does not exist", frame_id);

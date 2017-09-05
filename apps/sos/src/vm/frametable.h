@@ -8,10 +8,12 @@
 #define _FRAMETABLE_H_
 
 #include <sel4/sel4.h>
+#include "pager.h"
 
 /* Individual frame */
 typedef struct {
     seL4_CPtr cap; /* The cap for the frame */
+    enum chance_type chance;
 } frame_entry;
 
 /*
@@ -65,5 +67,29 @@ seL4_Word frame_table_paddr_to_sos_vaddr(seL4_Word paddr);
  * @return frame id of the starting first frame, -1 if failed.
  */
 seL4_Word multi_frame_alloc(seL4_Word *vaddr, seL4_Word nframes);
+
+/*
+ * Return the lower and upper bounds of the frame table
+ * @param[out] lower, the lowest index
+ * @param[out] upper, the upper index
+ * @returns 0 on success else -1
+ */
+int frame_table_get_limits(seL4_Word *lower, seL4_Word *upper);
+
+/*
+ * Return whether this frame is on it's first or second chance
+ * @param id, the id of the frame
+ * @param[out] chance, first or second chance
+ * @returns 0 on success else -1
+ */
+int frame_table_get_chance(seL4_Word frame_id, enum chance_type *chance);
+
+/*
+ * Set the chance type for a frame
+ * @param frame_id, id of the frame
+ * @param chance, the chance of the frame
+ * @returns 0 on success else -1
+ */
+int frame_table_set_chance(seL4_Word frame_id, enum chance_type chance);
 
 #endif /* _FRAMETABLE_H_ */
