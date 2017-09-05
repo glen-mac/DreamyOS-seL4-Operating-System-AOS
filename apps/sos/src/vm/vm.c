@@ -107,8 +107,7 @@ page_directory_create(void)
         return (page_directory *)NULL;
     }
     /* Prevent the page table from being paged */
-    // TODO: TURN THIS ON ONCE CODE BREAKS TO SEE IF IT WORKS
-    // assert(frame_table_set_chance(frame_id, PINNED) == 0);
+    assert(frame_table_set_chance(frame_id, PINNED) == 0);
 
     seL4_Word nframes = BIT(seL4_PageDirBits - seL4_PageBits);
     if ((frame_id = multi_frame_alloc(&kernel_cap_table_vaddr, nframes)) == -1) {
@@ -118,9 +117,8 @@ page_directory_create(void)
         return (page_directory *)NULL;
     }
     /* Prevent the cap table from being paged */
-    // TODO: TURN THIS ON ONCE CODE BREAKS TO SEE IF IT WORKS
-    // for (seL4_Word i = 0; i < nframes; i++)
-    //     assert(frame_table_set_chance(frame_id + i, PINNED) == 0);
+    for (seL4_Word i = 0; i < nframes; i++)
+        assert(frame_table_set_chance(frame_id + i, PINNED) == 0);
 
     top_level->directory = (seL4_Word *)directory_vaddr;
     top_level->kernel_page_table_caps = (seL4_CPtr *)kernel_cap_table_vaddr;
@@ -131,6 +129,8 @@ page_directory_create(void)
 int 
 page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL4_CPtr kernel_cap)
 {
+    seL4_Word frame_id;
+
     assert(IS_ALIGNED_4K(page_id));
 
     seL4_Word directory_index = DIRECTORY_INDEX(page_id);
@@ -147,10 +147,11 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
     if (!directory[directory_index]) {
         LOG_INFO("Creating second level page table at index %d", directory_index);
         seL4_Word page_table_vaddr;
-        if (frame_alloc(&page_table_vaddr) == -1) {
+        if ((frame_id = frame_alloc(&page_table_vaddr)) == -1) {
             LOG_ERROR("Cannot alloc second level");
             return 1;
         }
+        assert(frame_table_set_chance(frame_id, PINNED) == 0);
 
         directory[directory_index] = page_table_vaddr;
     }

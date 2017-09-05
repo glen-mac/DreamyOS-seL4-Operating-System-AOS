@@ -264,18 +264,13 @@ static int thrash(int argc, char *argv[]) {
     }
 
     size_t npages = atoi(argv[1]);
-    printf("npages %d\n", npages);
-    char *buffer = malloc(npages * MAX_IO_BUF);
-    if (!buffer) {
-        printf("could not malloc buffer\n");
-        return 1;
-    }
-    // for (int i = 0; i < npages; i++)
-    //     buffer[i * MAX_IO_BUF] = 'A';
+    char buffer[npages * MAX_IO_BUF];
 
-    // for (int i = 0; i < npages; i++)
-    //     assert(buffer[i * MAX_IO_BUF] == 'A');
-    free(buffer);
+    for (int i = 0; i < npages; i++)
+        buffer[i * MAX_IO_BUF] = 'A';
+
+    for (int i = 0; i < npages; i++)
+        assert(buffer[i * MAX_IO_BUF] == 'A');
 
     return 0;
 }

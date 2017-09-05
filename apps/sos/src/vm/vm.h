@@ -54,6 +54,15 @@ int page_directory_insert(page_directory *directory, seL4_Word vaddr, seL4_CPtr 
 int page_directory_lookup(page_directory *directory, seL4_Word vaddr, seL4_CPtr *cap);
 
 /*
+ * Given a vaddr, mark the page as evicted
+ * @param directory, the page directory to insert into
+ * @param vaddr, the virtual address of the page
+ * @param cap, the cap for the page represented by vaddr
+ * @returns 0 on success else 1
+ */
+int page_directory_evict(page_directory *directory, seL4_Word vaddr, seL4_CPtr *cap);
+
+/*
  * Given a vaddr, translate it to the sos vaddr of the frame 
  * @param vaddr, the process virtual address
  * @param[out] sos_vaddr, the vaddr for the frame so sos can access it

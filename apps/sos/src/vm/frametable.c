@@ -24,7 +24,7 @@
 #define INDEX_TO_ADDR(index) (ut_base + (index << seL4_PageBits))
 
 /* Portion of pages to give to SOS applications */
-#define FT_PORTION 0.8
+#define FT_PORTION 0.8 
 
 /* High and low watermark for number of free frames */
 #define HIGH_WATERMARK 64
@@ -69,7 +69,8 @@ frame_table_init(seL4_Word paddr, seL4_Word size_in_bits, seL4_Word low, seL4_Wo
      *
      * We set aside 80% of the memory for user application frames, and 20% of UT for SOS.
      */
-    frame_table_max = BYTES_TO_4K_PAGES(ut_top - ut_base) * FT_PORTION;
+    frame_table_max = 1400; //BYTES_TO_4K_PAGES(ut_top - ut_base) * FT_PORTION;
+    //LOG_INFO("frame_table_max is %d", frame_table_max);
 
     seL4_ARM_Page frame_cap;
     seL4_Word vaddr = PHYSICAL_VSTART + paddr;
@@ -188,6 +189,12 @@ frame_table_get_capability(seL4_Word frame_id)
     }
 
     return frame_table[frame_id].cap;
+}
+
+seL4_Word
+frame_table_index_to_sos_vaddr(seL4_Word frame_id)
+{
+    return frame_table_paddr_to_sos_vaddr(INDEX_TO_ADDR(frame_id));
 }
 
 seL4_Word
@@ -348,7 +355,6 @@ _frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
         assert(frame_table[p_id].chance == FIRST_CHANCE);
 
         frame_table[p_id].cap = frame_cap;
-        frame_table[p_id].vaddr = *vaddr;
         frame_table[p_id].chance = FIRST_CHANCE; /* Reset the chance */
         frame_table_cnt++;
         paddr += PAGE_SIZE_4K;

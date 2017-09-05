@@ -17,7 +17,7 @@
 
 #include <sys/panic.h>
 #include <utils/util.h>
-#include <string.h>
+#include <strings.h>
 
 /* Variable to represent where we are up to in our search for a victim page */
 static volatile seL4_Word current_page = 0;
@@ -39,12 +39,11 @@ init_pager(void)
         return 1;
 
     seL4_Word badge;
-    seL4_MessageInfo_t message;
 
     /* Spin until the pager is initialised */
     LOG_INFO("Spinning until pager is initialised");
     while (pager_initialised == FALSE) {
-        message = seL4_Wait(_sos_ipc_ep_cap, &badge);
+        seL4_Wait(_sos_ipc_ep_cap, &badge);
         if (badge & IRQ_EP_BADGE && badge & IRQ_BADGE_NETWORK)
             network_irq();
     }
@@ -63,13 +62,21 @@ try_paging(seL4_Word *vaddr)
 
     seL4_Word frame_id = next_victim();
     LOG_INFO("victim frame is %d", frame_id);
+    if (frame_id == -1)
+        return -1; /* We're unable to choose a vicitm, all pages are pinned */
 
+    /* Evict the frame from memory and push it to the disk */
     evict_frame(frame_id);
 
-    // Frame alloc with the now free memory in the frame table
+    /* Zero out the frame and return the vaddr / frame_id */
+    *vaddr = frame_table_index_to_sos_vaddr(frame_id);
+    bzero((void *)(*vaddr), PAGE_SIZE_4K);
+    seL4_ARM_Page_Unmap(frame_table_get_capability(frame_id)); /* Unmap because sos_map_page will map in again */
+    assert(frame_table_set_chance(frame_id, FIRST_CHANCE) == 0);
 
-    *vaddr = (seL4_Word)NULL;
-    return -1;
+    return frame_id;
+
+    // return frame_alloc(frame_id);
 }
 
 int
@@ -81,6 +88,8 @@ next_victim(void)
     assert(frame_table_get_limits(&lower, &upper) == 0);
 
     enum chance_type chance;
+    seL4_Word starting_page = current_page;
+    seL4_Word loops = 0;
 
     while (TRUE) {
         if (!frame_table_get_capability(current_page))
@@ -89,12 +98,14 @@ next_victim(void)
         assert(frame_table_get_chance(current_page, &chance) == 0);
         switch (chance) {
             
-            /* increment the chance of the current page and move on */
+            /* Increment the chance of the current page and move on */
             case FIRST_CHANCE:
                 frame_table_set_chance(current_page, SECOND_CHANCE);
+                break;
             
             /* can't touch this page so move on */
             case PINNED:
+                LOG_INFO("%d is pinned", current_page);
                 goto next;
 
             /* return current page and set the current as the next */
@@ -104,11 +115,17 @@ next_victim(void)
                 return current_old;
         }
    
+        if (current_page == starting_page)
+            loops++;
+
+        /* We've looped around twice and have not chosen a page, all the pages are pinned */
+        if (loops == 1)
+            break;
+
         next:
             current_page = ((current_page + 1) % (upper - lower)) + lower;
     }
 
-    panic("shouldnt get here");
     return -1;
 }
 
@@ -123,10 +140,12 @@ evict_frame(seL4_Word frame_id)
     seL4_Word page_id;
     assert(frame_table_get_page_id(frame_id, &pid, &page_id) == 0);
 
-    LOG_INFO("pid is %d; page_id is %d", pid, page_id);
+    LOG_INFO("pid is %d; page_id is %p", pid, page_id);
 
     /* Get the page cap for the process */
     // TODO: Instead of curproc, index into the proc array with pid
+
+    // TODO: MARK IN THE PAGETABLE THIS PAGE AS EVICTED
     assert(page_directory_lookup(curproc->p_addrspace->directory, page_id, &pt_cap) == 0);
 
     LOG_INFO("pt_cap is %d", pt_cap);
@@ -145,10 +164,11 @@ evict_frame(seL4_Word frame_id)
     // reschedule that coro for later once the lock has been free'd (paged successful to disk for example)
     // yield(NULL);
 
+    // DONT THINK WE NEED TO DO THIS. THIS IS HANDLED IN THE CALLER FUNCTION
     // 4. Then need to unmap the vaddr from sos
     // maybe a linked list of mapped address so we can loop and unMap them ?
     // 5. UT Free the memory so we can reuse it for another frame 
-    frame_free(frame_id);
+    // frame_free(frame_id);
 
     return 0;
 }
