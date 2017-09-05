@@ -6,8 +6,12 @@
 
 #include "pager.h"
 #include "frametable.h"
+#include "vm.h"
+#include "picoro.h"
 
 #include <sys/panic.h>
+#include <proc/proc.h>
+#include <cspace/cspace.h>
 #include <utils/util.h>
 
 /* Variable to represent where we are up to in our search for a victim page */
@@ -91,7 +95,7 @@ evict_frame(seL4_Word frame_id)
     /* get the vaddr for the frame entry so we know what to unmap */
     seL4_Word vaddr = frame_table_get_vaddr(frame_id);
     /* set pt_cap with the cap used to map in the frame in the vAS */
-    assert(page_directory_lookup(cur_proc->p_addrspace->directory, vaddr, &pt_cap) == 0);
+    assert(page_directory_lookup(curproc->p_addrspace->directory, vaddr, &pt_cap) == 0);
     /* unmap the page from the proc vAS */
     seL4_ARM_Page_Unmap(pt_cap);
     cspace_delete_cap(cur_cspace, pt_cap);

@@ -192,7 +192,7 @@ frame_table_get_capability(seL4_Word frame_id)
 
 
 seL4_Word
-frame_table_get_vaddr(seL4_Word frame_id)
+frame_table_get_vaddr(seL4_Word frame_id) {
     if (!frame_table) {
         LOG_ERROR("frame_table uninitialised");
         return (seL4_ARM_Page)NULL;
