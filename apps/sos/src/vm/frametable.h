@@ -13,6 +13,7 @@
 /* Individual frame */
 typedef struct {
     seL4_CPtr cap; /* The cap for the frame */
+    seL4_Word vaddr; /* the vaddr that this frame corresponds to in PROC AS */
     enum chance_type chance;
 } frame_entry;
 
@@ -45,6 +46,13 @@ void frame_free(seL4_Word vaddr);
  * @return capability of the frame, NULL on error.
  */
 seL4_ARM_Page frame_table_get_capability(seL4_Word frame_id);
+
+/*
+ * Return the vaddr for a frame - for the specific proc AS
+ * @param frame_id, id of the frame to lookup
+ * @return vaddr of the frame corres. to the vpage, 1 on error.
+ */
+seL4_Word frame_table_get_vaddr(seL4_Word frame_id);
 
 /*
  * Given the SOS vaddr of the frame, return its index
