@@ -18,7 +18,7 @@
 
 /* Variable to represent where we are up to in our search for a victim page */
 static volatile seL4_Word current_page = 0;
-
+static volatile seL4_Word pager_initialised = FALSE;
 static fhandle_t pagefile_handle;
 
 static void pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
@@ -35,11 +35,18 @@ init_pager(void)
     if (nfs_create(&mnt_point, "pagefile", &file_attr, pagefile_create_callback, (uintptr_t)NULL) != RPC_OK)
         return 1;
 
-    /*
-     * Need to receive network interrupt to get the callback 
-     * TODO: Could this fuck us up somewhere? hope not
-     */
-    resume(coroutine(event_loop), _sos_ipc_ep_cap);
+    seL4_Word badge;
+    seL4_Word label;
+    seL4_MessageInfo_t message;
+
+    /* Spin until the pager is initialised */
+    LOG_INFO("Spinning until pager is initialised");
+    while (pager_initialised == FALSE) {
+        message = seL4_Wait(_sos_ipc_ep_cap, &badge);
+        label = seL4_MessageInfo_get_label(message);
+        if (badge & IRQ_EP_BADGE && badge & IRQ_BADGE_NETWORK)
+            network_irq();
+    }
 
     LOG_INFO("resuming sos initialisation");
 
@@ -142,5 +149,5 @@ pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, f
     LOG_INFO("pagefile created");
     assert(status == NFS_OK);
     memcpy(&pagefile_handle, fh, sizeof(fhandle_t));
-    yield(NULL);
+    pager_initialised = TRUE;
 }
