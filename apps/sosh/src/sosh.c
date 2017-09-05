@@ -257,6 +257,29 @@ static int kill(int argc, char *argv[]) {
     return sos_process_delete(pid);
 }
 
+static int thrash(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Usage: thrash npage\n");
+        return 1;
+    }
+
+    size_t npages = atoi(argv[1]);
+    printf("npages %d\n", npages);
+    char *buffer = malloc(npages * MAX_IO_BUF);
+    if (!buffer) {
+        printf("could not malloc buffer\n");
+        return 1;
+    }
+    // for (int i = 0; i < npages; i++)
+    //     buffer[i * MAX_IO_BUF] = 'A';
+
+    // for (int i = 0; i < npages; i++)
+    //     assert(buffer[i * MAX_IO_BUF] == 'A');
+    free(buffer);
+
+    return 0;
+}
+
 static int benchmark(int argc, char *argv[]) {
     if(argc == 2 && strcmp(argv[1], "-d") == 0) {
         printf("Running benchmark in DEBUG mode\n");
@@ -278,7 +301,7 @@ struct command {
 struct command commands[] = { { "dir", dir }, { "ls", dir }, { "cat", cat }, {
         "cp", cp }, { "ps", ps }, { "exec", exec }, {"sleep",second_sleep}, {"msleep",milli_sleep},
         {"time", second_time}, {"mtime", micro_time}, {"kill", kill},
-        {"benchmark", benchmark}};
+        {"benchmark", benchmark}, {"thrash", thrash}};
 
 int main(void) {
     char buf[BUF_SIZ];
