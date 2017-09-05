@@ -128,7 +128,8 @@ frame_alloc(seL4_Word *vaddr)
 
     frame_alloc_page:
         LOG_INFO("frame_alloc failed, trying to page");
-        return try_paging(vaddr); /* Will return -1 if this fails */
+        if ((p_id = try_paging(vaddr)) != -1)
+            return p_id;
 
     /* On error, set the vaddr to null and return -1 */
     frame_alloc_error:
@@ -187,6 +188,22 @@ frame_table_get_capability(seL4_Word frame_id)
     }
 
     return frame_table[frame_id].cap;
+}
+
+
+seL4_Word
+frame_table_get_vaddr(seL4_Word frame_id)
+    if (!frame_table) {
+        LOG_ERROR("frame_table uninitialised");
+        return (seL4_ARM_Page)NULL;
+    }
+
+    if (!ISINRANGE(0, frame_id, ADDR_TO_INDEX(ut_top))) {
+        LOG_ERROR("frame_id: %d out of bounds", frame_id);
+        return (seL4_ARM_Page)NULL;
+    }
+
+    return frame_table[frame_id].vaddr;
 }
 
 seL4_Word
@@ -290,6 +307,7 @@ _frame_alloc(seL4_Word *vaddr, seL4_Word nframes)
         assert(frame_table[p_id].chance == FIRST_CHANCE);
 
         frame_table[p_id].cap = frame_cap;
+        frame_table[p_id].vaddr = *vaddr;
         frame_table[p_id].chance = FIRST_CHANCE; /* Reset the chance */
         frame_table_cnt++;
         paddr += PAGE_SIZE_4K;
