@@ -129,7 +129,7 @@ frame_alloc(seL4_Word *vaddr)
 
     frame_alloc_page:
         LOG_INFO("frame_alloc failed, trying to page");
-        if ((p_id = try_paging(vaddr)) != -1)
+        if ((p_id = page_out(vaddr)) != -1)
             return p_id;
 
     /* On error, set the vaddr to null and return -1 */

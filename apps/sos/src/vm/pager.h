@@ -22,11 +22,19 @@ enum chance_type {
 int init_pager(void);
 
 /*
+ * Page the frame belonging to this vaddr
+ * @param page_id, the process vaddr of the page
+ * @param access_type, the type of access for this page (for permissions mapping)
+ * @returns 1 on failure, else 0
+ */
+int page_in(seL4_Word page_id, seL4_Word access_type);
+
+/*
  * Try paging a frame out to disk to make room for a new frame
  * @param[out] vaddr, the sos vaddr of the frame
  * @returns -1 on failure, else the id of the frame
  */
-int try_paging(seL4_Word *vaddr);
+int page_out(seL4_Word *vaddr);
 
 /*
  * Find the next page to be evicted

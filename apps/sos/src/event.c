@@ -41,7 +41,9 @@ event_loop(const seL4_CPtr ep)
                 timer_interrupt();
 
         } else if (label == seL4_VMFault) {
-            vm_fault();
+            // THIS IS BAD, NEED TO FIX THIS ASAP
+            syscall_coro = coroutine(vm_fault);
+            resume(syscall_coro, NULL);
         } else if (label == seL4_NoFault) {
             syscall_coro = coroutine(handle_syscall);
             resume(syscall_coro, badge);

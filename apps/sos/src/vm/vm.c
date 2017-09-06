@@ -10,7 +10,9 @@
 #include "mapping.h"
 #include <proc/proc.h>
 
+#include <utils/arith.h>
 #include <utils/util.h>
+#include <limits.h>
 
 #define verbose 5
 #include <sys/debug.h>
@@ -56,10 +58,13 @@
 #define PERMISSION_FAULT_PAGE 0b001111
 
 static seL4_Word get_fault_status(seL4_Word fault_cause);
+static int page_table_is_evicted(seL4_Word page_id);
 
 void 
 vm_fault(void)
 {
+    seL4_MessageInfo_t reply;
+
     /* Ordering defined by seL4 */
     seL4_Word fault_pc = seL4_GetMR(0);
     seL4_Word fault_addr = seL4_GetMR(1);
@@ -67,8 +72,10 @@ vm_fault(void)
     seL4_Word fault_cause = seL4_GetMR(3);
 
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
-    if (reply_cap == CSPACE_NULL)
-        panic("TODO: kill process? Not sure how this could happen");
+    if (reply_cap == CSPACE_NULL) {
+        LOG_ERROR("reply cap was null, this should not happen");
+        goto fault_error;
+    }
 
     seL4_Word access_type = ACCESS_TYPE(fault_cause);
     seL4_Word fault_status = get_fault_status(fault_cause);
@@ -76,16 +83,34 @@ vm_fault(void)
     LOG_INFO("Access type %s, fault_status %d", access_type? "Write": "Read", fault_status);
     LOG_INFO("Fault at 0x%08x, pc = 0x%08x, %s", fault_addr, fault_pc, fault_type ? "Instruction Fault" : "Data fault");
 
-    if (fault_status == PERMISSION_FAULT_PAGE)
-        panic("TODO: Kill the process; Incorrect permissions!");
+    if (fault_status == PERMISSION_FAULT_PAGE) {
+        LOG_ERROR("Incorrect permissions");
+        goto fault_error;
+    }
+
+    /* If the page is marked as evicted, page it in */
+    if (page_table_is_evicted(fault_addr)) {
+        if (page_in(fault_addr, access_type) != 0) {
+            LOG_ERROR("failed to page in");
+            goto fault_error;
+        }
+        goto thread_restart;
+    }
 
     seL4_Word kvaddr;
-    assert(vm_map(fault_addr, access_type, &kvaddr) == 0);
+    if (vm_map(fault_addr, access_type, &kvaddr) != 0) {
+        LOG_ERROR("failed to map in a new page");
+        goto fault_error;
+    }
 
-    seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 0);
-    seL4_Send(reply_cap, reply);
+    thread_restart:
+        reply = seL4_MessageInfo_new(0, 0, 0, 0);
+        seL4_Send(reply_cap, reply);
+        cspace_free_slot(cur_cspace, reply_cap);
+        return;
 
-    cspace_free_slot(cur_cspace, reply_cap);
+    fault_error:
+        panic("TODO: Kill the process");
 }
 
 page_directory *
@@ -157,7 +182,9 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
     }
 
     page_table_entry *second_level = (page_table_entry *)directory[directory_index];
-    assert(second_level[table_index].page == (seL4_CPtr)NULL);
+    // I TURNED THIS OFF BECAUSE THIS WONT BE NULL FOR EVICTED PAGES
+    // IDK IF THIS IS THE BEST THING THOUGH, ID BE MORE CONFIDENT WITH THE ERROR CHECKING
+    //assert(second_level[table_index].page == (seL4_CPtr)NULL);
     second_level[table_index].page = cap;
 
     /* Add the kernel cap to our bookkeeping table if one was given to us */
@@ -203,6 +230,46 @@ page_directory_lookup(page_directory *dir, seL4_Word page_id, seL4_CPtr *cap)
 }
 
 int
+page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_id)
+{
+    assert(IS_ALIGNED_4K(page_id));
+
+    seL4_Word directory_index = DIRECTORY_INDEX(page_id);
+    seL4_Word table_index = TABLE_INDEX(page_id);
+
+    if (!dir || !(dir->directory)) {
+        LOG_ERROR("Directory doesnt exist");
+        return 1;
+    }
+
+    seL4_Word *directory = dir->directory;
+    page_table_entry *second_level = (page_table_entry *)directory[directory_index];
+    if (!second_level) {
+        LOG_ERROR("Second level doesnt exist");
+        return 1; 
+    }
+
+    if (!second_level[table_index].page) {
+        LOG_ERROR("page doesnt exist");
+        return 1; 
+    }
+
+    seL4_CPtr cap = second_level[table_index].page;
+
+    /* Must be less than, as we use the highest bit to represent evicted or not */
+    assert(free_id < MAX_CAP_ID);
+
+    second_level[table_index].page = free_id;
+    second_level[table_index].page |= EVICTED_BIT; /* Mark as evicted */
+
+    /* Unmap and delete the cap */
+    seL4_ARM_Page_Unmap(cap);
+    cspace_delete_cap(cur_cspace, cap);
+
+    return 0;
+}
+
+int
 vm_translate(seL4_Word vaddr, seL4_Word *sos_vaddr)
 {
     int err;
@@ -241,6 +308,8 @@ vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
         return 1;
     }
 
+    LOG_INFO("before sos_map_page");
+
     // TODO: This can fail, we need to send ENOMEM to the process.
     assert(sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) == 0);
     return 0;
@@ -254,4 +323,17 @@ get_fault_status(seL4_Word fault_cause)
     seL4_Word bit_10 = fault_cause & BIT(10);
     seL4_Word lower_bits = fault_cause & (BIT(3) | BIT(2) | BIT(1) | BIT(0));
     return (bit_12 << 5) | (bit_10 << 4) | lower_bits;
+}
+
+static int
+page_table_is_evicted(seL4_Word page_id)
+{
+    seL4_CPtr cap;
+
+    if (page_directory_lookup(curproc->p_addrspace->directory, PAGE_ALIGN_4K(page_id), &cap) != 0) {
+        LOG_INFO("Page entry doesnt exist, cannot be evicted");
+        return FALSE;
+    }
+
+    return cap & EVICTED_BIT;
 }

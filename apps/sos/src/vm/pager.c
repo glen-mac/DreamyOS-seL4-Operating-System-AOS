@@ -9,20 +9,28 @@
 #include "event.h"
 #include "picoro.h"
 
+#include <fs/sos_nfs.h>
 #include <nfs/nfs.h>
 #include "network.h"
 #include <vm/vm.h>
 #include <proc/proc.h>
 #include <cspace/cspace.h>
 
-#include <sys/panic.h>
+#include <utils/list.h>
 #include <utils/util.h>
+#include <utils/page.h>
+
+#include <sys/panic.h>
 #include <strings.h>
+
+#define PAGEFILE_MAX_PAGES 10 // BYTES_TO_4K_PAGES(BIT(31)) // 2 GB pagefile size
 
 /* Variable to represent where we are up to in our search for a victim page */
 static volatile seL4_Word current_page = 0;
 static volatile seL4_Word pager_initialised = FALSE;
 static fhandle_t pagefile_handle;
+
+static list_t *pagefile_free_pages = NULL;
 
 static void pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
 
@@ -48,35 +56,92 @@ init_pager(void)
             network_irq();
     }
 
-    LOG_INFO("resuming sos initialisation");
+    LOG_INFO("Resuming sos initialisation");
 
-    // Create pagefile metadata
+    /* Page file metadata */
+    if ((pagefile_free_pages = malloc(sizeof(list_t))) == NULL) {
+        LOG_ERROR("failed to malloc free page list");
+        return 1;
+    }
+
+    list_init(pagefile_free_pages);
+
+    /* Mark every page on the file as empty */
+    LOG_INFO("max pages is %d", PAGEFILE_MAX_PAGES);
+
+    for (size_t id = 0; id < PAGEFILE_MAX_PAGES; ++id) {
+        if (list_prepend(pagefile_free_pages, (void *)id) == -1) {
+            LOG_ERROR("failed to prepend free page %d", id);
+            return 1;
+        }
+    }
 
     return 0;
 }
 
 int
-try_paging(seL4_Word *vaddr)
+page_in(seL4_Word page_id, seL4_Word access_type)
 {
-    // Some check to see if our pagefile is full?
+    LOG_INFO("paging in %p", page_id);
+
+    seL4_CPtr pagefile_id;
+    if (page_directory_lookup(curproc->p_addrspace->directory, PAGE_ALIGN_4K(page_id), &pagefile_id) != 0) {
+        LOG_ERROR("lookup of pagefile id failed");
+        return 1;
+    }
+
+    pagefile_id &= (~EVICTED_BIT);
+    LOG_INFO("page is stored at %d", pagefile_id);
+
+    seL4_Word sos_vaddr;
+    if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
+        LOG_INFO("failed to map in a page");
+        return 1;
+    }
+
+    /* A page was just pushed to disk, page_id now corresponds to a legit page and 
+     * sos_vaddr is where we can access that frame */
+
+    // TODO: Grab the big page lock
+
+    /* Read the page in from the pagefile and load it into memory */
+
+
+    /* Mark the page as free in the pagefile */
+
+    LOG_ERROR("page_in not implemented yet");
+    return 1;
+}
+
+int
+page_out(seL4_Word *page_id)
+{
+    if (list_is_empty(pagefile_free_pages)) {
+        LOG_ERROR("No more space in the pagefile");
+        return -1;
+    }
 
     seL4_Word frame_id = next_victim();
-    LOG_INFO("victim frame is %d", frame_id);
-    if (frame_id == -1)
+    if (frame_id == -1) {
+        LOG_ERROR("Unable to choose a victim");
         return -1; /* We're unable to choose a vicitm, all pages are pinned */
+    }
+
+    LOG_INFO("victim frame is %d", frame_id);
 
     /* Evict the frame from memory and push it to the disk */
-    evict_frame(frame_id);
+    if (evict_frame(frame_id) == -1) {
+        LOG_ERROR("Evicting frame failed");
+        return -1;
+    }
 
-    /* Zero out the frame and return the vaddr / frame_id */
-    *vaddr = frame_table_index_to_sos_vaddr(frame_id);
-    bzero((void *)(*vaddr), PAGE_SIZE_4K);
+    /* Zero out the frame and return the page_id / frame_id */
+    *page_id = frame_table_index_to_sos_vaddr(frame_id);
+    bzero((void *)(*page_id), PAGE_SIZE_4K);
     seL4_ARM_Page_Unmap(frame_table_get_capability(frame_id)); /* Unmap because sos_map_page will map in again */
     assert(frame_table_set_chance(frame_id, FIRST_CHANCE) == 0);
 
     return frame_id;
-
-    // return frame_alloc(frame_id);
 }
 
 int
@@ -105,7 +170,6 @@ next_victim(void)
             
             /* can't touch this page so move on */
             case PINNED:
-                LOG_INFO("%d is pinned", current_page);
                 goto next;
 
             /* return current page and set the current as the next */
@@ -140,23 +204,44 @@ evict_frame(seL4_Word frame_id)
     seL4_Word page_id;
     assert(frame_table_get_page_id(frame_id, &pid, &page_id) == 0);
 
-    LOG_INFO("pid is %d; page_id is %p", pid, page_id);
+    LOG_INFO("Evicting pid is %d; page_id is %p", pid, page_id);
 
     /* Get the page cap for the process */
     // TODO: Instead of curproc, index into the proc array with pid
 
-    // TODO: MARK IN THE PAGETABLE THIS PAGE AS EVICTED
-    assert(page_directory_lookup(curproc->p_addrspace->directory, page_id, &pt_cap) == 0);
+    /* Pop the next free page off the list */
+    void *free_node = pagefile_free_pages->head;
+    seL4_Word free_id = (seL4_Word)pagefile_free_pages->head->data;
+    pagefile_free_pages->head = pagefile_free_pages->head->next;
+    free(free_node);
 
-    LOG_INFO("pt_cap is %d", pt_cap);
+    LOG_INFO("Free page in file at %d", free_id);
 
-    /* Unmap the page from the process so we get a fault access */
-    seL4_ARM_Page_Unmap(pt_cap);
-    cspace_delete_cap(cur_cspace, pt_cap);
+    assert(page_directory_evict(curproc->p_addrspace->directory, page_id, free_id) == 0);
 
-    // 2. Write the page to the pagefile (needs to still be mapped into sos for this)
-    // Need to store the cap somewhere aswell
-    // Do not need to write it if the page was clean, but we need to handle that bug free
+    LOG_INFO("page entry evicted");
+
+    // TODO: GRAB A BIG LOCK AROUND PAGING
+
+    /* Write the page to disk */
+
+    /* TODO: DONT NEED TO WRITE PAGE IF ITS NOT DIRTY? */
+    // seL4_Word sos_vaddr = frame_table_index_to_sos_vaddr(frame_id);
+
+    // uiovec iov = {
+    //     .uiov_base = (char *)sos_vaddr,
+    //     .uiov_len = PAGE_SIZE_4K,
+    //     .uiov_pos = (free_id * PAGE_SIZE_4K)
+    // };
+    // vnode handle = {.vn_data = &pagefile_handle};
+    // LOG_INFO("Sos vaddr is %p", sos_vaddr);
+    // LOG_INFO("lenth is %d", PAGE_SIZE_4K);
+    // int result = sos_nfs_write(&handle, &iov);
+    // LOG_INFO("result is %d", result);
+    // if (result != PAGE_SIZE_4K) {
+    //     LOG_ERROR("Writing to pagefile failed");
+    //     return -1;
+    // }
 
     // 3. Yield until NFS comes back, this is where problems happen. Because we could go back to the event loop and 
     // get a fault handle for that page we are currently evicting. I think we need a big lock around paging.
