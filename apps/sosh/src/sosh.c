@@ -264,13 +264,19 @@ static int thrash(int argc, char *argv[]) {
     }
 
     size_t npages = atoi(argv[1]);
-    char buffer[npages * MAX_IO_BUF];
+    int buffer[npages * MAX_IO_BUF];
 
-    for (int i = 0; i < npages; i++)
-        buffer[i * MAX_IO_BUF] = 'A';
+    for (int i = 0; i < npages; i++) {
+        for (int j = 0; j < MAX_IO_BUF; ++j)
+            buffer[(i * MAX_IO_BUF) + j] = (i * MAX_IO_BUF) + j;
+    }
 
-    for (int i = 0; i < npages; i++)
-        assert(buffer[i * MAX_IO_BUF] == 'A');
+    for (int i = 0; i < npages; i++) {
+        // Just to test everything is being copied correctly
+        for (int j = 0; j < MAX_IO_BUF; ++j) {
+            assert(buffer[(i * MAX_IO_BUF) + j] == (i * MAX_IO_BUF) + j);
+        }
+    }
 
     return 0;
 }

@@ -90,7 +90,7 @@ vm_fault(void)
 
     /* If the page is marked as evicted, page it in */
     if (page_table_is_evicted(fault_addr)) {
-        if (page_in(fault_addr, access_type) != 0) {
+        if (page_in(PAGE_ALIGN_4K(fault_addr), access_type) != 0) {
             LOG_ERROR("failed to page in");
             goto fault_error;
         }
@@ -98,7 +98,7 @@ vm_fault(void)
     }
 
     seL4_Word kvaddr;
-    if (vm_map(fault_addr, access_type, &kvaddr) != 0) {
+    if (vm_map(PAGE_ALIGN_4K(fault_addr), access_type, &kvaddr) != 0) {
         LOG_ERROR("failed to map in a new page");
         goto fault_error;
     }

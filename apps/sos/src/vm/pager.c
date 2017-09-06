@@ -94,6 +94,7 @@ page_in(seL4_Word page_id, seL4_Word access_type)
     LOG_INFO("page is stored at %d", pagefile_id);
 
     seL4_Word sos_vaddr;
+
     if (vm_map(PAGE_ALIGN_4K(page_id), access_type, &sos_vaddr) != 0) {
         LOG_INFO("failed to map in a page");
         return 1;
@@ -104,36 +105,37 @@ page_in(seL4_Word page_id, seL4_Word access_type)
 
     // TODO: Grab the big page lock
 
-    /* try to read and write */
-    LOG_INFO("trying to read and write to sos_vaddr %p", sos_vaddr);
-
-    ((char *)sos_vaddr)[0] = 0;
-    assert(((char *)sos_vaddr)[0] == 0);
-
     /* Read the page in from the pagefile and into memory */
     vnode handle = {.vn_data = &pagefile_handle};
     size_t bytes_remaining = PAGE_SIZE_4K;
     int result;
     do {
+        // Could it be that these values are changing between calling sos_nfs_read and when the callback happens?
         uiovec iov = {
-           .uiov_base = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining)),
+           .uiov_base = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining)), // Could it be this?
            .uiov_len = bytes_remaining,
            .uiov_pos = (pagefile_id * PAGE_SIZE_4K) + (PAGE_SIZE_4K - bytes_remaining)
         };
+
+        LOG_INFO("READ: base %p, len %lu, pos %lu", iov.uiov_base, iov.uiov_len, iov.uiov_pos);
 
         if ((result = sos_nfs_read(&handle, &iov)) == -1) {
             LOG_ERROR("Error when reading from pagefile");
             return 1;
         }
 
+        LOG_INFO("READ: result was %d", result);
+
+        char *data_ptr = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining));
+        LOG_INFO("data: %d", *data_ptr);
+
         bytes_remaining -= result;
-
-        LOG_INFO("bytes remaining %d", bytes_remaining);
-
     } while (bytes_remaining > 0);
 
     /* Mark the page as free in the pagefile */
     assert(list_prepend(pagefile_free_pages, (void *)pagefile_id) == 0);
+
+    seL4_ARM_Page_Unify_Instruction(frame_table_get_capability(frame_table_sos_vaddr_to_index(sos_vaddr)), 0, PAGE_SIZE_4K);
 
     return 0;
 }
@@ -240,13 +242,13 @@ evict_frame(seL4_Word frame_id)
 
     /* Pop the next free page off the list */
     void *free_node = pagefile_free_pages->head;
-    seL4_Word free_id = (seL4_Word)pagefile_free_pages->head->data;
+    seL4_Word pagefile_id = (seL4_Word)pagefile_free_pages->head->data;
     pagefile_free_pages->head = pagefile_free_pages->head->next;
     free(free_node);
 
-    LOG_INFO("Free page in file at %d", free_id);
+    LOG_INFO("Free page in file at %d", pagefile_id);
 
-    assert(page_directory_evict(curproc->p_addrspace->directory, page_id, free_id) == 0);
+    assert(page_directory_evict(curproc->p_addrspace->directory, page_id, pagefile_id) == 0);
 
     LOG_INFO("page entry evicted");
 
@@ -262,13 +264,20 @@ evict_frame(seL4_Word frame_id)
         uiovec iov = {
            .uiov_base = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining)),
            .uiov_len = bytes_remaining,
-           .uiov_pos = (free_id * PAGE_SIZE_4K) + (PAGE_SIZE_4K - bytes_remaining)
+           .uiov_pos = (pagefile_id * PAGE_SIZE_4K) + (PAGE_SIZE_4K - bytes_remaining)
         };
+
+        LOG_INFO("WRITE: base %p, len %lu, pos %lu", iov.uiov_base, iov.uiov_len, iov.uiov_pos);
 
         if ((result = sos_nfs_write(&handle, &iov)) == -1) {
             LOG_ERROR("Error when writing to pagefile");
             return 1;
         }
+
+        char *data_ptr = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining));
+        LOG_INFO("data: %d", *data_ptr);
+
+        LOG_INFO("WRITE: result was %d", result);
 
         bytes_remaining -= result;
 

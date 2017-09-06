@@ -144,9 +144,7 @@ sos_nfs_read(vnode *node, uiovec *iov)
     if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)iov) != RPC_OK)
         return -1;
 
-    LOG_INFO("before yield");
     int *ret = yield(NULL);
-    LOG_INFO("after yield");
     return *ret;
 }
 
@@ -259,8 +257,6 @@ sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int
     }
 
     struct iovec *iov = (struct iovec *)token;
-    LOG_INFO("iov is %p", iov);
-    LOG_INFO("iov->iov_base is %p", iov->iov_base);
     memcpy(iov->iov_base, data, count);
     ret_val = count;
 

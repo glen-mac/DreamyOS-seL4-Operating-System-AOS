@@ -59,7 +59,7 @@ static int
 load_segment_into_vspace(addrspace *as,
                          char *src, unsigned long segment_size,
                          unsigned long file_size, unsigned long dst,
-                         unsigned long permissions)
+                         unsigned long permissions, int pin)
 {
 
     /* Overview of ELF segment loading
@@ -111,7 +111,8 @@ load_segment_into_vspace(addrspace *as,
         /* Not observable to I-cache yet so flush the frame */
         seL4_Word frame_id = frame_table_sos_vaddr_to_index(kdst);
         seL4_Word frame_cap = frame_table_get_capability(frame_id);
-        assert(frame_table_set_chance(frame_id, PINNED) == 0); /* TEMPORARY PINNING */
+        // if (pin)
+        //     assert(frame_table_set_chance(frame_id, PINNED) == 0); /* TEMPORARY PINNING */
         seL4_ARM_Page_Unify_Instruction(frame_cap, 0, PAGE_SIZE_4K);
 
         pos += nbytes;
@@ -138,6 +139,7 @@ elf_load(addrspace *as, char *elf_file)
         return seL4_InvalidArgument;
 
     num_headers = elf_getNumProgramHeaders(elf_file);
+    int pin = FALSE;
     for (int i = 0; i < num_headers; i++) {
         
         /* Skip non-loadable segments (such as debugging data). */
@@ -155,8 +157,9 @@ elf_load(addrspace *as, char *elf_file)
         // TODO: Should probably return error here instead of panicing.
         LOG_INFO("Loading segment %08x-->%08x", (int)vaddr, (int)(vaddr + segment_size));
         err = load_segment_into_vspace(as, source_addr, segment_size, file_size, vaddr,
-                                       get_sel4_rights_from_elf(flags));
+                                       get_sel4_rights_from_elf(flags), pin);
         conditional_panic(err != 0, "Elf loading failed!\n");
+        pin = FALSE;
     }
 
     /* Map in the heap region after all other regions were added */
