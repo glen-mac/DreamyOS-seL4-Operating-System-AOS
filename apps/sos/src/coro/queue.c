@@ -4,7 +4,7 @@
  * Glenn McGuire & Cameron Lonsdale
  */
 
-#include <utils/queue.h>
+#include "queue.h"
 #include <stdlib.h>
 
 int
@@ -21,13 +21,13 @@ queue_init(queue * q) {
 }
 
 int
-queue_add(queue q, void *item) {
+queue_add(queue q, coro c) {
     if (q == NULL)
         return -1;
     qnode temp = (qnode)malloc(sizeof(struct queue_node));
     if (!temp)
         return -1;
-    temp->data = item; 
+    temp->routine = c; 
     temp->next = NULL;
     if(q->front == NULL && q->end == NULL){
         q->front = q->end = temp;
@@ -39,13 +39,13 @@ queue_add(queue q, void *item) {
 }
 
 int
-queue_pop(queue q, void * item) {
+queue_pop(queue q, coro * c) {
     if(q == NULL || q->front == NULL) {
-        *(uintptr_t *)item = (uintptr_t)NULL;
+        *c = NULL;
         return -1;
     }
     /* set the return value */
-    *(uintptr_t *)item = (uintptr_t)q->front->data;
+    *c = q->front->routine;
     qnode temp = q->front;
     if(q->front == q->end) {
         q->front = q->end = NULL;

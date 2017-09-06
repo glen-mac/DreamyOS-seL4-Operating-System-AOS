@@ -8,7 +8,7 @@
 #include "sys_time.h"
 
 #include <clock/clock.h>
-#include "picoro.h"
+#include <coro/picoro.h>
 #include "syscall.h"
 #include <utils/time.h>
 #include <utils/util.h>

@@ -7,9 +7,9 @@
 #include "pager.h"
 #include "frametable.h"
 #include "vm.h"
-#include "picoro.h"
 
 #include <sys/panic.h>
+#include <coro/picoro.h>
 #include <proc/proc.h>
 #include <cspace/cspace.h>
 #include <utils/util.h>

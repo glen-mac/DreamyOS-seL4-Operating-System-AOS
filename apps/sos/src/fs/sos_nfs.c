@@ -11,7 +11,7 @@
 
 #include <network.h>
 
-#include "picoro.h"
+#include <coro/picoro.h>
 #include <syscall/syscall.h>
 
 

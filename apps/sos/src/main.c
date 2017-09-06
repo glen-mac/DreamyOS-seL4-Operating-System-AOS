@@ -26,7 +26,7 @@
 
 #include "mapping.h"
 #include "network.h"
-#include "picoro.h"
+#include <coro/picoro.h>
 #include <proc/elf.h>
 #include <proc/proc.h>
 #include <ut_manager/ut.h>

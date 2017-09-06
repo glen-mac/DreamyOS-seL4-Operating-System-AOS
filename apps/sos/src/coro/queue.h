@@ -4,11 +4,13 @@
  * Glenn McGuire & Cameron Lonsdale
  */
 
+#include <sel4/sel4.h>
 #include <stdint.h>
+#include "picoro.h"
 
 /* queue node definition */
 struct queue_node {
-    void * data;
+    coro routine;
     struct queue_node * next;
 };
 typedef struct queue_node * qnode;
@@ -32,11 +34,11 @@ int queue_init(queue * q);
  * @param item, the address of the item to store
  * @returns 0 on success and 1 on error
  */
-int queue_add(queue q, void *item);
+int queue_add(queue q, coro c);
 
 /* pop an element off the queue 
  * @parmam q, the queue to use
  * @params item, the address to store the item at the front of the queue
  * @returns 0 on success and 1 on error
  */
-int queue_pop(queue q, void * item);
+int queue_pop(queue q, coro * c);

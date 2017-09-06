@@ -6,7 +6,7 @@
 
 #include "sos_serial.h"
 #include <fcntl.h>
-#include "picoro.h"
+#include <coro/picoro.h>
 #include <vfs/vfs.h>
 #include <vfs/device.h>
 
