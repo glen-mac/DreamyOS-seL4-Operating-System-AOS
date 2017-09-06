@@ -94,7 +94,7 @@ page_in(seL4_Word page_id, seL4_Word access_type)
     LOG_INFO("page is stored at %d", pagefile_id);
 
     seL4_Word sos_vaddr;
-    if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
+    if (vm_map(PAGE_ALIGN_4K(page_id), access_type, &sos_vaddr) != 0) {
         LOG_INFO("failed to map in a page");
         return 1;
     }
@@ -104,13 +104,38 @@ page_in(seL4_Word page_id, seL4_Word access_type)
 
     // TODO: Grab the big page lock
 
-    /* Read the page in from the pagefile and load it into memory */
+    /* try to read and write */
+    LOG_INFO("trying to read and write to sos_vaddr %p", sos_vaddr);
 
+    ((char *)sos_vaddr)[0] = 0;
+    assert(((char *)sos_vaddr)[0] == 0);
+
+    /* Read the page in from the pagefile and into memory */
+    vnode handle = {.vn_data = &pagefile_handle};
+    size_t bytes_remaining = PAGE_SIZE_4K;
+    int result;
+    do {
+        uiovec iov = {
+           .uiov_base = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining)),
+           .uiov_len = bytes_remaining,
+           .uiov_pos = (pagefile_id * PAGE_SIZE_4K) + (PAGE_SIZE_4K - bytes_remaining)
+        };
+
+        if ((result = sos_nfs_read(&handle, &iov)) == -1) {
+            LOG_ERROR("Error when reading from pagefile");
+            return 1;
+        }
+
+        bytes_remaining -= result;
+
+        LOG_INFO("bytes remaining %d", bytes_remaining);
+
+    } while (bytes_remaining > 0);
 
     /* Mark the page as free in the pagefile */
+    assert(list_prepend(pagefile_free_pages, (void *)pagefile_id) == 0);
 
-    LOG_ERROR("page_in not implemented yet");
-    return 1;
+    return 0;
 }
 
 int
@@ -138,7 +163,11 @@ page_out(seL4_Word *page_id)
     /* Zero out the frame and return the page_id / frame_id */
     *page_id = frame_table_index_to_sos_vaddr(frame_id);
     bzero((void *)(*page_id), PAGE_SIZE_4K);
-    seL4_ARM_Page_Unmap(frame_table_get_capability(frame_id)); /* Unmap because sos_map_page will map in again */
+    // LOG_INFO("unmapping using %p", frame_table_get_capability(frame_id));
+    //seL4_ARM_Page_Unmap(frame_table_get_capability(frame_id)); /* Unmap because sos_map_page will map in again */
+
+    /* Apparently we dont need to map in again??? */
+
     assert(frame_table_set_chance(frame_id, FIRST_CHANCE) == 0);
 
     return frame_id;
@@ -224,24 +253,26 @@ evict_frame(seL4_Word frame_id)
     // TODO: GRAB A BIG LOCK AROUND PAGING
 
     /* Write the page to disk */
-
     /* TODO: DONT NEED TO WRITE PAGE IF ITS NOT DIRTY? */
-    // seL4_Word sos_vaddr = frame_table_index_to_sos_vaddr(frame_id);
+    seL4_Word sos_vaddr = frame_table_index_to_sos_vaddr(frame_id);
+    vnode handle = {.vn_data = &pagefile_handle};
+    size_t bytes_remaining = PAGE_SIZE_4K;
+    int result;
+    do {
+        uiovec iov = {
+           .uiov_base = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining)),
+           .uiov_len = bytes_remaining,
+           .uiov_pos = (free_id * PAGE_SIZE_4K) + (PAGE_SIZE_4K - bytes_remaining)
+        };
 
-    // uiovec iov = {
-    //     .uiov_base = (char *)sos_vaddr,
-    //     .uiov_len = PAGE_SIZE_4K,
-    //     .uiov_pos = (free_id * PAGE_SIZE_4K)
-    // };
-    // vnode handle = {.vn_data = &pagefile_handle};
-    // LOG_INFO("Sos vaddr is %p", sos_vaddr);
-    // LOG_INFO("lenth is %d", PAGE_SIZE_4K);
-    // int result = sos_nfs_write(&handle, &iov);
-    // LOG_INFO("result is %d", result);
-    // if (result != PAGE_SIZE_4K) {
-    //     LOG_ERROR("Writing to pagefile failed");
-    //     return -1;
-    // }
+        if ((result = sos_nfs_write(&handle, &iov)) == -1) {
+            LOG_ERROR("Error when writing to pagefile");
+            return 1;
+        }
+
+        bytes_remaining -= result;
+
+    } while (bytes_remaining > 0);
 
     // 3. Yield until NFS comes back, this is where problems happen. Because we could go back to the event loop and 
     // get a fault handle for that page we are currently evicting. I think we need a big lock around paging.

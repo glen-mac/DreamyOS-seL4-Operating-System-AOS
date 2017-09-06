@@ -182,6 +182,10 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
     }
 
     page_table_entry *second_level = (page_table_entry *)directory[directory_index];
+
+    /* Must be less than, as we use the highest bit to represent evicted or not */
+    assert(cap < MAX_CAP_ID);
+
     // I TURNED THIS OFF BECAUSE THIS WONT BE NULL FOR EVICTED PAGES
     // IDK IF THIS IS THE BEST THING THOUGH, ID BE MORE CONFIDENT WITH THE ERROR CHECKING
     //assert(second_level[table_index].page == (seL4_CPtr)NULL);
@@ -307,8 +311,6 @@ vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
         LOG_INFO("Incorrect Permissions");
         return 1;
     }
-
-    LOG_INFO("before sos_map_page");
 
     // TODO: This can fail, we need to send ENOMEM to the process.
     assert(sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) == 0);
