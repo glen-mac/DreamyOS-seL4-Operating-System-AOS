@@ -313,8 +313,10 @@ vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
     }
 
     // TODO: This can fail, we need to send ENOMEM to the process.
-    assert(sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) == 0);
-    return 0;
+    if (sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) != 0) {
+        LOG_ERROR("sos_map_page failed");
+        return 1;
+    }
 }
 
 /* The status of the fault is indicated by bits 12, 10 and 3:0 all strung together */
