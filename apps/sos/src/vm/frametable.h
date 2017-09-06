@@ -13,8 +13,10 @@
 /* Individual frame */
 typedef struct {
     seL4_CPtr cap; /* The cap for the frame */
-    seL4_Word vaddr; /* the vaddr that this frame corresponds to in PROC AS */
     enum chance_type chance;
+    // TODO: If we want to support shared memory, we need a linked list of these
+    seL4_Word pid; /* ID of the process this page is mapped into */
+    seL4_Word page_id; /* Page id of the process vaddr this page is mapped into */
 } frame_entry;
 
 /*
@@ -48,11 +50,11 @@ void frame_free(seL4_Word vaddr);
 seL4_ARM_Page frame_table_get_capability(seL4_Word frame_id);
 
 /*
- * Return the vaddr for a frame - for the specific proc AS
- * @param frame_id, id of the frame to lookup
- * @return vaddr of the frame corres. to the vpage, 1 on error.
+ * Given a frame index, return the sos vaddr of the frame
+ * @param frame_id, id of the frame
+ * @returns sos_vaddr for that frame
  */
-seL4_Word frame_table_get_vaddr(seL4_Word frame_id);
+seL4_Word frame_table_index_to_sos_vaddr(seL4_Word frame_id);
 
 /*
  * Given the SOS vaddr of the frame, return its index
@@ -99,5 +101,22 @@ int frame_table_get_chance(seL4_Word frame_id, enum chance_type *chance);
  * @returns 0 on success else -1
  */
 int frame_table_set_chance(seL4_Word frame_id, enum chance_type chance);
+
+/*
+ * Set the process page id associated with this frame
+ * @param frame_id, id of the frame
+ * @param pid, the process id
+ * @param page_id, id of the page
+ */
+int frame_table_set_page_id(seL4_Word frame_id, seL4_Word pid, seL4_Word page_id);
+
+/*
+ * Get the pid and page_id where this frame is mapped into 
+ * @param frame_id, id of the frame
+ * @param[out] pid, pid of the process
+ * @param[out] page_id, id of the page
+ * @returns 0 on success else 1
+ */
+int frame_table_get_page_id(seL4_Word frame_id, seL4_Word *pid, seL4_Word *page_id);
 
 #endif /* _FRAMETABLE_H_ */

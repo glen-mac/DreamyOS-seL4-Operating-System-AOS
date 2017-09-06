@@ -19,5 +19,4 @@ sos: ${sos-components-y} \
      libsel4 libelf $(libc) libcpio \
      libsel4cspace libserial libclock \
      liblwip libnfs libethdrivers \
-     libsos libplatsupport
-
+     libsos libplatsupport libutils

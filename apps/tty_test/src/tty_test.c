@@ -146,6 +146,8 @@ test_m4(void)
     result = sos_sys_write(console_fd, heap_buf, BUF_SZ);
     assert(result == BUF_SZ);
 
+    free(heap_buf);
+
     /* try sleeping */
     for (int i = 0; i < 5; i++) {
        time_t prev_seconds = time(NULL);
@@ -156,6 +158,7 @@ test_m4(void)
     }
 
     /* Checking permissions */
+    printf("printing from a code section, dont be surprised if these look weird\n");
     result = sos_sys_write(console_fd, (char *)0x10000, 3);
     assert(result == 3);
 

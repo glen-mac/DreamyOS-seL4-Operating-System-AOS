@@ -109,7 +109,9 @@ load_segment_into_vspace(addrspace *as,
             memcpy((void*)(kdst + (dst & PAGE_MASK_4K)), (void*)src, MIN(nbytes, file_size - pos));
 
         /* Not observable to I-cache yet so flush the frame */
-        seL4_Word frame_cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(kdst));
+        seL4_Word frame_id = frame_table_sos_vaddr_to_index(kdst);
+        seL4_Word frame_cap = frame_table_get_capability(frame_id);
+        assert(frame_table_set_chance(frame_id, PINNED) == 0); /* TEMPORARY PINNING */
         seL4_ARM_Page_Unify_Instruction(frame_cap, 0, PAGE_SIZE_4K);
 
         pos += nbytes;

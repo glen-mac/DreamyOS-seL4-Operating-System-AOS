@@ -15,8 +15,8 @@ syscall_brk(void)
     seL4_Word newbrk = seL4_GetMR(1);
     LOG_INFO("syscall: thread made sos_brk(%d)", newbrk);
 
-    seL4_Word *heap_b = (seL4_Word *)(curproc->p_addrspace->region_heap->start);
-    seL4_Word *heap_t = (seL4_Word *)(curproc->p_addrspace->region_heap->end);
+    seL4_Word *heap_b = &(curproc->p_addrspace->region_heap->start);
+    seL4_Word *heap_t = &(curproc->p_addrspace->region_heap->end);
 
     /* Set return value as okay by default */
     seL4_SetMR(0, 0);
