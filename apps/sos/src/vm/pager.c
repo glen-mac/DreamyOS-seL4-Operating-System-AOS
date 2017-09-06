@@ -23,7 +23,7 @@
 #include <sys/panic.h>
 #include <strings.h>
 
-#define PAGEFILE_MAX_PAGES 10 // BYTES_TO_4K_PAGES(BIT(31)) // 2 GB pagefile size
+#define PAGEFILE_MAX_PAGES 5000 // BYTES_TO_4K_PAGES(BIT(31)) // 2 GB pagefile size
 
 /* Variable to represent where we are up to in our search for a victim page */
 static volatile seL4_Word current_page = 0;
@@ -95,7 +95,9 @@ page_in(seL4_Word page_id, seL4_Word access_type)
 
     seL4_Word sos_vaddr;
 
-    if (vm_map(PAGE_ALIGN_4K(page_id), access_type, &sos_vaddr) != 0) {
+    LOG_INFO("access type is %d", access_type);
+
+    if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
         LOG_INFO("failed to map in a page");
         return 1;
     }

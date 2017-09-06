@@ -90,7 +90,7 @@ vm_fault(void)
 
     /* If the page is marked as evicted, page it in */
     if (page_table_is_evicted(fault_addr)) {
-        if (page_in(PAGE_ALIGN_4K(fault_addr), access_type) != 0) {
+        if (page_in(fault_addr, access_type) != 0) {
             LOG_ERROR("failed to page in");
             goto fault_error;
         }
@@ -312,7 +312,6 @@ vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
         return 1;
     }
 
-    // TODO: This can fail, we need to send ENOMEM to the process.
     if (sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) != 0) {
         LOG_ERROR("sos_map_page failed");
         return 1;

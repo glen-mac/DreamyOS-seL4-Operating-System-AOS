@@ -89,6 +89,7 @@ load_segment_into_vspace(addrspace *as,
 
     /* Add the region to the curproc region list */
     as_add_region(as, as_create_region(dst, segment_size, permissions));
+    LOG_INFO("permissions is %d", permissions);
 
     /* We work a page at a time in the destination vspace. */
     unsigned long pos = 0;
