@@ -11,6 +11,9 @@
 
 typedef struct coro *coro;
 
+/* return current running routine */
+coro coro_getcur();
+
 /*
  * Create a coroutine that will run fun(). The coroutine starts off suspended.
  * When it is first resumed, the argument to resume() is passed to fun().

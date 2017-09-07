@@ -30,11 +30,6 @@
 //#define TX_DELAY_US  1000UL
 #define TX_DELAY_US  0UL
 
-struct serial {
-    void (*fHandler) (struct serial *serial, char c);
-    struct udp_pcb *fUpcb;
-};
-
 static void
 serial_recv_handler(void *vSerial, struct udp_pcb *unused0, 
                     struct pbuf *p, struct ip_addr *unused1, u16_t unused2)

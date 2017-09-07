@@ -45,7 +45,7 @@ handler(struct serial *serial, char c)
         nbytes_read++;
 
         if (c == '\n' || nbytes_read >= global_uio->uiov_len)
-            resume(syscall_coro, NULL);
+            resume((coro)(serial->routine), NULL);
 
     } else if (!ring_buffer_is_full(input_buffer)) {
         /* Otherwise we buffer it */
@@ -128,7 +128,8 @@ sos_serial_read(vnode *node, uiovec *iov)
     /* Need to read more, this is blocking */
     nbytes_read = bytes_read;
     global_uio = iov;
-
+    
+    ((struct serial *)(node->vn_data))->routine = (void *)coro_getcur();   
     yield(NULL); /* Yield back to event_loop, will be resumed when there is data */
 
     global_uio = NULL;

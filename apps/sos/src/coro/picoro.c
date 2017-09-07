@@ -156,6 +156,13 @@ void coroutine_start(void) {
     coroutine_main(stack);
 }
 
+/*
+ * Return current running coroutine
+ */
+coro coro_getcur() {
+    return running;
+}
+
 /* eof */
 
 #pragma GCC pop_options

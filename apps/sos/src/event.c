@@ -6,7 +6,6 @@
 
 #include "event.h"
 
-#include <coro/picoro.h>
 #include <vm/vm.h>
 #include <clock/clock.h>
 #include <cspace/cspace.h>
@@ -15,11 +14,6 @@
 #include <syscall/syscall.h>
 #include <utils/util.h>
 #include "network.h"
-
-/* 
- * Syscall coroutine
- */
-coro syscall_coro = NULL;
 
 void
 event_loop(const seL4_CPtr ep)
@@ -41,12 +35,9 @@ event_loop(const seL4_CPtr ep)
                 timer_interrupt();
 
         } else if (label == seL4_VMFault) {
-            // THIS IS BAD, NEED TO FIX THIS ASAP
-            syscall_coro = coroutine(vm_fault);
-            resume(syscall_coro, NULL);
+            resume(coroutine(vm_fault), NULL);
         } else if (label == seL4_NoFault) {
-            syscall_coro = coroutine(handle_syscall);
-            resume(syscall_coro, badge);
+            resume(coroutine(handle_syscall), badge);
         } else {
             LOG_INFO("Rootserver got an unknown message");
         }
