@@ -167,10 +167,10 @@ syscall_stat(void)
 
     // then copy out to the one specified by the user (using our page boundary special copy)
     memcpy((sos_stat_t *)kbuf, (sos_stat_t *)kstat, sizeof(sos_stat_t)); // fix this
-
     result = 0;
+    free(kstat);
+
     message_reply:
-        free(kstat);
         seL4_SetMR(0, result);
         return 1;
 }
@@ -231,12 +231,12 @@ vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
      * If it failed, try to map in the addr
      * Then the translation should succeed
      */
-    if (vm_translate(vaddr, &sos_vaddr) != 0) {
+    if (vm_translate(vaddr, access_type, &sos_vaddr) != 0) {
         if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
             LOG_ERROR("Mapping failed");
             return (seL4_Word)NULL;
         }
-        assert(vm_translate(vaddr, &sos_vaddr) == 0);
+        assert(vm_translate(vaddr, access_type, &sos_vaddr) == 0);
     } else {
         /* Check address has permission for access type */
         addrspace *as = curproc->p_addrspace;

@@ -30,7 +30,7 @@
 
 #define TRUE 1
 #define FALSE 0
-#define NDEBUG
+
 #ifdef NDEBUG
 #define LOG_ERROR(format, ...)
 #define LOG_INFO(format, ...)

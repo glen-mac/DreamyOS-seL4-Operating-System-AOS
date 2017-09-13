@@ -74,10 +74,11 @@ int page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_
 /*
  * Given a vaddr, translate it to the sos vaddr of the frame 
  * @param vaddr, the process virtual address
+ * @param access_type, the type of access to this address (for page in)
  * @param[out] sos_vaddr, the vaddr for the frame so sos can access it
  * @returns 0 on success else 1
  */
-int vm_translate(seL4_Word vaddr, seL4_Word *sos_vaddr);
+int vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr);
 
 /*
  * Given a vaddr, try to map in that page 

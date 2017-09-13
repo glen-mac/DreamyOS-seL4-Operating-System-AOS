@@ -274,13 +274,22 @@ page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_id)
 }
 
 int
-vm_translate(seL4_Word vaddr, seL4_Word *sos_vaddr)
+vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
 {
     int err;
 
     seL4_Word offset = (vaddr & PAGE_MASK_4K);
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
     seL4_ARM_Page page_cap;
+
+    if (page_table_is_evicted(page_id)) {
+        LOG_INFO("page is evicted");
+        panic("this is happening");
+        if (page_in(page_id, access_type) != 0) {
+            LOG_ERROR("failed to page_in");
+            return 1;
+        }
+    }
 
     if ((err = page_directory_lookup(curproc->p_addrspace->directory, page_id, &page_cap)) != 0) {
         LOG_ERROR("Mapping not found");
