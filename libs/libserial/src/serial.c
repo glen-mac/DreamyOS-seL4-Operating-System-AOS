@@ -27,8 +27,8 @@
 /* Attempt to obtain UDP reliability by providing some delay to flush network queues
  * This should not be a problem when using a high throughput connection
  */
-//#define TX_DELAY_US  1000UL
-#define TX_DELAY_US  0UL
+#define TX_DELAY_US  1000UL
+//#define TX_DELAY_US  0UL
 
 static void
 serial_recv_handler(void *vSerial, struct udp_pcb *unused0, 

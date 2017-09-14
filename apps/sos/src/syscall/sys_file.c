@@ -121,7 +121,8 @@ syscall_do_read_write(seL4_Word access_mode)
         };
 
         if (access_mode == ACCESS_READ) {
-            result = vn->vn_ops->vop_read(vn, &iov);
+            if ((result = vn->vn_ops->vop_read(vn, &iov)) == -1)
+                goto message_reply;
 
             /*
              * Difference between amount read and requested
@@ -130,13 +131,14 @@ syscall_do_read_write(seL4_Word access_mode)
              * For example the console reading a new line. Or cat reading the end of a file
              */
             if (result != bytes_this_round) {
-                LOG_INFO("Early exit");
+                LOG_INFO("Early exit, %d %d", result, bytes_this_round);
                 nbytes_remaining -= result;
                 open_file->fp += result;
                 break;
             }
         } else {
-            result = vn->vn_ops->vop_write(vn, &iov);
+            if ((result = vn->vn_ops->vop_write(vn, &iov)) == -1)
+                goto message_reply;
         }
 
         nbytes_remaining -= result;

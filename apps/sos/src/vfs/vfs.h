@@ -14,8 +14,8 @@
 
 typedef struct {
 	void *uiov_base;
-	size_t uiov_len;
-	size_t uiov_pos;
+	seL4_Word uiov_len;
+	off_t uiov_pos;
 } uiovec;
 
 typedef struct _vnode vnode;

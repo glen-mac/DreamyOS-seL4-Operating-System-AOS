@@ -16,12 +16,12 @@
 #include <serial/serial.h>
 
 #include <utils/util.h>
-#include "ringbuf.h"
+#include <utils/ringbuf.h>
 
-static uiovec * volatile global_uio = NULL;
+static uiovec *volatile global_uio = NULL;
 static volatile int nbytes_read = 0;
 
-static ring_buffer_t * volatile input_buffer = NULL;
+static ring_buffer_t *volatile input_buffer = NULL;
 static sos_stat_t *stat = NULL;
 
 /*
@@ -104,14 +104,14 @@ int
 sos_serial_write(vnode *node, uiovec *iov)
 {
     struct serial *port = node->vn_data;
-    return serial_send(port, iov->uiov_base, iov->uiov_len);
+    return serial_send(port, (char *)iov->uiov_base, (int)iov->uiov_len);
 }
 
 int
 sos_serial_read(vnode *node, uiovec *iov)
 {
     char *user_buf = iov->uiov_base;
-    int bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->uiov_len);
+    seL4_Word bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->uiov_len);
 
     /* Read from the buffer if there are stored bytes */
     for (int i = 0; i < bytes_read; ++i) {

@@ -147,7 +147,7 @@ sos_nfs_write(vnode *node, uiovec *iov)
             return -1;
 
         ret = yield(NULL);
-        if (*ret == 0)
+        if (*ret == 0 || *ret == -1)
             break;
 
         iov->uiov_len -= *ret;
@@ -161,7 +161,6 @@ sos_nfs_write(vnode *node, uiovec *iov)
 int
 sos_nfs_read(vnode *node, uiovec *iov)
 {
-    // TODO: create struct on the stack instead and pass this?
     nfs_cb *cb = (nfs_cb *)malloc(sizeof(nfs_cb));
     cb->routine = coro_getcur();
     cb->iv = iov;
@@ -169,19 +168,28 @@ sos_nfs_read(vnode *node, uiovec *iov)
     int *ret;
     seL4_Word total = iov->uiov_len;
 
+    LOG_INFO("len is %d", total);
+
     /* Loop to make sure entire page is written, as nfs could break it up into small packets */
     while (iov->uiov_len > 0) {
+
+        LOG_INFO("pos is %llu", iov->uiov_pos);
+
         if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)cb) != RPC_OK)
             return -1;
 
         ret = yield(NULL);
-        if (*ret == 0)
+        if (*ret == 0 || *ret == -1) {
+            LOG_INFO("ret was %d", *ret);
             break;
+        }
 
         iov->uiov_len -= *ret;
         iov->uiov_base += *ret;
         iov->uiov_pos += *ret;
     }
+
+    LOG_INFO("done");   
 
     free(cb);
     return total - iov->uiov_len;
