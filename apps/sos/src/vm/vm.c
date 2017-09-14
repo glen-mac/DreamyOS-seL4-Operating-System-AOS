@@ -301,6 +301,7 @@ vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
     return 0;
 }
 
+// TODO: I dont think we need this here, its only used sys_file so we can put it back there
 seL4_Word
 vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
 {

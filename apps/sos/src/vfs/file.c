@@ -1,23 +1,15 @@
 /*  
  * Implementations for file handle and file table management.
+ *
+ * Cameron Lonsdale & Glenn McGuire
  */
 
 #include "file.h"
-
 #include <assert.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <errno.h>
-
-#include <sys/panic.h>
-
 #include <utils/util.h>
-
-/*
- * The global open file table (OFT).
- *
- * The global OFT contains FILES_MAX file structures.
- * The default size is 8192 maximum open files in the system
- */
 
 static ssize_t fdtable_next_unused_index(file **table);
 
@@ -60,16 +52,12 @@ fdtable *
 fdtable_create(void)
 {
     fdtable *fdt;
-
     if ((fdt = malloc(sizeof(fdtable))) == NULL) {
         LOG_ERROR("fdt table malloc failed");
         return NULL;
     }
 
-    // TODO this is needed why??.
-    for (int i = 0; i < PROCESS_MAX_FILES; i++)
-        fdt->table[i] = NULL;
-
+    bzero(fdt->table, PROCESS_MAX_FILES);
     return fdt;
 }
 
@@ -82,13 +70,11 @@ fdtable_get(fdtable *fdt, int fd, file **f)
         return EBADF;
     }
 
-    file *fdt_file = fdt->table[fd];
-    if (fdt_file == NULL) {
-        LOG_ERROR("%d didnt correspond to a legit file", fd);
+    if ((*f = fdt->table[fd]) == NULL) {
+        LOG_ERROR("%d didnt correspond to an open file", fd);
         return EBADF;
     }
 
-    *f = fdt_file;
     return 0;
 }
 
@@ -106,7 +92,7 @@ int
 fdtable_get_unused_fd(fdtable *fdt, int *fd)
 {
     if ((*fd = fdtable_next_unused_index(fdt->table)) == -1) {
-        LOG_ERROR("proc out of space for an open file");
+        LOG_ERROR("Proc out of space for an open file");
         return EMFILE; /* Process out of space for new file */
     }
 
@@ -118,12 +104,12 @@ int
 fdtable_close_fd(fdtable *fdt, int fd, file **oft_file)
 {
     if (fd < 0 || (unsigned)fd >= PROCESS_MAX_FILES) {
-        LOG_ERROR("invalid fd %d", fd);
+        LOG_ERROR("Invalid fd %d", fd);
         return EBADF;
     }
 
     if ((*oft_file = fdt->table[fd]) == NULL) {
-        LOG_ERROR("invalid file for fd %d", fd);
+        LOG_ERROR("Invalid file for fd %d", fd);
         return EBADF;
     }
 

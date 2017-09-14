@@ -71,7 +71,10 @@ sos_nfs_init(void)
     }
 
     nfs_mount->vn_ops = &nfs_dir_ops;
-    vfs_mount(nfs_mount);
+    if (vfs_mount(nfs_mount) != 0) {
+        LOG_ERROR("Error mounting nfs to vfs");
+        return 1;
+    }
 
     return 0;
 }

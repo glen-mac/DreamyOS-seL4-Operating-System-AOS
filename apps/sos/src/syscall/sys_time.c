@@ -28,7 +28,7 @@ syscall_usleep(void)
     assert(register_timer(MILLISECONDS(ms_delay), callback_sys_usleep, (void *)coro_getcur()) != 0);
 
     /* Unblock the process when timer callback is called */ 
-    int * retval = (int *)yield(NULL);
+    int *retval = (int *)yield(NULL);
 
     LOG_INFO(">>> usleep coro returned to usleep!!!");
     LOG_INFO(">>> usleep return value was: %d", *retval);
