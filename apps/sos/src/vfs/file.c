@@ -53,6 +53,7 @@ file_close(file *f)
 {
     vfs_close(f->vn);
     f->vn = NULL;
+    free(f);
 }
 
 fdtable *

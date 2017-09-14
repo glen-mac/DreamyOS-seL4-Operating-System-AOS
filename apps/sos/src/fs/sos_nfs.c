@@ -168,28 +168,19 @@ sos_nfs_read(vnode *node, uiovec *iov)
     int *ret;
     seL4_Word total = iov->uiov_len;
 
-    LOG_INFO("len is %d", total);
-
     /* Loop to make sure entire page is written, as nfs could break it up into small packets */
     while (iov->uiov_len > 0) {
-
-        LOG_INFO("pos is %llu", iov->uiov_pos);
-
         if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)cb) != RPC_OK)
             return -1;
 
         ret = yield(NULL);
-        if (*ret == 0 || *ret == -1) {
-            LOG_INFO("ret was %d", *ret);
+        if (*ret == 0 || *ret == -1)
             break;
-        }
 
         iov->uiov_len -= *ret;
         iov->uiov_base += *ret;
         iov->uiov_pos += *ret;
     }
-
-    LOG_INFO("done");   
 
     free(cb);
     return total - iov->uiov_len;
@@ -236,7 +227,12 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
         goto coro_resume;
     }
 
-    vn->vn_data = malloc(sizeof(fhandle_t));
+    if((vn->vn_data = malloc(sizeof(fhandle_t))) == NULL) {
+        LOG_ERROR("malloc failed when creating vn_data");
+        free(vn);
+        goto coro_resume;
+    }
+
     memcpy(vn->vn_data, fh, sizeof(fhandle_t));
     vn->vn_ops = &nfs_vnode_ops;
 

@@ -70,10 +70,12 @@ syscall_close(void)
     LOG_INFO("thread made close(%d)", fd);
 
     file *open_file;
-    int ret_val = fdtable_close_fd(curproc->file_table, fd, &open_file);
+    int ret_val;
+    if ((ret_val = fdtable_close_fd(curproc->file_table, fd, &open_file)) == 0)
+        file_close(open_file);
 
     seL4_SetMR(0, ret_val);
-    return 1;
+    return 1; /* nwords in message */
 }
 
 static seL4_Word
