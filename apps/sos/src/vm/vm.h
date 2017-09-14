@@ -81,6 +81,15 @@ int page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_
 int vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr);
 
 /*
+ * Translate a process virtual address to the sos vaddr of the frame.
+ * The frame is mapped in if translation failed.
+ * @param vaddr, the addr to translate
+ * @param access_type, the type of access to the memory, for permissions checking
+ * @returns sos virtual address
+ */
+seL4_Word vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type);
+
+/*
  * Given a vaddr, try to map in that page 
  * @param as, the address space to map into
  * @param vaddr, the vaddr of the page to map in

@@ -138,27 +138,53 @@ sos_nfs_list(char ***list, size_t *nfiles)
 int
 sos_nfs_write(vnode *node, uiovec *iov)
 {
-    if (nfs_write(node->vn_data, iov->uiov_pos, iov->uiov_len, iov->uiov_base, sos_nfs_write_callback, (uintptr_t)coro_getcur()) != RPC_OK)
-        return -1;
+    int *ret;
+    seL4_Word total = iov->uiov_len;
 
-    int *ret = yield(NULL);
-    return *ret;
+    /* Loop to make sure entire page is written, as nfs could break it up into small packets */
+    while (iov->uiov_len > 0) {
+        if (nfs_write(node->vn_data, iov->uiov_pos, iov->uiov_len, iov->uiov_base, sos_nfs_write_callback, (uintptr_t)coro_getcur()) != RPC_OK)
+            return -1;
+
+        ret = yield(NULL);
+        if (*ret == 0)
+            break;
+
+        iov->uiov_len -= *ret;
+        iov->uiov_base += *ret;
+        iov->uiov_pos += *ret;
+    }
+
+    return total - iov->uiov_len;
 }
 
 int
 sos_nfs_read(vnode *node, uiovec *iov)
 {
-    /* create read callback struct */
     // TODO: create struct on the stack instead and pass this?
-    nfs_cb * cb = (nfs_cb *)malloc(sizeof(nfs_cb));
+    nfs_cb *cb = (nfs_cb *)malloc(sizeof(nfs_cb));
     cb->routine = coro_getcur();
     cb->iv = iov;
-    if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)cb) != RPC_OK)
-        return -1;
 
-    int *ret = yield(NULL);
+    int *ret;
+    seL4_Word total = iov->uiov_len;
+
+    /* Loop to make sure entire page is written, as nfs could break it up into small packets */
+    while (iov->uiov_len > 0) {
+        if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)cb) != RPC_OK)
+            return -1;
+
+        ret = yield(NULL);
+        if (*ret == 0)
+            break;
+
+        iov->uiov_len -= *ret;
+        iov->uiov_base += *ret;
+        iov->uiov_pos += *ret;
+    }
+
     free(cb);
-    return *ret;
+    return total - iov->uiov_len;
 }
 
 int
@@ -264,8 +290,11 @@ static void
 sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data)
 {
     int ret_val = -1;
-    /* unwrap the callback data */
-    nfs_cb * call_data = (nfs_cb *)token;
+
+    /* Unwrap the callback data */
+    nfs_cb *call_data = (nfs_cb *)token;
+    assert(call_data != NULL);
+
     if (status != NFS_OK) {
         LOG_ERROR("read error status: %d", status);
         goto coro_resume;

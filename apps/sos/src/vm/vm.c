@@ -301,6 +301,40 @@ vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
     return 0;
 }
 
+seL4_Word
+vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
+{
+    seL4_Word offset = (vaddr & PAGE_MASK_4K);
+    seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
+    seL4_Word sos_vaddr;
+
+    /*
+     * Attempt to translate vaddr to kvaddr
+     * If it failed, try to map in the addr
+     * Then the translation should succeed
+     */
+    if (vm_translate(vaddr, access_type, &sos_vaddr) != 0) {
+        if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
+            LOG_ERROR("Mapping failed");
+            return (seL4_Word)NULL;
+        }
+        assert(vm_translate(vaddr, access_type, &sos_vaddr) == 0);
+    } else {
+        /* Check address has permission for access type */
+        addrspace *as = curproc->p_addrspace;
+        region *vaddr_region;
+        if (!as_find_region(as, vaddr, &vaddr_region) == 0 ||
+            !as_region_permission_check(vaddr_region, access_type)) {
+            LOG_INFO("Incorrect Permissions");
+            return (seL4_Word)NULL;
+        }
+    }
+
+    seL4_ARM_Page frame_cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(sos_vaddr));
+    seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(frame_cap);
+    return frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
+}
+
 int
 vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
 {

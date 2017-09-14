@@ -17,19 +17,16 @@
 #include <utils/util.h>
 
 static seL4_Word syscall_do_read_write(seL4_Word access_mode);
-static seL4_Word vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type);
 
 seL4_Word
 syscall_write(void)
 {
-    LOG_INFO("syscall: thread made sos_write");
     return syscall_do_read_write(ACCESS_WRITE);
 }
 
 seL4_Word
 syscall_read(void)
 {
-    LOG_INFO("syscall: thread made sos_read");
     return syscall_do_read_write(ACCESS_READ);
 }
 
@@ -39,6 +36,7 @@ syscall_open(void)
     LOG_INFO("syscall: thread made sos_open");
 
     // TODO: Hard copy the filename because it might cross a page boundary
+
     seL4_Word name = vaddr_to_sos_vaddr(seL4_GetMR(1), ACCESS_READ);
     fmode_t mode = seL4_GetMR(2);
     LOG_INFO("sycall: thread made open(%s, %d)", (char *)name, mode);
@@ -82,13 +80,10 @@ static seL4_Word
 syscall_do_read_write(seL4_Word access_mode)
 {
     int result;
-    seL4_Word kvaddr;
 
     seL4_Word fd = seL4_GetMR(1);
     seL4_Word buf = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
-
-    seL4_Word nbytes_remaining = nbytes;
 
     LOG_INFO("syscall: %s(%d, %p, %d) received on SOS", access_mode == ACCESS_READ ? "read": "write", fd, (void *)buf, nbytes);
 
@@ -99,19 +94,21 @@ syscall_do_read_write(seL4_Word access_mode)
         goto message_reply;
     }
 
-    if ((access_mode == ACCESS_WRITE && !(open_file->mode == O_WRONLY || open_file->mode == O_RDWR)) ||
-        (access_mode == ACCESS_READ && !(open_file->mode == O_RDONLY || open_file->mode == O_RDWR))) {
-        LOG_ERROR("permission error");
+    if ((access_mode == ACCESS_WRITE && open_file->mode == O_RDONLY) ||
+        (access_mode == ACCESS_READ && open_file->mode == O_WRONLY)) {
+        LOG_ERROR("Permission error");
         result = -1;
         goto message_reply;
     }
 
     vnode *vn = open_file->vn;
-    int bytes_this_round = 0;
+    seL4_Word bytes_this_round = 0;
+    seL4_Word nbytes_remaining = nbytes;
+    seL4_Word kvaddr;
 
-    while (nbytes_remaining != 0) {
+    while (nbytes_remaining > 0) {
         if (!(kvaddr = vaddr_to_sos_vaddr(buf, !access_mode))) {
-            /* Could not translate address */ 
+            LOG_ERROR("Address translation failed");
             result = -1;
             goto message_reply;
         }
@@ -126,11 +123,16 @@ syscall_do_read_write(seL4_Word access_mode)
         if (access_mode == ACCESS_READ) {
             result = vn->vn_ops->vop_read(vn, &iov);
 
-            /* Didnt read enough data, could be packet loss OR newline. Could be a problem in the future idk */
+            /*
+             * Difference between amount read and requested
+             * Since packetisation is handled by the concrete implementations,
+             * This can only be a device specifying to exit early
+             * For example the console reading a new line. Or cat reading the end of a file
+             */
             if (result != bytes_this_round) {
+                LOG_INFO("Early exit");
                 nbytes_remaining -= result;
                 open_file->fp += result;
-                LOG_INFO("Early exit");
                 break;
             }
         } else {
@@ -210,45 +212,4 @@ syscall_listdir(void)
         free(dir);
         seL4_SetMR(0, result);
         return 1;
-}
-
-/*
- * Translate a process virtual address to the sos vaddr of the frame.
- * The frame is mapped in if translation failed.
- * @param vaddr, the addr to translate
- * @param access_type, the type of access to the memory, for permissions checking
- * @returns sos virtual address
- */
-static seL4_Word
-vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
-{
-    seL4_Word offset = (vaddr & PAGE_MASK_4K);
-    seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
-    seL4_Word sos_vaddr;
-
-    /*
-     * Attempt to translate vaddr to kvaddr
-     * If it failed, try to map in the addr
-     * Then the translation should succeed
-     */
-    if (vm_translate(vaddr, access_type, &sos_vaddr) != 0) {
-        if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
-            LOG_ERROR("Mapping failed");
-            return (seL4_Word)NULL;
-        }
-        assert(vm_translate(vaddr, access_type, &sos_vaddr) == 0);
-    } else {
-        /* Check address has permission for access type */
-        addrspace *as = curproc->p_addrspace;
-        region *vaddr_region;
-        if (!as_find_region(as, vaddr, &vaddr_region) == 0 ||
-            !as_region_permission_check(vaddr_region, access_type)) {
-            LOG_INFO("Incorrect Permissions");
-            return (seL4_Word)NULL;
-        }
-    }
-
-    seL4_ARM_Page frame_cap = frame_table_get_capability(frame_table_sos_vaddr_to_index(sos_vaddr));
-    seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(frame_cap);
-    return frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
 }
