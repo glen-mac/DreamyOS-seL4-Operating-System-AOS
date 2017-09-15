@@ -142,5 +142,9 @@ sos_map_page(seL4_Word page_id, addrspace *as, unsigned long permissions, seL4_W
         return 1;
     }
 
+    /* For demand paging, we need to know what process vaddr is mapped to this frame in the frame table entry */
+    /* TOOD: HACK PID FOR NOW */
+    assert(frame_table_set_page_id(frame_id, 1337, page_id) == 0);
+
     return 0;
 }

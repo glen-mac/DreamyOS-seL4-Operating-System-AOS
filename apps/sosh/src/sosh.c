@@ -72,6 +72,8 @@ static int cat(int argc, char **argv) {
         return 1;
     }
 
+    close(fd);
+
     return 0;
 }
 
@@ -264,18 +266,19 @@ static int thrash(int argc, char *argv[]) {
     }
 
     size_t npages = atoi(argv[1]);
-    printf("npages %d\n", npages);
-    char *buffer = malloc(npages * MAX_IO_BUF);
-    if (!buffer) {
-        printf("could not malloc buffer\n");
-        return 1;
-    }
-    // for (int i = 0; i < npages; i++)
-    //     buffer[i * MAX_IO_BUF] = 'A';
+    int buffer[npages * MAX_IO_BUF];
 
-    // for (int i = 0; i < npages; i++)
-    //     assert(buffer[i * MAX_IO_BUF] == 'A');
-    free(buffer);
+    for (int i = 0; i < npages; i++) {
+        for (int j = 0; j < MAX_IO_BUF; ++j)
+            buffer[(i * MAX_IO_BUF) + j] = (i * MAX_IO_BUF) + j;
+    }
+
+    for (int i = 0; i < npages; i++) {
+        // Just to test everything is being copied correctly
+        for (int j = 0; j < MAX_IO_BUF; ++j) {
+            assert(buffer[(i * MAX_IO_BUF) + j] == (i * MAX_IO_BUF) + j);
+        }
+    }
 
     return 0;
 }

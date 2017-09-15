@@ -20,6 +20,8 @@ typedef struct {
     struct list_node *head;
 } list_t;
 
+typedef struct list_node * lnode;
+
 /* Create a new linked-list. Returns 0 on success. */
 int list_init(list_t *l);
 

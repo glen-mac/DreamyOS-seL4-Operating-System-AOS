@@ -6,7 +6,7 @@
 
 #include "sos_serial.h"
 #include <fcntl.h>
-#include "picoro.h"
+#include <coro/picoro.h>
 #include <vfs/vfs.h>
 #include <vfs/device.h>
 
@@ -16,12 +16,12 @@
 #include <serial/serial.h>
 
 #include <utils/util.h>
-#include "ringbuf.h"
+#include <utils/ringbuf.h>
 
-static uiovec * volatile global_uio = NULL;
+static uiovec *volatile global_uio = NULL;
 static volatile int nbytes_read = 0;
 
-static ring_buffer_t * volatile input_buffer = NULL;
+static ring_buffer_t *volatile input_buffer = NULL;
 static sos_stat_t *stat = NULL;
 
 /*
@@ -45,7 +45,7 @@ handler(struct serial *serial, char c)
         nbytes_read++;
 
         if (c == '\n' || nbytes_read >= global_uio->uiov_len)
-            resume(syscall_coro, NULL);
+            resume((coro)(serial->routine), NULL);
 
     } else if (!ring_buffer_is_full(input_buffer)) {
         /* Otherwise we buffer it */
@@ -104,14 +104,14 @@ int
 sos_serial_write(vnode *node, uiovec *iov)
 {
     struct serial *port = node->vn_data;
-    return serial_send(port, iov->uiov_base, iov->uiov_len);
+    return serial_send(port, (char *)iov->uiov_base, (int)iov->uiov_len);
 }
 
 int
 sos_serial_read(vnode *node, uiovec *iov)
 {
     char *user_buf = iov->uiov_base;
-    int bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->uiov_len);
+    seL4_Word bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->uiov_len);
 
     /* Read from the buffer if there are stored bytes */
     for (int i = 0; i < bytes_read; ++i) {
@@ -128,7 +128,8 @@ sos_serial_read(vnode *node, uiovec *iov)
     /* Need to read more, this is blocking */
     nbytes_read = bytes_read;
     global_uio = iov;
-
+    
+    ((struct serial *)(node->vn_data))->routine = (void *)coro_getcur();   
     yield(NULL); /* Yield back to event_loop, will be resumed when there is data */
 
     global_uio = NULL;

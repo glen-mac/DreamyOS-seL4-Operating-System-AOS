@@ -6,12 +6,13 @@
  */
 
 #include "sos_nfs.h"
+#include "event.h"
 
 #include <string.h>
 
 #include <network.h>
 
-#include "picoro.h"
+#include <coro/picoro.h>
 #include <syscall/syscall.h>
 
 
@@ -48,6 +49,12 @@ static char ** volatile global_dir = NULL;
 static volatile size_t global_size = 0;
 static volatile nfscookie_t global_cookie = 0;
 
+/* nfs operation struct to pass as the token (used only for read) */
+typedef struct {
+    coro routine;
+    uiovec * iv;
+} nfs_cb;
+
 int
 sos_nfs_init(void)
 {
@@ -64,7 +71,10 @@ sos_nfs_init(void)
     }
 
     nfs_mount->vn_ops = &nfs_dir_ops;
-    vfs_mount(nfs_mount);
+    if (vfs_mount(nfs_mount) != 0) {
+        LOG_ERROR("Error mounting nfs to vfs");
+        return 1;
+    }
 
     return 0;
 }
@@ -73,7 +83,7 @@ int
 sos_nfs_lookup(char *name, int create_file, vnode **result)
 {
     vnode *vn;
-    nfs_lookup(&mnt_point, name, sos_nfs_lookup_callback, (uintptr_t)NULL);
+    nfs_lookup(&mnt_point, name, sos_nfs_lookup_callback, (uintptr_t)coro_getcur());
     vn = yield(NULL);
 
     if (!vn) {
@@ -83,7 +93,7 @@ sos_nfs_lookup(char *name, int create_file, vnode **result)
                 .mode = 0664, /* Read write for owner and group, read for everyone */
                 // TODO: creation time and stuff
             };
-            nfs_create(&mnt_point, name, &file_attr, sos_nfs_lookup_callback, (uintptr_t)NULL);
+            nfs_create(&mnt_point, name, &file_attr, sos_nfs_lookup_callback, (uintptr_t)coro_getcur());
             vn = yield(NULL);
         } else {
             LOG_ERROR("lookup for %s failed", name);
@@ -105,7 +115,7 @@ sos_nfs_list(char ***list, size_t *nfiles)
         return 1;
 
     do {
-        if (nfs_readdir(&mnt_point, global_cookie, sos_nfs_readdir_callback, (uintptr_t)NULL) != RPC_OK)
+        if (nfs_readdir(&mnt_point, global_cookie, sos_nfs_readdir_callback, (uintptr_t)coro_getcur()) != RPC_OK)
             return 1;
 
         int *ret_val = yield(NULL);
@@ -131,27 +141,58 @@ sos_nfs_list(char ***list, size_t *nfiles)
 int
 sos_nfs_write(vnode *node, uiovec *iov)
 {
-    if (nfs_write(node->vn_data, iov->uiov_pos, iov->uiov_len, iov->uiov_base, sos_nfs_write_callback, (uintptr_t)NULL) != RPC_OK)
-        return -1;
+    int *ret;
+    seL4_Word total = iov->uiov_len;
 
-    int *ret = yield(NULL);
-    return *ret;
+    /* Loop to make sure entire page is written, as nfs could break it up into small packets */
+    while (iov->uiov_len > 0) {
+        if (nfs_write(node->vn_data, iov->uiov_pos, iov->uiov_len, iov->uiov_base, sos_nfs_write_callback, (uintptr_t)coro_getcur()) != RPC_OK)
+            return -1;
+
+        ret = yield(NULL);
+        if (*ret == 0 || *ret == -1)
+            break;
+
+        iov->uiov_len -= *ret;
+        iov->uiov_base += *ret;
+        iov->uiov_pos += *ret;
+    }
+
+    return total - iov->uiov_len;
 }
 
 int
 sos_nfs_read(vnode *node, uiovec *iov)
 {
-    if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)iov) != RPC_OK)
-        return -1;
+    nfs_cb *cb = (nfs_cb *)malloc(sizeof(nfs_cb));
+    cb->routine = coro_getcur();
+    cb->iv = iov;
 
-    int *ret = yield(NULL);
-    return *ret;
+    int *ret;
+    seL4_Word total = iov->uiov_len;
+
+    /* Loop to make sure entire page is written, as nfs could break it up into small packets */
+    while (iov->uiov_len > 0) {
+        if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)cb) != RPC_OK)
+            return -1;
+
+        ret = yield(NULL);
+        if (*ret == 0 || *ret == -1)
+            break;
+
+        iov->uiov_len -= *ret;
+        iov->uiov_base += *ret;
+        iov->uiov_pos += *ret;
+    }
+
+    free(cb);
+    return total - iov->uiov_len;
 }
 
 int
 sos_nfs_stat(vnode *node, sos_stat_t **stat)
 {
-    if (nfs_getattr(node->vn_data, sos_nfs_getattr_callback, (uintptr_t)NULL) != RPC_OK)
+    if (nfs_getattr(node->vn_data, sos_nfs_getattr_callback, (uintptr_t)coro_getcur()) != RPC_OK)
         return -1;
 
     if ((*stat = yield(NULL)) == NULL)
@@ -189,12 +230,17 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
         goto coro_resume;
     }
 
-    vn->vn_data = malloc(sizeof(fhandle_t));
+    if((vn->vn_data = malloc(sizeof(fhandle_t))) == NULL) {
+        LOG_ERROR("malloc failed when creating vn_data");
+        free(vn);
+        goto coro_resume;
+    }
+
     memcpy(vn->vn_data, fh, sizeof(fhandle_t));
     vn->vn_ops = &nfs_vnode_ops;
 
     coro_resume:
-        resume(syscall_coro, vn);
+        resume((coro)token, vn);
 }
 
 /*
@@ -221,7 +267,7 @@ sos_nfs_readdir_callback(uintptr_t token, enum nfs_stat status, int num_files, c
 
     ret_val = 0;
     coro_resume:
-        resume(syscall_coro, &ret_val);
+        resume((coro)token, &ret_val);
 }
 
 
@@ -240,7 +286,7 @@ sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, in
 
     ret_val = count;
     coro_resume:
-        resume(syscall_coro, &ret_val);
+        resume((coro)token, &ret_val);
 }
 
 /*
@@ -251,17 +297,22 @@ static void
 sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data)
 {
     int ret_val = -1;
+
+    /* Unwrap the callback data */
+    nfs_cb *call_data = (nfs_cb *)token;
+    assert(call_data != NULL);
+
     if (status != NFS_OK) {
         LOG_ERROR("read error status: %d", status);
         goto coro_resume;
     }
-
-    struct iovec *iov = (struct iovec *)token;
+    
+    struct iovec *iov = (struct iovec *)call_data->iv;
     memcpy(iov->iov_base, data, count);
     ret_val = count;
 
     coro_resume:
-        resume(syscall_coro, &ret_val);
+        resume(call_data->routine, &ret_val);
 }
 
 
@@ -293,7 +344,7 @@ sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr)
     stat->st_atime = (long)(fattr->atime.seconds*1000 + fattr->atime.useconds / 1000);
 
     coro_resume:
-        resume(syscall_coro, stat);
+        resume((coro)token, stat);
 }
 
 /*

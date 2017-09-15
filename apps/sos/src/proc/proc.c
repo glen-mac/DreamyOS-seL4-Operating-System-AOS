@@ -55,6 +55,8 @@ start_first_process(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     assert(tty_test_process->croot != NULL);
 
     /* Create an IPC buffer */
+
+    // TODO: make this a frame and pin it.
     tty_test_process->ipc_buffer_addr = ut_alloc(seL4_PageBits);
     conditional_panic(!tty_test_process->ipc_buffer_addr, "No memory for ipc buffer");
     err =  cspace_ut_retype_addr(tty_test_process->ipc_buffer_addr,

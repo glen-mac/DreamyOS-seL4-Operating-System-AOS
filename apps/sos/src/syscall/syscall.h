@@ -7,10 +7,8 @@
 #ifndef _SYSCALL_H_
 #define _SYSCALL_H_
 
-#include "picoro.h"
+#include <coro/picoro.h>
 #include <sel4/sel4.h>
-
-extern coro syscall_coro;
 
 /*
  * Process a System Call

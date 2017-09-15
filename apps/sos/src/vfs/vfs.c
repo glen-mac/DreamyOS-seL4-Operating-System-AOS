@@ -35,13 +35,16 @@ vfs_init(void)
      */
     vnode *device_mount = malloc(sizeof(vnode));
     if (!device_mount) {
-        LOG_ERROR("malloc failed when creating device namespace");
+        LOG_ERROR("Malloc failed when creating device namespace");
         return 1;
     }
 
     device_mount->vn_data = NULL;
     device_mount->vn_ops = &device_vnode_ops;
-    vfs_mount(device_mount);
+    if (vfs_mount(device_mount) != 0) {
+        LOG_ERROR("Error mounting device namespace");
+        return 1;
+    }
    
     return 0;
 }

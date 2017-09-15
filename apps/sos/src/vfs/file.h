@@ -1,5 +1,7 @@
 /*
  * Declarations for file handle and file table management.
+ *
+ * Cameron Lonsdale & Glenn McGuire
  */
 
 #ifndef _FILE_H_
@@ -7,12 +9,9 @@
 
 #include <sel4/sel4.h>
 #include <sel4/types.h>
-
 #include <sos.h>
-
 #include "vfs.h"
 
-/* File structure stored in global open file table */
 typedef struct {
     off_t fp;
     vnode *vn;
@@ -23,7 +22,7 @@ typedef struct {
  * The per-process file descriptor table (FDT).
  */
 typedef struct {
-    file *table[PROCESS_MAX_FILES];
+    file *table[PROCESS_MAX_FILES]; // TODO: We take this from SOS.h, im not sure that is a good idea
 } fdtable;
 
 
