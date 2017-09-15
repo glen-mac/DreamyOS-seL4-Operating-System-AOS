@@ -1,0 +1,2 @@
+apps-$(CONFIG_APP_NEWAPP) += newapp
+newapp: $(libc) libsel4 libsos

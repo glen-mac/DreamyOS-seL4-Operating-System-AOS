@@ -36,6 +36,7 @@ menu "seL4 Libraries"
 endmenu
 
 menu "seL4 Applications"
+    source "apps/newapp/Kconfig"
     source "apps/sos/Kconfig"
     source "apps/sosh/Kconfig"
     source "apps/tty_test/Kconfig"
