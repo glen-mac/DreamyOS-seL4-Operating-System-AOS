@@ -12,6 +12,7 @@
 #include "sys_time.h"
 #include "sys_file.h"
 #include "sys_vm.h"
+#include "sys_proc.h"
 
 /* Currently dependent on syscall numbers ordering, might change this */
 static seL4_Word (*syscall_table[])(void) = {
@@ -31,6 +32,11 @@ static seL4_Word (*syscall_table[])(void) = {
     syscall_time_stamp,
     syscall_stat,
     syscall_listdir,
+    syscall_proc_create,
+    syscall_proc_delete,
+    syscall_proc_id,
+    syscall_proc_status,
+    syscall_proc_wait,
 };
 
 void
