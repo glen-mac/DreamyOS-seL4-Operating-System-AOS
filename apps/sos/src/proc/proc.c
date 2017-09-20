@@ -14,6 +14,7 @@
 #include <string.h>
 #include <utils/page.h>
 #include <utils/util.h>
+#include <clock/clock.h>
 
 #include <assert.h>
 #include <ut_manager/ut.h>
@@ -64,7 +65,6 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
         curr_pid = last_pid;
         return -1;
     }
-
 
     LOG_INFO("new_pid is %d", new_pid);
 
@@ -135,6 +135,9 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
 
     /* ------------------------------ START PROC --------------------------- */
 
+    /* set the start time */
+    new_proc->stime = time_stamp();
+
     /* Start the new process */
     seL4_UserContext context;
     memset(&context, 0, sizeof(context));
@@ -143,6 +146,10 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
 
     seL4_TCB_WriteRegisters(new_proc->tcb_cap, 1, 0, 2, &context);
     
+    /* copy the name and null terminate */
+    memcpy(new_proc->proc_name, app_name, N_NAME);
+    new_proc->proc_name[31] = NULL;
+
     LOG_INFO("new_pid is %d", new_pid);
 
     return new_pid;
