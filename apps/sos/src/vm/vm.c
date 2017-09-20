@@ -10,6 +10,7 @@
 #include "frametable.h"
 #include "mapping.h"
 #include <proc/proc.h>
+#include <syscall/sys_proc.h>
 
 #include <utils/arith.h>
 #include <utils/util.h>
@@ -114,7 +115,8 @@ vm_fault(seL4_Word pid)
         return;
 
     fault_error:
-        panic("TODO: Kill the process");
+        // TODO SEGFAULT MESSAGE
+        syscall_exit(curproc);
 }
 
 page_directory *
@@ -153,6 +155,52 @@ page_directory_create(void)
     top_level->kernel_page_table_caps = (seL4_CPtr *)kernel_cap_table_vaddr;
 
     return top_level;
+}
+
+int
+page_directory_destroy(page_directory *dir)
+{
+    if (!dir) {
+        LOG_ERROR("Directory is null");
+        return 1;
+    }
+
+    if (!dir->kernel_page_table_caps) {
+        LOG_ERROR("kernel page table is null");
+        return 1;
+    }
+
+    if (!dir->directory) {
+        LOG_ERROR("Directory is null");
+        return 1;
+    }
+
+    /* Destroy kernel page table caps */
+    seL4_Word nframes = BIT(seL4_PageDirBits - seL4_PageBits);
+    for (size_t i = 0; i < (PAGE_SIZE_4K * nframes) / sizeof(seL4_CPtr); ++i) {
+        LOG_INFO("%d cap is %d", i, dir->kernel_page_table_caps[i]);
+        if (dir->kernel_page_table_caps[i] && (seL4_ARM_PageTable_Unmap(dir->kernel_page_table_caps[i]) != 0)) {
+            LOG_ERROR("PageTable Unmap failed");
+            return 1;
+        }
+    }
+
+    /* Since frames are contigous, we can get the start id and then increment */
+    for (seL4_Word id = frame_table_sos_vaddr_to_index(&(dir->kernel_page_table_caps)); id < nframes; ++id)
+        frame_free(id);
+
+    /* Free the directory */
+
+    /* Free all second levels in the page table */
+    for (seL4_Word second_level = 0; second_level < PAGE_SIZE_4K / sizeof(seL4_Word); ++second_level) {
+        if (dir->directory[second_level])
+            frame_free(frame_table_sos_vaddr_to_index(dir->directory[second_level]));
+    }
+    /* Free the top level */
+    frame_free(frame_table_sos_vaddr_to_index(dir->directory));
+
+    free(dir);
+    return 0;
 }
 
 int 

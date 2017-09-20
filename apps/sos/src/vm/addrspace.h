@@ -43,6 +43,13 @@ typedef struct {
 addrspace *as_create(void);
 
 /*
+ * Destroy an address space
+ * @param as, the addrspace to destroy
+ * @returns 0 on success else 1
+ */
+int as_destroy(addrspace *as);
+
+/*
  * Create a region
  * @param start, the starting virtual address of the region
  * @param size, the size of the region
@@ -50,6 +57,13 @@ addrspace *as_create(void);
  * @returns region pointer, or NULL on error
  */
 region *as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions);
+
+/*
+ * Destroy a region
+ * @param reg, the region to destroy
+ * @returns 0 on success else 1
+ */
+int as_destroy_region(region *reg);
 
 /*
  * Add a region to an address space
