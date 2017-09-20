@@ -80,7 +80,7 @@ init_pager(void)
 }
 
 int
-page_in(seL4_Word page_id, seL4_Word access_type, proc * curproc)
+page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
 {
     LOG_INFO("paging in %p", page_id);
 
@@ -97,7 +97,7 @@ page_in(seL4_Word page_id, seL4_Word access_type, proc * curproc)
 
     LOG_INFO("access type is %d", access_type);
 
-    if (vm_map(page_id, access_type, &sos_vaddr, curproc) != 0) {
+    if (vm_map(curproc, page_id, access_type, &sos_vaddr) != 0) {
         LOG_INFO("failed to map in a page");
         return 1;
     }
@@ -143,7 +143,7 @@ page_in(seL4_Word page_id, seL4_Word access_type, proc * curproc)
 }
 
 int
-page_out(seL4_Word *page_id)
+page_out(addrspace *as, seL4_Word *page_id)
 {
     if (list_is_empty(pagefile_free_pages)) {
         LOG_ERROR("No more space in the pagefile");
@@ -159,7 +159,7 @@ page_out(seL4_Word *page_id)
     LOG_INFO("victim frame is %d", frame_id);
 
     /* Evict the frame from memory and push it to the disk */
-    if (evict_frame(frame_id) == -1) {
+    if (evict_frame(as, frame_id) == -1) {
         LOG_ERROR("Evicting frame failed");
         return -1;
     }
@@ -227,7 +227,7 @@ next_victim(void)
 }
 
 int
-evict_frame(seL4_Word frame_id)
+evict_frame(addrspace *as, seL4_Word frame_id)
 {
     /* cap variable to use for unmapping */
     seL4_CPtr pt_cap; 
@@ -250,7 +250,7 @@ evict_frame(seL4_Word frame_id)
 
     LOG_INFO("Free page in file at %d", pagefile_id);
 
-    assert(page_directory_evict(curproc->p_addrspace->directory, page_id, pagefile_id) == 0);
+    assert(page_directory_evict(as->directory, page_id, pagefile_id) == 0);
 
     LOG_INFO("page entry evicted");
 

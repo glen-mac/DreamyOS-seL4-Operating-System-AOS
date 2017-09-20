@@ -16,28 +16,28 @@
 #include <vm/vm.h>
 #include <utils/util.h>
 
-static seL4_Word syscall_do_read_write(seL4_Word access_mode);
+static seL4_Word syscall_do_read_write(seL4_Word access_mode, proc *curproc);
 
 seL4_Word
-syscall_write(proc * curproc)
+syscall_write(proc *curproc)
 {
     return syscall_do_read_write(ACCESS_WRITE, curproc);
 }
 
 seL4_Word
-syscall_read(proc * curproc)
+syscall_read(proc *curproc)
 {
     return syscall_do_read_write(ACCESS_READ, curproc);
 }
 
 seL4_Word
-syscall_open(proc * curproc)
+syscall_open(proc *curproc)
 {
     LOG_INFO("syscall: thread made sos_open");
 
     // TODO: Hard copy the filename because it might cross a page boundary
 
-    seL4_Word name = vaddr_to_sos_vaddr(seL4_GetMR(1), ACCESS_READ, curproc);
+    seL4_Word name = vaddr_to_sos_vaddr(curproc, seL4_GetMR(1), ACCESS_READ);
     fmode_t mode = seL4_GetMR(2);
     LOG_INFO("sycall: thread made open(%s, %d)", (char *)name, mode);
 
@@ -64,7 +64,7 @@ syscall_open(proc * curproc)
 }
 
 seL4_Word
-syscall_close(proc * curproc)
+syscall_close(proc *curproc)
 {
     int fd = seL4_GetMR(1);
     LOG_INFO("thread made close(%d)", fd);
@@ -79,7 +79,7 @@ syscall_close(proc * curproc)
 }
 
 static seL4_Word
-syscall_do_read_write(seL4_Word access_mode, proc * curproc)
+syscall_do_read_write(seL4_Word access_mode, proc *curproc)
 {
     int result;
 
@@ -109,7 +109,7 @@ syscall_do_read_write(seL4_Word access_mode, proc * curproc)
     seL4_Word kvaddr;
 
     while (nbytes_remaining > 0) {
-        if (!(kvaddr = vaddr_to_sos_vaddr(buf, !access_mode, curproc))) {
+        if (!(kvaddr = vaddr_to_sos_vaddr(curproc, buf, !access_mode))) {
             LOG_ERROR("Address translation failed");
             result = -1;
             goto message_reply;
@@ -164,8 +164,8 @@ syscall_stat(proc * curproc)
     seL4_Word name = seL4_GetMR(1);
     seL4_Word stat_buf = seL4_GetMR(2);
     
-    seL4_Word kname = vaddr_to_sos_vaddr(name, ACCESS_READ, curproc); // TODO: Copy this in, it could cross page boundary, same for open() and others that use name
-    seL4_Word kbuf = vaddr_to_sos_vaddr(stat_buf, ACCESS_WRITE, curproc); // same
+    seL4_Word kname = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ); // TODO: Copy this in, it could cross page boundary, same for open() and others that use name
+    seL4_Word kbuf = vaddr_to_sos_vaddr(curproc, stat_buf, ACCESS_WRITE); // same
 
     sos_stat_t *kstat;
     if (vfs_stat((char *)kname, &kstat) != 0)
@@ -189,7 +189,7 @@ syscall_listdir(proc * curproc)
     int result = -1;
 
     seL4_Word pos = seL4_GetMR(1);
-    seL4_Word uname = vaddr_to_sos_vaddr(seL4_GetMR(2), ACCESS_WRITE, curproc);
+    seL4_Word uname = vaddr_to_sos_vaddr(curproc, seL4_GetMR(2), ACCESS_WRITE);
     seL4_Word nbytes = seL4_GetMR(3);
 
     char **dir;

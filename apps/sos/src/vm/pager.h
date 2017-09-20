@@ -8,6 +8,8 @@
 #define _PAGER_H_
 
 #include <sel4/sel4.h>
+#include "addrspace.h"
+#include <proc/proc.h>
 
 enum chance_type {
 	FIRST_CHANCE, /* One more chance */
@@ -27,14 +29,14 @@ int init_pager(void);
  * @param access_type, the type of access for this page (for permissions mapping)
  * @returns 1 on failure, else 0
  */
-int page_in(seL4_Word page_id, seL4_Word access_type);
+int page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type);
 
 /*
  * Try paging a frame out to disk to make room for a new frame
  * @param[out] vaddr, the sos vaddr of the frame
  * @returns -1 on failure, else the id of the frame
  */
-int page_out(seL4_Word *vaddr);
+int page_out(addrspace *as, seL4_Word *vaddr);
 
 /*
  * Find the next page to be evicted
@@ -47,6 +49,6 @@ int next_victim(void);
  * @param frame_id, the id of the frame
  * @returns 0 on success else -1
  */
-int evict_frame(seL4_Word frame_id);
+int evict_frame(addrspace *as, seL4_Word frame_id);
 
 #endif /* _PAGER_H_ */

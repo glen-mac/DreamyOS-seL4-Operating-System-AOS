@@ -12,14 +12,14 @@
 #define _LIBOS_ELF_H_
 
 #include <sel4/sel4.h>
-#include <vm/addrspace.h>
+#include <proc/proc.h>
 
 /*
  * Load an elf binary into an address space
- * @param as, the destination address space
+ * @param proc, the destination process
  * @param elf_file, name of the elf binary
  * @returns 0 on success, else error
  */
-int elf_load(addrspace *as, char *elf_file);
+int elf_load(proc *curproc, char *elf_file);
 
 #endif /* _LIBOS_ELF_H_ */

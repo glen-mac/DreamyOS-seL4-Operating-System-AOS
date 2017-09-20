@@ -3,13 +3,12 @@
  * 
  * Glenn McGuire & Cameron Lonsdale
  */
-
 #ifndef _ADDRSPACE_H_
 #define _ADDRSPACE_H_
 
 #include <sel4/sel4.h>
 
-#include "vm.h"
+typedef struct page_dir page_directory;
 
 /*
  * Region structure to specify regions in an address space

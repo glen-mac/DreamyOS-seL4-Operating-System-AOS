@@ -6,6 +6,7 @@
 
 #include "vm.h"
 
+#include "event.h"
 #include "frametable.h"
 #include "mapping.h"
 #include <proc/proc.h>
@@ -58,12 +59,15 @@
 #define PERMISSION_FAULT_PAGE 0b001111
 
 static seL4_Word get_fault_status(seL4_Word fault_cause);
-static int page_table_is_evicted(seL4_Word page_id);
+static int page_table_is_evicted(proc *curproc, seL4_Word page_id);
 
 void 
-vm_fault(void)
+vm_fault(seL4_Word pid)
 {
     seL4_MessageInfo_t reply;
+
+    LOG_INFO("vm_fault by process %d", pid);
+    proc *curproc = get_proc(pid);
 
     /* Ordering defined by seL4 */
     seL4_Word fault_pc = seL4_GetMR(0);
@@ -89,8 +93,8 @@ vm_fault(void)
     }
 
     /* If the page is marked as evicted, page it in */
-    if (page_table_is_evicted(fault_addr)) {
-        if (page_in(fault_addr, access_type) != 0) {
+    if (page_table_is_evicted(curproc, fault_addr)) {
+        if (page_in(curproc, fault_addr, access_type) != 0) {
             LOG_ERROR("failed to page in");
             goto fault_error;
         }
@@ -98,7 +102,7 @@ vm_fault(void)
     }
 
     seL4_Word kvaddr;
-    if (vm_map(PAGE_ALIGN_4K(fault_addr), access_type, &kvaddr) != 0) {
+    if (vm_map(curproc, PAGE_ALIGN_4K(fault_addr), access_type, &kvaddr) != 0) {
         LOG_ERROR("failed to map in a new page");
         goto fault_error;
     }
@@ -274,7 +278,7 @@ page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_id)
 }
 
 int
-vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr, proc *curproc)
+vm_translate(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
 {
     int err;
 
@@ -282,10 +286,10 @@ vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr, proc 
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
     seL4_ARM_Page page_cap;
 
-    if (page_table_is_evicted(page_id, curproc)) {
+    if (page_table_is_evicted(curproc, page_id)) {
         LOG_INFO("page is evicted");
         panic("this is happening");
-        if (page_in(page_id, access_type, curproc) != 0) {
+        if (page_in(curproc, page_id, access_type) != 0) {
             LOG_ERROR("failed to page_in");
             return 1;
         }
@@ -301,9 +305,8 @@ vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr, proc 
     return 0;
 }
 
-// TODO: I dont think we need this here, its only used sys_file so we can put it back there
 seL4_Word
-vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type, proc *curproc)
+vaddr_to_sos_vaddr(proc *curproc, seL4_Word vaddr, seL4_Word access_type)
 {
     seL4_Word offset = (vaddr & PAGE_MASK_4K);
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
@@ -314,12 +317,12 @@ vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type, proc *curproc)
      * If it failed, try to map in the addr
      * Then the translation should succeed
      */
-    if (vm_translate(vaddr, access_type, &sos_vaddr, curproc) != 0) {
-        if (vm_map(page_id, access_type, &sos_vaddr, curproc) != 0) {
+    if (vm_translate(curproc, vaddr, access_type, &sos_vaddr) != 0) {
+        if (vm_map(curproc, page_id, access_type, &sos_vaddr) != 0) {
             LOG_ERROR("Mapping failed");
             return (seL4_Word)NULL;
         }
-        assert(vm_translate(vaddr, access_type, &sos_vaddr) == 0);
+        assert(vm_translate(curproc, vaddr, access_type, &sos_vaddr) == 0);
     } else {
         /* Check address has permission for access type */
         addrspace *as = curproc->p_addrspace;
@@ -337,7 +340,7 @@ vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type, proc *curproc)
 }
 
 int
-vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr, proc * curproc)
+vm_map(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
 {
     addrspace *as = curproc->p_addrspace;
 
@@ -356,10 +359,12 @@ vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr, proc * curproc
         return 1;
     }
 
-    if (sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr, curproc) != 0) {
+    if (sos_map_page(curproc, PAGE_ALIGN_4K(vaddr), vaddr_region->permissions, kvaddr) != 0) {
         LOG_ERROR("sos_map_page failed");
         return 1;
     }
+
+    return 0;
 }
 
 /* The status of the fault is indicated by bits 12, 10 and 3:0 all strung together */
@@ -373,10 +378,9 @@ get_fault_status(seL4_Word fault_cause)
 }
 
 static int
-page_table_is_evicted(seL4_Word page_id, proc * curproc)
+page_table_is_evicted(proc *curproc, seL4_Word page_id)
 {
     seL4_CPtr cap;
-
     if (page_directory_lookup(curproc->p_addrspace->directory, PAGE_ALIGN_4K(page_id), &cap) != 0) {
         LOG_INFO("Page entry doesnt exist, cannot be evicted");
         return FALSE;

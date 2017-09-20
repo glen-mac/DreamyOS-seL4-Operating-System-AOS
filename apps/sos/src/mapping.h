@@ -14,6 +14,7 @@
 #include <sel4/sel4.h>
 #include <cspace/cspace.h>
 
+#include <proc/proc.h>
 #include <vm/addrspace.h>
 
 /*
@@ -48,6 +49,6 @@ void *map_device(void *paddr, int size);
  * @param permissions, the permissions of the page
  * @param[out] kvaddr, the sos virtual address to access the physical memory
  */
-int sos_map_page(seL4_Word vaddr, addrspace *as, unsigned long permissions, seL4_Word *kvaddr);
+int sos_map_page(proc *curproc, seL4_Word page_id, unsigned long permissions, seL4_Word *kvaddr);
 
 #endif /* _MAPPING_H_ */

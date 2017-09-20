@@ -17,11 +17,17 @@ seL4_Word
 syscall_proc_create(proc *curproc)
 {
     // TODO: Hard copy the filename because it might cross a page boundary
-    seL4_Word name = vaddr_to_sos_vaddr(seL4_GetMR(1), ACCESS_READ, curproc);
+    LOG_INFO("syscall proc_create");
+
+    seL4_Word name = vaddr_to_sos_vaddr(curproc, seL4_GetMR(1), ACCESS_READ);
+
+    LOG_INFO("name is %s", name);
 
     pid_t pid = proc_start(_cpio_archive, name, _sos_ipc_ep_cap);
     if (pid == -1)
         LOG_ERROR("Error starting process");
+
+    LOG_INFO("after proc_start");
 
     seL4_SetMR(0, (seL4_Word)pid);
     return 1; /* nwords in message */

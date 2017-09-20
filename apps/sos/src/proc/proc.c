@@ -6,6 +6,8 @@
 
 #include "proc.h"
 
+#include "event.h"
+
 #include <sel4/sel4.h>
 #include <stdlib.h>
 #include "mapping.h"
@@ -35,7 +37,6 @@
 
 /* Global process array */
 proc *sos_procs[MAX_PROCS];
-
 
 /* the last found pid */
 static seL4_Word curr_pid = 0;
@@ -84,18 +85,13 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     seL4_DebugNameThread(new_proc->tcb_cap, app_name);
 #endif
 
-    // if ((elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size) == NULL)) {
-    //     LOG_ERROR("Error reading file from _cpio_archive");
-    //     return -1;
-    // }
-
     if ((elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size)) == NULL) {
         LOG_ERROR("Unable to locate cpio header");
         return -1;
     }
 
     /* load the elf image */
-    if (elf_load(new_proc->p_addrspace, elf_base) != 0) {
+    if (elf_load(new_proc, elf_base) != 0) {
         LOG_ERROR("Error loading elf");
         return -1;
     }
@@ -194,7 +190,7 @@ proc_create(seL4_CPtr fault_ep, pid_t new_pid)
                                   cur_cspace,
                                   fault_ep,
                                   seL4_AllRights, 
-                                  seL4_CapData_Badge_new(SET_PROCID_BADGE(NEW_EP_BADGE, new_pid));
+                                  seL4_CapData_Badge_new(SET_PROCID_BADGE(NEW_EP_BADGE, new_pid)));
     /* should be the first slot in the space, hack I know */
     assert(user_ep_cap == 1);
 
@@ -209,7 +205,7 @@ proc_create(seL4_CPtr fault_ep, pid_t new_pid)
     conditional_panic(err, "Failed to create TCB");
 
     /* Configure the TCB */
-    err = seL4_TCB_Configure(new_proc->tcb_cap, user_ep_cap, NEW_PRIORITY,
+    err = seL4_TCB_Configure(new_proc->tcb_cap, user_ep_cap, NEW_EP_BADGE_PRIORITY,
                              new_proc->croot->root_cnode, seL4_NilData,
                              new_proc->p_addrspace->vspace, seL4_NilData, PROCESS_IPC_BUFFER,
                              new_proc->ipc_buffer_cap);

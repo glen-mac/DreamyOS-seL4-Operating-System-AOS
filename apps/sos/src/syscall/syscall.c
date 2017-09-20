@@ -6,6 +6,7 @@
 
 #include "syscall.h"
 #include <cspace/cspace.h>
+#include <unistd.h>
 #include <utils/util.h>
 
 /* include all sys_* wrappers */
@@ -16,7 +17,7 @@
 #include "event.h"
 
 /* Currently dependent on syscall numbers ordering, might change this */
-static seL4_Word (*syscall_table[])(void) = {
+static seL4_Word (*syscall_table[])(proc *) = {
     NULL,
     syscall_write,
     NULL,
@@ -41,10 +42,11 @@ static seL4_Word (*syscall_table[])(void) = {
 };
 
 void
-handle_syscall(seL4_Word badge)
+handle_syscall(seL4_Word pid)
 {
     seL4_Word syscall_number = seL4_GetMR(0);
-    proc *curproc = get_proc(GET_PROCID_BADGE(badge));
+
+    proc *curproc = get_proc(pid);
 
     /* Save the caller */
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);

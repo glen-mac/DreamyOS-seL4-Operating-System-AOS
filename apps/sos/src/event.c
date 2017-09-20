@@ -35,9 +35,9 @@ event_loop(const seL4_CPtr ep)
                 timer_interrupt();
 
         } else if (label == seL4_VMFault) {
-            resume(coroutine(vm_fault), NULL);
+            resume(coroutine(vm_fault), GET_PROCID_BADGE(badge));
         } else if (label == seL4_NoFault) {
-            resume(coroutine(handle_syscall), badge);
+            resume(coroutine(handle_syscall), GET_PROCID_BADGE(badge));
         } else {
             LOG_INFO("Rootserver got an unknown message");
         }

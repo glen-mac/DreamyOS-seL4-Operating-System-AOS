@@ -3,12 +3,14 @@
  *
  * Cameron Lonsdale & Glenn McGuire
  */
-
 #ifndef _VM_H_
 #define _VM_H_
 
 #include <sel4/sel4.h>
 #include <limits.h>
+
+#include "addrspace.h"
+#include <proc/proc.h>
 
 #define ACCESS_READ 0
 #define ACCESS_WRITE 1
@@ -16,8 +18,10 @@
 #define MAX_CAP_ID BIT((sizeof(seL4_CPtr) * CHAR_BIT) - 1) // 2^31
 #define EVICTED_BIT MAX_CAP_ID
 
+typedef struct _proc proc;
+
 /* Struct for the top level of the page table */
-typedef struct {
+typedef struct page_dir {
     seL4_Word *directory; /* Virtual address to the top level page directory */
     seL4_CPtr *kernel_page_table_caps; /* Virtual address to an array of in-kernel page table caps */
 } page_directory;
@@ -34,8 +38,9 @@ typedef struct {
 
 /* 
  * Handle a vm fault.
+ * @param pid, pid of the calling process
  */ 
-void vm_fault(void);
+void vm_fault(seL4_Word pid);
 
 /*
  * Create a page directory
@@ -78,7 +83,7 @@ int page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_
  * @param[out] sos_vaddr, the vaddr for the frame so sos can access it
  * @returns 0 on success else 1
  */
-int vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr);
+int vm_translate(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr);
 
 /*
  * Translate a process virtual address to the sos vaddr of the frame.
@@ -87,7 +92,7 @@ int vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr);
  * @param access_type, the type of access to the memory, for permissions checking
  * @returns sos virtual address
  */
-seL4_Word vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type);
+seL4_Word vaddr_to_sos_vaddr(proc *curproc, seL4_Word vaddr, seL4_Word access_type);
 
 /*
  * Given a vaddr, try to map in that page 
@@ -96,6 +101,6 @@ seL4_Word vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type);
  * @param kvaddr[out], the kvaddr of the frame
  * @returns 0 on success else 1
  */
-int vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr);
+int vm_map(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr);
 
 #endif /* _VM_H_ */

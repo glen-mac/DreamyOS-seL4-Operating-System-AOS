@@ -56,7 +56,7 @@ get_sel4_rights_from_elf(unsigned long permissions)
  * Inject data into the given vspace.
  */
 static int
-load_segment_into_vspace(addrspace *as,
+load_segment_into_vspace(proc *curproc,
                          char *src, unsigned long segment_size,
                          unsigned long file_size, unsigned long dst,
                          unsigned long permissions, int pin)
@@ -87,6 +87,8 @@ load_segment_into_vspace(addrspace *as,
     
     assert(file_size <= segment_size);
 
+    addrspace *as = curproc->p_addrspace;
+
     /* Add the region to the curproc region list */
     as_add_region(as, as_create_region(dst, segment_size, permissions));
     LOG_INFO("permissions is %d", permissions);
@@ -100,7 +102,7 @@ load_segment_into_vspace(addrspace *as,
     while (pos < segment_size) {
         seL4_Word vpage = PAGE_ALIGN_4K(dst);
 
-        err = sos_map_page(vpage, as, permissions, &kdst);
+        err = sos_map_page(curproc, vpage, permissions, &kdst);
         // TODO: Return error instead of panicing
         conditional_panic(err, "mapping elf segment failed failed");
 
@@ -125,7 +127,7 @@ load_segment_into_vspace(addrspace *as,
 }
 
 int
-elf_load(addrspace *as, char *elf_file)
+elf_load(proc *curproc, char *elf_file)
 {
     char *source_addr;
     unsigned long flags = 0;
@@ -157,7 +159,7 @@ elf_load(addrspace *as, char *elf_file)
         /* Copy into the address space */
         // TODO: Should probably return error here instead of panicing.
         LOG_INFO("Loading segment %08x-->%08x", (int)vaddr, (int)(vaddr + segment_size));
-        err = load_segment_into_vspace(as, source_addr, segment_size, file_size, vaddr,
+        err = load_segment_into_vspace(curproc, source_addr, segment_size, file_size, vaddr,
                                        get_sel4_rights_from_elf(flags), pin);
         conditional_panic(err != 0, "Elf loading failed!\n");
         pin = FALSE;
@@ -165,6 +167,9 @@ elf_load(addrspace *as, char *elf_file)
 
     /* Map in the heap region after all other regions were added */
     // TOOD: Might be able to move this into create_proc and just grab the info from the end of LL of regions
+
+    addrspace *as = curproc->p_addrspace;
+
     assert(vaddr != 0);
     seL4_Word heap_loc = PAGE_ALIGN_4K(vaddr + segment_size + PAGE_SIZE_4K);
     region *heap = as_create_region(heap_loc, 0, seL4_CanRead | seL4_CanWrite);
