@@ -44,12 +44,6 @@
 
 #define TTY_NAME CONFIG_SOS_STARTUP_APP
 
-/*
- * The linker will link this symbol to the start address
- * of an archive of attached applications.
- */
-extern char _cpio_archive[];
-
 const seL4_BootInfo *_boot_info;
 
 /*

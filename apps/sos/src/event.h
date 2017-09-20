@@ -34,6 +34,12 @@ extern seL4_CPtr _sos_ipc_ep_cap;
 extern seL4_CPtr _sos_interrupt_ep_cap;
 
 /*
+ * The linker will link this symbol to the start address
+ * of an archive of attached applications.
+ */
+extern char _cpio_archive[];
+
+/*
  * Event handler loop
  * @param ep, the endpoint where messages come in
  */
