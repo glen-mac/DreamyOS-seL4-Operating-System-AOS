@@ -7,6 +7,7 @@
 #include "addrspace.h"
 
 #include "vm.h"
+#include "layout.h"
 
 #include <cspace/cspace.h>
 #include <sel4/sel4.h>
@@ -25,6 +26,8 @@ as_create(void)
     }
 
     as->region_list = NULL;
+    as->region_stack = NULL;
+    as->region_heap = NULL;
 
     /* Create a VSpace */
     if ((as->vspace_addr = ut_alloc(seL4_PageDirBits)) == (seL4_Word)NULL) {
@@ -130,4 +133,31 @@ as_region_permission_check(region *reg, seL4_Word access_type)
         return 1;
 
     return 0;
+}
+
+int
+as_define_stack(addrspace *as)
+{
+    if (!as) {
+        LOG_ERROR("as not defined");
+        return 1;
+    }
+
+    if (as->region_stack) {
+        LOG_ERROR("region_stack already defined");
+        return 1;
+    }
+
+    region *stack = as_create_region(
+        PROCESS_STACK_TOP - PAGE_SIZE_4K,
+        PAGE_SIZE_4K,
+        seL4_CanRead | seL4_CanWrite
+    );
+    if (stack == NULL) {
+        LOG_ERROR("as_create_region failed");
+        return 1;
+    }
+
+    as->region_stack = stack;
+    return as_add_region(as, stack);
 }

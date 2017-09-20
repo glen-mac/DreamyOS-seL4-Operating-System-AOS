@@ -48,7 +48,7 @@ addrspace *as_create(void);
  * @param start, the starting virtual address of the region
  * @param size, the size of the region
  * @param permissions, encoded permissions of the region
- * @returns 0 on success else 1
+ * @returns region pointer, or NULL on error
  */
 region *as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions);
 
@@ -85,5 +85,12 @@ int as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end);
  * @return 0 on success, else 1
  */ 
 int as_region_permission_check(region *reg, seL4_Word access_type);
+
+/*
+ * Define a stack region for an address space
+ * @param as, the address space to define the stack in
+ * @returns 0 on success, else 1
+ */
+int as_define_stack(addrspace *as);
 
 #endif /* _ADDRSPACE_H_ */

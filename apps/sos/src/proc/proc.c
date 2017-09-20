@@ -44,17 +44,29 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
 {
     int err;
     pid_t new_pid;
+    
+    /* These required for loading program sections */
+    char *elf_base;
+    unsigned long elf_size;
 
+    /* Create a process struct */
     proc *new_proc = proc_create(fault_ep);
-    
-    if (new_proc == NULL)
+    if (new_proc == NULL) {
+        LOG_ERROR("proc_create failed");
         return -1;
-    
-    err = proc_next_pid(&new_pid);   
-    if (err)
-        return -1;
+    }
 
-    /* store new proc */
+    /* Assign a PID to this proc */
+    if (proc_next_pid(&new_pid) != 0) {
+        LOG_ERROR("proc_next_pid failed");
+        return -1;
+    }
+
+    LOG_INFO("new_pid is %d", new_pid);
+
+    new_proc->pid = new_pid;
+
+    /* Store new proc */
     sos_procs[new_pid] = new_proc;
 
     /* Provide a logical name for the thread -- Helpful for debugging */
@@ -62,23 +74,28 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     seL4_DebugNameThread(new_proc->tcb_cap, app_name);
 #endif
 
-    /* ------------------------------- ELF LOADING ------------------------- */
+    // if ((elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size) == NULL)) {
+    //     LOG_ERROR("Error reading file from _cpio_archive");
+    //     return -1;
+    // }
 
-    /* parse the cpio image */
-    dprintf(1, "\nStarting \"%s\"...\n", app_name);
-    elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size);
-    conditional_panic(!elf_base, "Unable to locate cpio header");
+    if ((elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size)) == NULL) {
+        LOG_ERROR("Unable to locate cpio header");
+        return -1;
+    }
 
     /* load the elf image */
-    err = elf_load(new_proc->p_addrspace, elf_base);
-    conditional_panic(err, "Failed to load elf image");
+    if (elf_load(new_proc->p_addrspace, elf_base) != 0) {
+        LOG_ERROR("Error loading elf");
+        return -1;
+    }
 
-    /* ------------------------------- SECTION LOADING --------------------- */
+    if (as_define_stack(new_proc->p_addrspace) != 0) {
+        LOG_ERROR("Error defining stack");
+        return -1;
+    }
 
-    /* Create a stack frame */
-    region *stack = as_create_region(PROCESS_STACK_TOP - PAGE_SIZE_4K, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
-    as_add_region(new_proc->p_addrspace, stack);
-    new_proc->p_addrspace->region_stack = stack;
+    // we can use a frame for this..?
 
     /* Map in the IPC buffer for the thread */
     seL4_CPtr pt_cap;
@@ -114,12 +131,15 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     /* ------------------------------ START PROC --------------------------- */
 
     /* Start the new process */
+    seL4_UserContext context;
     memset(&context, 0, sizeof(context));
     context.pc = elf_getEntryPoint(elf_base);
     context.sp = PROCESS_STACK_TOP;
 
     seL4_TCB_WriteRegisters(new_proc->tcb_cap, 1, 0, 2, &context);
     
+    LOG_INFO("new_pid is %d", new_pid);
+
     return new_pid;
 }
 
@@ -132,7 +152,7 @@ proc_create(seL4_CPtr fault_ep)
 
     /* create new proces */
     proc *new_proc = malloc(sizeof(proc));
-    if (new_proc == -1)
+    if (!new_proc)
         return NULL;
 
     /* create new addr space */
@@ -209,7 +229,7 @@ proc_next_pid(pid_t *new_pid) {
     /* else return the free pid */
     return_pid:
         *new_pid = curr_pid;
-        curr_pid = (cur_pid + 1) % MAX_PROCS;
+        curr_pid = (curr_pid + 1) % MAX_PROCS;
         return 0;
 }
 
