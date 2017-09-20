@@ -57,7 +57,8 @@ handle_syscall(seL4_Word pid)
     if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) &&
         syscall_table[syscall_number]) {
         seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, syscall_table[syscall_number](curproc));
-        seL4_Send(reply_cap, reply);
+        if (syscall_number != SOS_SYS_EXIT)
+            seL4_Send(reply_cap, reply);
     } else {
         LOG_INFO("Unknown syscall %d", syscall_number);
     }

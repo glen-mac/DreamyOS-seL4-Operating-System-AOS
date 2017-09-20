@@ -16,10 +16,7 @@
 
 /* Process Struct */
 typedef struct _proc {
-    seL4_Word tcb_addr;
-    seL4_TCB tcb_cap;
-
-    seL4_Word ipc_buffer_addr;  
+    seL4_TCB tcb_cap; 
     seL4_CPtr ipc_buffer_cap;
 
     cspace_t *croot;

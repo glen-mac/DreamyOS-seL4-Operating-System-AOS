@@ -61,6 +61,7 @@ seL4_Word
 syscall_exit(proc *curproc)
 {
     LOG_INFO("proc %d called exit", curproc->pid);
-    LOG_INFO("tcp_cap %d", curproc->tcb_cap);
-    return seL4_TCB_Suspend(curproc->tcb_cap);
+    assert(seL4_TCB_Suspend(curproc->tcb_cap) == 0);
+    LOG_INFO("after");
+    return 0;
 }
