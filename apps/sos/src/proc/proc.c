@@ -189,7 +189,7 @@ proc_create(seL4_CPtr fault_ep)
 }
 
 static int
-proc_next_pid(seL4_Word *new_pid) {
+proc_next_pid(pid_t *new_pid) {
     seL4_Word start_pid = curr_pid;
     
     /* early return on next pid was free */
