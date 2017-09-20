@@ -69,8 +69,8 @@ frame_table_init(seL4_Word paddr, seL4_Word size_in_bits, seL4_Word low, seL4_Wo
      *
      * We set aside 80% of the memory for user application frames, and 20% of UT for SOS.
      */
-    frame_table_max = 1400; //BYTES_TO_4K_PAGES(ut_top - ut_base) * FT_PORTION;
-    //LOG_INFO("frame_table_max is %d", frame_table_max);
+    frame_table_max = BYTES_TO_4K_PAGES(ut_top - ut_base) * FT_PORTION;
+    LOG_INFO("frame_table_max is %d", frame_table_max);
 
     seL4_ARM_Page frame_cap;
     seL4_Word vaddr = PHYSICAL_VSTART + paddr;
@@ -129,8 +129,9 @@ frame_alloc(seL4_Word *vaddr)
 
     frame_alloc_page:
         LOG_INFO("frame_alloc failed, trying to page");
-        if ((p_id = page_out(vaddr)) != -1)
-            return p_id;
+        return -1; /* TODO TURN PAGING BACK ON AFTER PROC WORKS */
+        // if ((p_id = page_out(vaddr)) != -1)
+        //     return p_id;
 
     /* On error, set the vaddr to null and return -1 */
     frame_alloc_error:
