@@ -10,6 +10,7 @@
 #include "frametable.h"
 #include "mapping.h"
 #include <proc/proc.h>
+#include <syscall/sys_proc.h>
 
 #include <utils/arith.h>
 #include <utils/util.h>
@@ -114,7 +115,8 @@ vm_fault(seL4_Word pid)
         return;
 
     fault_error:
-        panic("TODO: Kill the process");
+        // TODO SEGFAULT MESSAGE
+        syscall_exit(curproc);
 }
 
 page_directory *
