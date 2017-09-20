@@ -59,8 +59,12 @@
 #define PERMISSION_FAULT_SECTION 0b001101
 #define PERMISSION_FAULT_PAGE 0b001111
 
+#define IS_EVICTED(x) (x & EVICTED_BIT)
+
 static seL4_Word get_fault_status(seL4_Word fault_cause);
 static int page_table_is_evicted(proc *curproc, seL4_Word page_id);
+static int page_table_destroy(page_table_entry *table);
+static int page_destroy(seL4_CPtr page_cap);
 
 void 
 vm_fault(seL4_Word pid)
@@ -175,10 +179,27 @@ page_directory_destroy(page_directory *dir)
         return 1;
     }
 
+    /* Free the directory */
+
+    /* Free all second levels in the page table */
+    for (seL4_Word second_level = 0; second_level < PAGE_SIZE_4K / sizeof(seL4_Word); ++second_level) {
+        if (!dir->directory[second_level])
+            continue;
+
+        if (page_table_destroy((struct page_table_entry *)dir->directory[second_level]) != 0) {
+            LOG_ERROR("Failed to destroy page table");
+            return 1;
+        }
+    }
+
+    /* Free the top level */
+    frame_free(frame_table_sos_vaddr_to_index(dir->directory));
+
+    /* Free the hardware page table caps */
+
     /* Destroy kernel page table caps */
     seL4_Word nframes = BIT(seL4_PageDirBits - seL4_PageBits);
     for (size_t i = 0; i < (PAGE_SIZE_4K * nframes) / sizeof(seL4_CPtr); ++i) {
-        LOG_INFO("%d cap is %d", i, dir->kernel_page_table_caps[i]);
         if (dir->kernel_page_table_caps[i] && (seL4_ARM_PageTable_Unmap(dir->kernel_page_table_caps[i]) != 0)) {
             LOG_ERROR("PageTable Unmap failed");
             return 1;
@@ -189,17 +210,57 @@ page_directory_destroy(page_directory *dir)
     for (seL4_Word id = frame_table_sos_vaddr_to_index(&(dir->kernel_page_table_caps)); id < nframes; ++id)
         frame_free(id);
 
-    /* Free the directory */
-
-    /* Free all second levels in the page table */
-    for (seL4_Word second_level = 0; second_level < PAGE_SIZE_4K / sizeof(seL4_Word); ++second_level) {
-        if (dir->directory[second_level])
-            frame_free(frame_table_sos_vaddr_to_index(dir->directory[second_level]));
-    }
-    /* Free the top level */
-    frame_free(frame_table_sos_vaddr_to_index(dir->directory));
-
     free(dir);
+    return 0;
+}
+
+/*
+ * Destroy a page table
+ * @returns 0 on success else 1
+ */
+static int
+page_table_destroy(page_table_entry *table)
+{
+    for (size_t i = 0; i < PAGE_SIZE_4K / sizeof(seL4_CPtr); ++i) {
+        if (table[i].page && (page_destroy(table[i].page) != 0)) {
+            LOG_ERROR("Failed to destroy page");
+            return 1;
+        }
+    }
+
+    /* Free the frame backing the page table */
+    frame_free(frame_table_sos_vaddr_to_index((seL4_Word)table));
+    return 0;
+}
+
+/*
+ * Destroy a page
+ * @returns 0 on success else 1
+ */
+static int
+page_destroy(seL4_CPtr page_cap)
+{
+    if (IS_EVICTED(page_cap)) {
+        panic("not implemented, how do I free an evicted page?");
+    }
+
+    if (seL4_ARM_Page_Unmap(page_cap) != 0) {
+        LOG_ERROR("Failed to unmap page");
+        return 1;
+    }
+
+    seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(page_cap);
+    seL4_Word paddr = paddr_obj.paddr;
+
+    if (cspace_delete_cap(cur_cspace, page_cap) != CSPACE_NOERROR) {
+        LOG_ERROR("Failed to delete cap for frame");
+        return 1;
+    }
+
+    /* Free the frame */
+    seL4_Word frame_id = frame_table_sos_vaddr_to_index(frame_table_paddr_to_sos_vaddr(paddr));
+    frame_free(frame_id);
+
     return 0;
 }
 
@@ -249,8 +310,9 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
 
         seL4_CPtr *cap_table = dir->kernel_page_table_caps;
         assert(!cap_table[index]);
-        cap_table[index] = cap;
+        cap_table[index] = kernel_cap;
         LOG_INFO("kernel cap inserted into %u", index);
+        LOG_INFO("Kernel cap is %d", kernel_cap);
     }
 
     return 0;
@@ -434,5 +496,5 @@ page_table_is_evicted(proc *curproc, seL4_Word page_id)
         return FALSE;
     }
 
-    return cap & EVICTED_BIT;
+    return IS_EVICTED(cap);
 }
