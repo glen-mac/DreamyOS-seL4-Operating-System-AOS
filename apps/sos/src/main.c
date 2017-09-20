@@ -257,7 +257,7 @@ main(void)
     sos_init(&_sos_ipc_ep_cap, &_sos_interrupt_ep_cap);
 
     /* Start the user application */
-    start_first_process(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap);
+    proc_start(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap);
     
     /* Unit tests */
     // test_m2();
