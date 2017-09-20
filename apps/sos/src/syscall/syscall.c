@@ -39,6 +39,7 @@ static seL4_Word (*syscall_table[])(proc *) = {
     syscall_proc_id,
     syscall_proc_status,
     syscall_proc_wait,
+    syscall_exit,
 };
 
 void

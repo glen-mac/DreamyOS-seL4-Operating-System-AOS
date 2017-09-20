@@ -44,14 +44,14 @@ sys_getpid(va_list ap) {
 long
 sys_exit(va_list ap)
 {
-    abort();
+    sos_sys_exit();
     return 0;
 }
 
 long
 sys_exit_group(va_list ap)
 {
-    abort();
+    // Not sure we need this?
     return 0;
 }
 

@@ -166,3 +166,9 @@ sos_sys_brk(seL4_Word newbrk)
     MAKE_SYSCALL(SOS_SYS_BRK, newbrk);
     return seL4_GetMR(1); /* could contain newbrk, or the original brk */
 }
+
+void
+sos_sys_exit(void)
+{
+    MAKE_SYSCALL(SOS_SYS_EXIT);
+}

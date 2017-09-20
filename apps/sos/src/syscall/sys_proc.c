@@ -56,3 +56,11 @@ syscall_proc_wait(proc *curproc)
 {
     panic("not implemented");
 }
+
+seL4_Word
+syscall_exit(proc *curproc)
+{
+    LOG_INFO("proc %d called exit", curproc->pid);
+    LOG_INFO("tcp_cap %d", curproc->tcb_cap);
+    return seL4_TCB_Suspend(curproc->tcb_cap);
+}

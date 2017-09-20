@@ -47,12 +47,13 @@ char *file_name = "test_file_name";
 int
 main(void)
 {
-    thread_block();
-    // printf(">>> tty_test program started <<<\n");
+    // thread_block();
+    printf(">>> tty_test program started <<<\n");
     // test_m3();
     // test_m4();
     // test_m7();
-    return 0;
+    exit(0);
+    printf("Should not print");    
 }
 
 static void

@@ -90,7 +90,6 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
         return -1;
     }
 
-    /* load the elf image */
     if (elf_load(new_proc, elf_base) != 0) {
         LOG_ERROR("Error loading elf");
         return -1;
@@ -101,14 +100,13 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
         return -1;
     }
 
-    // we can use a frame for this..?
-
     /* Map in the IPC buffer for the thread */
     seL4_CPtr pt_cap;
-    err = map_page(new_proc->ipc_buffer_cap, new_proc->p_addrspace->vspace,
-                   PROCESS_IPC_BUFFER,
-                   seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap);
-    conditional_panic(err, "Unable to map IPC buffer for user app");
+    if (map_page(new_proc->ipc_buffer_cap, new_proc->p_addrspace->vspace,
+        PROCESS_IPC_BUFFER, seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap) != 0) {
+        LOG_ERROR("Unable to map IPC buffer for user app");
+        return -1;
+    }
 
     /* create region for the ipc buffer */
     region *ipc_region = as_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
@@ -151,65 +149,67 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
 
 static proc *
 proc_create(seL4_CPtr fault_ep, pid_t new_pid)
-{ 
-    int err;
-
-    seL4_CPtr user_ep_cap;
-
-    /* create new proces */
+{
     proc *new_proc = malloc(sizeof(proc));
     if (!new_proc)
         return NULL;
 
-    /* create new addr space */
-    new_proc->p_addrspace = as_create();
-    assert(new_proc->p_addrspace != NULL);
+    if ((new_proc->p_addrspace = as_create()) == NULL) {
+        LOG_ERROR("as_create failed");
+        return NULL;
+    }
 
-    /* create file table */
-    new_proc->file_table = fdtable_create();
-    assert(new_proc->file_table != NULL);
+    if ((new_proc->file_table = fdtable_create()) == NULL) {
+        LOG_ERROR("fdtable_create failed");
+        return NULL;
+    }
 
     /* Create a simple 1 level CSpace */
-    new_proc->croot = cspace_create(1);
-    assert(new_proc->croot != NULL);
-
-    /* Create an IPC buffer */
-
-    // TODO: make this a frame and pin it.
-    new_proc->ipc_buffer_addr = ut_alloc(seL4_PageBits);
-    conditional_panic(!new_proc->ipc_buffer_addr, "No memory for ipc buffer");
-    err =  cspace_ut_retype_addr(new_proc->ipc_buffer_addr,
-                                 seL4_ARM_SmallPageObject,
-                                 seL4_PageBits,
-                                 cur_cspace,
-                                 &new_proc->ipc_buffer_cap);
-    conditional_panic(err, "Unable to allocate page for IPC buffer");
+    if ((new_proc->croot = cspace_create(1)) == NULL) {
+        LOG_ERROR("cspace_create failed");
+        return NULL;
+    }
+    
+    /* Create IPC buffer */
+    seL4_Word paddr = ut_alloc(seL4_PageBits);
+    if (paddr == NULL) {
+        LOG_ERROR("No memory for IPC buffer");
+        return NULL;
+    }
+    
+    if (cspace_ut_retype_addr(paddr, seL4_ARM_SmallPageObject, seL4_PageBits,
+                              cur_cspace, &new_proc->ipc_buffer_cap) != 0) {
+        LOG_ERROR("Unable to allocate page for IPC buffer");
+    }
 
     /* Copy the fault endpoint to the user app to enable IPC */
-    user_ep_cap = cspace_mint_cap(new_proc->croot,
-                                  cur_cspace,
-                                  fault_ep,
-                                  seL4_AllRights, 
-                                  seL4_CapData_Badge_new(SET_PROCID_BADGE(NEW_EP_BADGE, new_pid)));
-    /* should be the first slot in the space, hack I know */
+    seL4_CPtr user_ep_cap = cspace_mint_cap(
+        new_proc->croot, cur_cspace, fault_ep, seL4_AllRights,
+        seL4_CapData_Badge_new(SET_PROCID_BADGE(NEW_EP_BADGE, new_pid))
+    );
+    /* Should be the first slot in the space, hack I know */
     assert(user_ep_cap == 1);
 
     /* Create a new TCB object */
-    new_proc->tcb_addr = ut_alloc(seL4_TCBBits);
-    conditional_panic(!new_proc->tcb_addr, "No memory for new TCB");
-    err =  cspace_ut_retype_addr(new_proc->tcb_addr,
-                                 seL4_TCBObject,
-                                 seL4_TCBBits,
-                                 cur_cspace,
-                                 &new_proc->tcb_cap);
-    conditional_panic(err, "Failed to create TCB");
+    paddr = ut_alloc(seL4_TCBBits);
+    if (paddr == NULL) {
+        LOG_ERROR("No memory for TCB");
+        return NULL;
+    }
+    
+    if (cspace_ut_retype_addr(paddr, seL4_TCBObject, seL4_TCBBits, cur_cspace, &new_proc->tcb_cap) != 0) {
+        LOG_ERROR("Failed to create TCB");
+        return NULL;
+    }
 
     /* Configure the TCB */
-    err = seL4_TCB_Configure(new_proc->tcb_cap, user_ep_cap, NEW_EP_BADGE_PRIORITY,
+    if (seL4_TCB_Configure(new_proc->tcb_cap, user_ep_cap, NEW_EP_BADGE_PRIORITY,
                              new_proc->croot->root_cnode, seL4_NilData,
                              new_proc->p_addrspace->vspace, seL4_NilData, PROCESS_IPC_BUFFER,
-                             new_proc->ipc_buffer_cap);
-    conditional_panic(err, "Unable to configure new TCB");
+                             new_proc->ipc_buffer_cap)) {
+        LOG_ERROR("Unable to configure new TCB");
+        return NULL;
+    }
 
     return new_proc;
 }

@@ -46,4 +46,11 @@ seL4_Word syscall_proc_status(proc *curproc);
  */
 seL4_Word syscall_proc_wait(proc *curproc);
 
+/*
+ * Syscall to exit a process
+ * Called when a process calls exit()
+ * Process terminates after this call, but the process struct is still intact
+ */
+seL4_Word syscall_exit(proc *curproc);
+
 #endif /* _SYS_PRC_H_ */

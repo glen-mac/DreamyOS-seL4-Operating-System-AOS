@@ -31,7 +31,11 @@ typedef struct _proc {
 
 pid_t proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep);
 
-/* get ptr of proc struct given the pid */
+/* 
+ * Get proc structure given pid
+ * @param pid, the pid of the process
+ * @returns process struct pointer
+ */
 proc *get_proc(pid_t pid);
 
 #endif /* _PROC_H_ */

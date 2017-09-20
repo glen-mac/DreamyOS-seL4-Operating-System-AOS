@@ -11,6 +11,7 @@
 #include <sel4/sel4.h>
 #include <syscall_stubs_sel4.h>
 #include <stdlib.h>
+#include <sos.h>
 
 MUSLC_SYSCALL_TABLE;
 
