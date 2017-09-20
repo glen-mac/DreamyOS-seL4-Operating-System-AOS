@@ -33,10 +33,10 @@ typedef struct {
 } proc;
 
 /* Global process array */
-proc sos_procs[MAX_PROCS];
+proc * sos_procs[MAX_PROCS];
 
 /* Hacky first proc */
-#define tty_test_process (&sos_procs[0])
+#define tty_test_process (sos_procs[0])
 #define curproc (tty_test_process)
 
 void proc_start(char *_cpio_archive, char* app_name, seL4_CPtr fault_ep);
