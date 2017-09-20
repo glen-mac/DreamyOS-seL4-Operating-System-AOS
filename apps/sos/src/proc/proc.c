@@ -31,13 +31,12 @@
 #define TTY_EP_BADGE (101)
 
 /* create new proc */
-static proc * proc_create(seL4_CPtr fault_ep);
+static proc *proc_create(seL4_CPtr fault_ep);
 
-static proc *
-proc_create(seL4_CPtr fault_ep) { 
+int
+proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
+{
     int err;
-
-    seL4_CPtr user_ep_cap;
 
     /* These required for setting up the TCB */
     seL4_UserContext context;
@@ -46,8 +45,89 @@ proc_create(seL4_CPtr fault_ep) {
     char *elf_base;
     unsigned long elf_size;
 
+    proc *new_proc = proc_create(fault_ep);
+    if (new_proc == NULL)
+        return -1;
+
+    /* Provide a logical name for the thread -- Helpful for debugging */
+    #ifdef SEL4_DEBUG_KERNEL
+        seL4_DebugNameThread(new_proc->tcb_cap, app_name);
+    #endif
+
+    /* ------------------------------- ELF LOADING ------------------------- */
+
+    /* parse the cpio image */
+    dprintf(1, "\nStarting \"%s\"...\n", app_name);
+    elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size);
+    conditional_panic(!elf_base, "Unable to locate cpio header");
+
+    /* load the elf image */
+    err = elf_load(new_proc->p_addrspace, elf_base);
+    conditional_panic(err, "Failed to load elf image");
+
+    /* ------------------------------- SECTION LOADING --------------------- */
+
+    /* Create a stack frame */
+    region *stack = as_create_region(PROCESS_STACK_TOP - PAGE_SIZE_4K, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
+    as_add_region(new_proc->p_addrspace, stack);
+    new_proc->p_addrspace->region_stack = stack;
+
+    /* Map in the IPC buffer for the thread */
+    seL4_CPtr pt_cap;
+    err = map_page(new_proc->ipc_buffer_cap, new_proc->p_addrspace->vspace,
+                   PROCESS_IPC_BUFFER,
+                   seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap);
+    conditional_panic(err, "Unable to map IPC buffer for user app");
+
+    /* create region for the ipc buffer */
+    region *ipc_region = as_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
+    as_add_region(new_proc->p_addrspace, ipc_region);
+
+    /* -------------------------------- FD OPENINING ----------------------- */
+
+    /* Open stdin, stdout and stderr */
+    file *open_file;
+
+    /* STDIN */
+    err = file_open("console", O_RDONLY, &open_file);
+    conditional_panic(err, "Unable to open stdin");
+    fdtable_insert(new_proc->file_table, STDIN_FILENO, open_file);
+
+    /* STDOUT */
+    err = file_open("console", O_WRONLY, &open_file);
+    conditional_panic(err, "Unable to open stdout");
+    fdtable_insert(new_proc->file_table, STDOUT_FILENO, open_file);
+
+    /* STDERR */
+    err = file_open("console", O_WRONLY, &open_file);
+    conditional_panic(err, "Unable to open stderr");
+    fdtable_insert(new_proc->file_table, STDERR_FILENO, open_file);    
+
+    /* ------------------------------ START PROC --------------------------- */
+
+    /* Start the new process */
+    memset(&context, 0, sizeof(context));
+    context.pc = elf_getEntryPoint(elf_base);
+    context.sp = PROCESS_STACK_TOP;
+
+    seL4_TCB_WriteRegisters(new_proc->tcb_cap, 1, 0, 2, &context);
+
+    pid_t pid = 0;
+
+    return pid;
+}
+
+static proc *
+proc_create(seL4_CPtr fault_ep)
+{ 
+    int err;
+
+    seL4_CPtr user_ep_cap;
+
     /* create new proces */
-    new_proc = malloc(sizeof(proc));
+    proc *new_proc = malloc(sizeof(proc));
+    if (new_proc == -1)
+        return NULL;
 
     /* create new addr space */
     new_proc->p_addrspace = as_create();
@@ -99,74 +179,5 @@ proc_create(seL4_CPtr fault_ep) {
                              new_proc->ipc_buffer_cap);
     conditional_panic(err, "Unable to configure new TCB");
 
-
-}
-
-void
-proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
-{
-    proc * new_proc = proc_create(fault_ep);  
-
-    /* Provide a logical name for the thread -- Helpful for debugging */
-    #ifdef SEL4_DEBUG_KERNEL
-        seL4_DebugNameThread(new_proc->tcb_cap, app_name);
-    #endif
-
-    /* ------------------------------- ELF LOADING ------------------------- */
-
-    /* parse the cpio image */
-    dprintf(1, "\nStarting \"%s\"...\n", app_name);
-    elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size);
-    conditional_panic(!elf_base, "Unable to locate cpio header");
-
-    /* load the elf image */
-    err = elf_load(new_proc->p_addrspace, elf_base);
-    conditional_panic(err, "Failed to load elf image");
-
-    /* ------------------------------- SECTION LOADING --------------------- */
-
-    /* Create a stack frame */
-    region *stack = as_create_region(PROCESS_STACK_TOP - PAGE_SIZE_4K, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
-    as_add_region(curproc->p_addrspace, stack);
-    curproc->p_addrspace->region_stack = stack;
-
-    /* Map in the IPC buffer for the thread */
-    seL4_CPtr pt_cap;
-    err = map_page(new_proc->ipc_buffer_cap, new_process->p_addrspace->vspace,
-                   PROCESS_IPC_BUFFER,
-                   seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap);
-    conditional_panic(err, "Unable to map IPC buffer for user app");
-
-    /* create region for the ipc buffer */
-    region *ipc_region = as_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
-    as_add_region(curproc->p_addrspace, ipc_region);
-
-    /* -------------------------------- FD OPENINING ----------------------- */
-
-    /* Open stdin, stdout and stderr */
-    file *open_file;
-
-    /* STDIN */
-    err = file_open("console", O_RDONLY, &open_file);
-    conditional_panic(err, "Unable to open stdin");
-    fdtable_insert(new_proc->file_table, STDIN_FILENO, open_file);
-
-    /* STDOUT */
-    err = file_open("console", O_WRONLY, &open_file);
-    conditional_panic(err, "Unable to open stdout");
-    fdtable_insert(new_proc->file_table, STDOUT_FILENO, open_file);
-
-    /* STDERR */
-    err = file_open("console", O_WRONLY, &open_file);
-    conditional_panic(err, "Unable to open stderr");
-    fdtable_insert(new_proc->file_table, STDERR_FILENO, open_file);    
-
-    /* ------------------------------ START PROC --------------------------- */
-
-    /* Start the new process */
-    memset(&context, 0, sizeof(context));
-    context.pc = elf_getEntryPoint(elf_base);
-    context.sp = PROCESS_STACK_TOP;
-
-    seL4_TCB_WriteRegisters(new_proc->tcb_cap, 1, 0, 2, &context);
+    return new_proc;
 }
