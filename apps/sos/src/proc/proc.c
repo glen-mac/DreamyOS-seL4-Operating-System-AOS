@@ -65,6 +65,9 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
         return -1;
     }
 
+
+    LOG_INFO("new_pid is %d", new_pid);
+
     /* Create a process struct */
     proc *new_proc = proc_create(fault_ep, new_pid);
     if (new_proc == NULL) {
@@ -72,8 +75,6 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
         curr_pid = last_pid;
         return -1;
     }
-
-    LOG_INFO("new_pid is %d", new_pid);
 
     new_proc->pid = new_pid;
 
@@ -187,6 +188,7 @@ proc_create(seL4_CPtr fault_ep, pid_t new_pid)
         new_proc->croot, cur_cspace, fault_ep, seL4_AllRights,
         seL4_CapData_Badge_new(SET_PROCID_BADGE(NEW_EP_BADGE, new_pid))
     );
+
     /* Should be the first slot in the space, hack I know */
     assert(user_ep_cap == 1);
 
@@ -229,6 +231,7 @@ proc_next_pid(pid_t *new_pid) {
         if (sos_procs[curr_pid] == NULL)
             goto return_pid;
     } while (curr_pid != start_pid);
+
     /* if we got here, we reached start of loop and are out of pids */
     return 1;
 
