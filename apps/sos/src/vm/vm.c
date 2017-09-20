@@ -274,7 +274,7 @@ page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_id)
 }
 
 int
-vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
+vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr, proc *curproc)
 {
     int err;
 
@@ -282,10 +282,10 @@ vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
     seL4_ARM_Page page_cap;
 
-    if (page_table_is_evicted(page_id)) {
+    if (page_table_is_evicted(page_id, curproc)) {
         LOG_INFO("page is evicted");
         panic("this is happening");
-        if (page_in(page_id, access_type) != 0) {
+        if (page_in(page_id, access_type, curproc) != 0) {
             LOG_ERROR("failed to page_in");
             return 1;
         }
@@ -303,7 +303,7 @@ vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
 
 // TODO: I dont think we need this here, its only used sys_file so we can put it back there
 seL4_Word
-vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
+vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type, proc *curproc)
 {
     seL4_Word offset = (vaddr & PAGE_MASK_4K);
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
@@ -314,8 +314,8 @@ vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
      * If it failed, try to map in the addr
      * Then the translation should succeed
      */
-    if (vm_translate(vaddr, access_type, &sos_vaddr) != 0) {
-        if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
+    if (vm_translate(vaddr, access_type, &sos_vaddr, curproc) != 0) {
+        if (vm_map(page_id, access_type, &sos_vaddr, curproc) != 0) {
             LOG_ERROR("Mapping failed");
             return (seL4_Word)NULL;
         }
@@ -337,7 +337,7 @@ vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
 }
 
 int
-vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
+vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr, proc * curproc)
 {
     addrspace *as = curproc->p_addrspace;
 
@@ -356,7 +356,7 @@ vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
         return 1;
     }
 
-    if (sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) != 0) {
+    if (sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr, curproc) != 0) {
         LOG_ERROR("sos_map_page failed");
         return 1;
     }
@@ -373,7 +373,7 @@ get_fault_status(seL4_Word fault_cause)
 }
 
 static int
-page_table_is_evicted(seL4_Word page_id)
+page_table_is_evicted(seL4_Word page_id, proc * curproc)
 {
     seL4_CPtr cap;
 

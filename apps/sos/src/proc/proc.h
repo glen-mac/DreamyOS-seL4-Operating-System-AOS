@@ -14,8 +14,9 @@
 #include <vm/vm.h>
 #include <vfs/file.h>
 
-/* Maximum number of processes to support */
-#define MAX_PROCS 32
+/* Hacky first proc */
+// #define tty_test_process (sos_procs[0])
+// #define curproc (tty_test_process)
 
 /* Process Struct */
 typedef struct {
@@ -32,13 +33,10 @@ typedef struct {
     pid_t pid;
 } proc;
 
-/* Global process array */
-proc *sos_procs[MAX_PROCS];
-
-/* Hacky first proc */
-#define tty_test_process (sos_procs[0])
-#define curproc (tty_test_process)
-
+/* start a proc and return the pid */
 pid_t proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep);
+
+/* get ptr of proc struct given the pid */
+proc *get_proc(pid_t pid);
 
 #endif /* _PROC_H_ */

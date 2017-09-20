@@ -80,7 +80,7 @@ init_pager(void)
 }
 
 int
-page_in(seL4_Word page_id, seL4_Word access_type)
+page_in(seL4_Word page_id, seL4_Word access_type, proc * curproc)
 {
     LOG_INFO("paging in %p", page_id);
 
@@ -97,7 +97,7 @@ page_in(seL4_Word page_id, seL4_Word access_type)
 
     LOG_INFO("access type is %d", access_type);
 
-    if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
+    if (vm_map(page_id, access_type, &sos_vaddr, curproc) != 0) {
         LOG_INFO("failed to map in a page");
         return 1;
     }

@@ -44,7 +44,7 @@ void
 handle_syscall(seL4_Word badge)
 {
     seL4_Word syscall_number = seL4_GetMR(0);
-    pid_t cur_proc = GET_PROCID_BADGE(badge);
+    proc *curproc = get_proc(GET_PROCID_BADGE(badge));
 
     /* Save the caller */
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
@@ -53,7 +53,7 @@ handle_syscall(seL4_Word badge)
     /* If syscall number is valid and function pointer is not NULL */
     if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) &&
         syscall_table[syscall_number]) {
-        seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, syscall_table[syscall_number]());
+        seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, syscall_table[syscall_number](curproc));
         seL4_Send(reply_cap, reply);
     } else {
         LOG_INFO("Unknown syscall %d", syscall_number);

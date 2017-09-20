@@ -18,26 +18,22 @@
 static void callback_sys_usleep(uint32_t id, void *data);
 
 seL4_Word
-syscall_usleep(void)
+syscall_usleep(proc * curproc)
 {
     uint32_t ms_delay = seL4_GetMR(1);
  
     LOG_INFO("syscall: thread made sos_usleep(%d)", ms_delay);
 
-    LOG_INFO(">>> registering callback with usleep stack coro @ %p", coro_getcur());
     assert(register_timer(MILLISECONDS(ms_delay), callback_sys_usleep, (void *)coro_getcur()) != 0);
 
     /* Unblock the process when timer callback is called */ 
-    int *retval = (int *)yield(NULL);
-
-    LOG_INFO(">>> usleep coro returned to usleep!!!");
-    LOG_INFO(">>> usleep return value was: %d", *retval);
+    yield(NULL);
 
     return 0;
 }
 
 seL4_Word
-syscall_time_stamp(void)
+syscall_time_stamp(proc * curproc)
 {
     LOG_INFO("syscall: thread made sos_time_stamp()");
 
@@ -53,9 +49,5 @@ syscall_time_stamp(void)
 void
 callback_sys_usleep(uint32_t id, void *data)
 {
-    int * a =(int *)malloc(sizeof(int));
-    *a = 1337;
-    LOG_INFO(">>> usleep callback recv with cur_coro addr: @ %p\n", (coro)data);
-    //create_event_cb(*(coro *)data, 1, (void *)a);   
-    resume((coro)data, (void *)a);
+    resume((coro)data, NULL);
 }

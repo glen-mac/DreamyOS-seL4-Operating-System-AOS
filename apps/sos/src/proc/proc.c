@@ -30,6 +30,13 @@
 #define NEW_EP_BADGE_PRIORITY (0)
 #define NEW_EP_BADGE (101)
 
+/* Maximum number of processes to support */
+#define MAX_PROCS 32
+
+/* Global process array */
+proc *sos_procs[MAX_PROCS];
+
+
 /* the last found pid */
 static seL4_Word curr_pid = 0;
 
@@ -236,3 +243,10 @@ proc_next_pid(pid_t *new_pid) {
         return 0;
 }
 
+proc *get_proc(pid_t pid) {
+    if (!ISINRANGE(0, pid, MAX_PROCS)) {
+        LOG_ERROR("pid: %d out of bounds", pid);
+        return NULL;
+    }
+    return sos_procs[pid];
+}

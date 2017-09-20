@@ -14,10 +14,10 @@
 
 
 seL4_Word
-syscall_proc_create(void)
+syscall_proc_create(proc *curproc)
 {
     // TODO: Hard copy the filename because it might cross a page boundary
-    seL4_Word name = vaddr_to_sos_vaddr(seL4_GetMR(1), ACCESS_READ);
+    seL4_Word name = vaddr_to_sos_vaddr(seL4_GetMR(1), ACCESS_READ, curproc);
 
     pid_t pid = proc_start(_cpio_archive, name, _sos_ipc_ep_cap);
     if (pid == -1)
@@ -28,25 +28,25 @@ syscall_proc_create(void)
 }
 
 seL4_Word
-syscall_proc_delete(void)
+syscall_proc_delete(proc *curproc)
 {
     panic("not implemented");
 }
 
 seL4_Word
-syscall_proc_id(void)
+syscall_proc_id(proc *curproc)
 {
     panic("not implemented");
 }
 
 seL4_Word
-syscall_proc_status(void)
+syscall_proc_status(proc *curproc)
 {
     panic("not implemented");
 }
 
 seL4_Word
-syscall_proc_wait(void)
+syscall_proc_wait(proc *curproc)
 {
     panic("not implemented");
 }
