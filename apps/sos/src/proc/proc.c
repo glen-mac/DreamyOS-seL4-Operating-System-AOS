@@ -27,14 +27,14 @@
 #define verbose 5
 #include <sys/debug.h>
 
-#define TTY_PRIORITY (0)
-#define TTY_EP_BADGE (101)
+#define NEW_EP_BADGE_PRIORITY (0)
+#define NEW_EP_BADGE (101)
 
 /* the last found pid */
 static seL4_Word curr_pid = 0;
 
 /* create new proc */
-static proc *proc_create(seL4_CPtr fault_ep);
+static proc *proc_create(seL4_CPtr fault_ep, pid_t new_pid);
 
 /* gets/sets the next free pid */
 static int proc_next_pid(pid_t *new_pid);
@@ -44,21 +44,24 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
 {
     int err;
     pid_t new_pid;
+    pid_t last_pid = curr_pid;
     
     /* These required for loading program sections */
     char *elf_base;
     unsigned long elf_size;
 
-    /* Create a process struct */
-    proc *new_proc = proc_create(fault_ep);
-    if (new_proc == NULL) {
-        LOG_ERROR("proc_create failed");
-        return -1;
-    }
-
     /* Assign a PID to this proc */
     if (proc_next_pid(&new_pid) != 0) {
         LOG_ERROR("proc_next_pid failed");
+        curr_pid = last_pid;
+        return -1;
+    }
+
+    /* Create a process struct */
+    proc *new_proc = proc_create(fault_ep, new_pid);
+    if (new_proc == NULL) {
+        LOG_ERROR("proc_create failed");
+        curr_pid = last_pid;
         return -1;
     }
 
@@ -144,7 +147,7 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
 }
 
 static proc *
-proc_create(seL4_CPtr fault_ep)
+proc_create(seL4_CPtr fault_ep, pid_t new_pid)
 { 
     int err;
 
@@ -184,7 +187,7 @@ proc_create(seL4_CPtr fault_ep)
                                   cur_cspace,
                                   fault_ep,
                                   seL4_AllRights, 
-                                  seL4_CapData_Badge_new(TTY_EP_BADGE));
+                                  seL4_CapData_Badge_new(SET_PROCID_BADGE(NEW_EP_BADGE, new_pid));
     /* should be the first slot in the space, hack I know */
     assert(user_ep_cap == 1);
 
@@ -199,7 +202,7 @@ proc_create(seL4_CPtr fault_ep)
     conditional_panic(err, "Failed to create TCB");
 
     /* Configure the TCB */
-    err = seL4_TCB_Configure(new_proc->tcb_cap, user_ep_cap, TTY_PRIORITY,
+    err = seL4_TCB_Configure(new_proc->tcb_cap, user_ep_cap, NEW_PRIORITY,
                              new_proc->croot->root_cnode, seL4_NilData,
                              new_proc->p_addrspace->vspace, seL4_NilData, PROCESS_IPC_BUFFER,
                              new_proc->ipc_buffer_cap);

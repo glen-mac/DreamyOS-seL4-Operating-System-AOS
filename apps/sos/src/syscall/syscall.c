@@ -13,6 +13,7 @@
 #include "sys_file.h"
 #include "sys_vm.h"
 #include "sys_proc.h"
+#include "event.h"
 
 /* Currently dependent on syscall numbers ordering, might change this */
 static seL4_Word (*syscall_table[])(void) = {
@@ -43,6 +44,7 @@ void
 handle_syscall(seL4_Word badge)
 {
     seL4_Word syscall_number = seL4_GetMR(0);
+    pid_t cur_proc = GET_PROCID_BADGE(badge);
 
     /* Save the caller */
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);
