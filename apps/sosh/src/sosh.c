@@ -283,6 +283,11 @@ static int thrash(int argc, char *argv[]) {
     return 0;
 }
 
+static void sosh_exit(int argc, char *argv[]) {
+    printf("[SOS Exiting]\n");
+    exit(0);
+}
+
 static int benchmark(int argc, char *argv[]) {
     if(argc == 2 && strcmp(argv[1], "-d") == 0) {
         printf("Running benchmark in DEBUG mode\n");
@@ -304,7 +309,7 @@ struct command {
 struct command commands[] = { { "dir", dir }, { "ls", dir }, { "cat", cat }, {
         "cp", cp }, { "ps", ps }, { "exec", exec }, {"sleep",second_sleep}, {"msleep",milli_sleep},
         {"time", second_time}, {"mtime", micro_time}, {"kill", kill},
-        {"benchmark", benchmark}, {"thrash", thrash}};
+        {"benchmark", benchmark}, {"thrash", thrash}, {"exit", sosh_exit}};
 
 int main(void) {
     char buf[BUF_SIZ];
