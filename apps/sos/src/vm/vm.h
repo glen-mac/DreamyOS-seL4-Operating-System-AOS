@@ -49,6 +49,12 @@ void vm_fault(seL4_Word pid);
 page_directory *page_directory_create(void);
 
 /*
+ * Destroy a page directory
+ * @returns 0 on success else 1
+ */
+int page_directory_destroy(page_directory *dir);
+
+/*
  * Insert a page into the two level page table
  * @param directory, the page directory to insert into
  * @param vaddr, the virtual address of the page

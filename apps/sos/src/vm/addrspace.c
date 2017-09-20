@@ -56,7 +56,37 @@ as_create(void)
     }
 
     return as;
+}
 
+int 
+as_destroy(addrspace *as)
+{
+    region *curr = as->region_list;
+    for (region *curr = as->region_list; curr != NULL; curr = curr->next_region) {
+        if (as_destroy_region(curr) != 0) {
+            LOG_ERROR("Failed to destroy region");
+            return 1;
+        }
+    }
+    as->region_list = NULL;
+
+    if (page_directory_destroy(as->directory) != 0) {
+        LOG_ERROR("Failed to destroy page_directory");
+        return 1;
+    }
+    as->directory = NULL;
+
+    /* Destroy hardware page table */
+    if (cspace_delete_cap(cur_cspace, as->vspace) == CSPACE_ERROR) {
+        LOG_ERROR("Failed to delete vspace cap");
+        return 1;
+    }
+    as->vspace = NULL;
+
+    ut_free(as->vspace_addr, seL4_PageDirBits);
+    as->vspace_addr = NULL;
+
+    return 0;
 }
 
 region *
@@ -73,6 +103,16 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
     new_region->end = start + size;
     new_region->permissions = permissions;
     return new_region;
+}
+
+int
+as_destroy_region(region *reg)
+{
+    if (!reg)
+        return 1;
+
+    free(reg);
+    return 0;
 }
 
 int
