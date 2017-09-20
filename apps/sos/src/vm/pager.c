@@ -143,7 +143,7 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
 }
 
 int
-page_out(addrspace *as, seL4_Word *page_id)
+page_out(seL4_Word *page_id)
 {
     if (list_is_empty(pagefile_free_pages)) {
         LOG_ERROR("No more space in the pagefile");
@@ -159,7 +159,7 @@ page_out(addrspace *as, seL4_Word *page_id)
     LOG_INFO("victim frame is %d", frame_id);
 
     /* Evict the frame from memory and push it to the disk */
-    if (evict_frame(as, frame_id) == -1) {
+    if (evict_frame(frame_id) == -1) {
         LOG_ERROR("Evicting frame failed");
         return -1;
     }
@@ -227,7 +227,7 @@ next_victim(void)
 }
 
 int
-evict_frame(addrspace *as, seL4_Word frame_id)
+evict_frame(seL4_Word frame_id)
 {
     /* cap variable to use for unmapping */
     seL4_CPtr pt_cap; 
@@ -240,7 +240,11 @@ evict_frame(addrspace *as, seL4_Word frame_id)
     LOG_INFO("Evicting pid is %d; page_id is %p", pid, page_id);
 
     /* Get the page cap for the process */
-    // TODO: Instead of curproc, index into the proc array with pid
+    proc *curproc = get_proc(pid);
+    if (curproc == NULL) {
+        LOG_ERROR("Invalid pid");
+        return 1;
+    }
 
     /* Pop the next free page off the list */
     void *free_node = pagefile_free_pages->head;
@@ -250,7 +254,7 @@ evict_frame(addrspace *as, seL4_Word frame_id)
 
     LOG_INFO("Free page in file at %d", pagefile_id);
 
-    assert(page_directory_evict(as->directory, page_id, pagefile_id) == 0);
+    assert(page_directory_evict(curproc->p_addrspace->directory, page_id, pagefile_id) == 0);
 
     LOG_INFO("page entry evicted");
 

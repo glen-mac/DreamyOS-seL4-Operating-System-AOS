@@ -250,10 +250,13 @@ proc_next_pid(pid_t *new_pid) {
         return 0;
 }
 
-proc *get_proc(pid_t pid) {
+proc *
+get_proc(pid_t pid)
+{
     if (!ISINRANGE(0, pid, MAX_PROCS)) {
         LOG_ERROR("pid: %d out of bounds", pid);
         return NULL;
     }
+
     return sos_procs[pid];
 }

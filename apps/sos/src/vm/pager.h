@@ -36,7 +36,7 @@ int page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type);
  * @param[out] vaddr, the sos vaddr of the frame
  * @returns -1 on failure, else the id of the frame
  */
-int page_out(addrspace *as, seL4_Word *vaddr);
+int page_out(seL4_Word *vaddr);
 
 /*
  * Find the next page to be evicted
@@ -49,6 +49,6 @@ int next_victim(void);
  * @param frame_id, the id of the frame
  * @returns 0 on success else -1
  */
-int evict_frame(addrspace *as, seL4_Word frame_id);
+int evict_frame(seL4_Word frame_id);
 
 #endif /* _PAGER_H_ */
