@@ -61,6 +61,19 @@ fdtable_create(void)
     return fdt;
 }
 
+int
+fdtable_destroy(fdtable *table)
+{
+    file *open_file;
+    for (size_t fd = 0; fd < PROCESS_MAX_FILES; ++fd) {
+        if (fdtable_close_fd(table, fd, &open_file) == 0)
+            file_close(open_file);
+    }
+
+    free(table);
+    return 0;
+}
+
 
 int
 fdtable_get(fdtable *fdt, int fd, file **f)

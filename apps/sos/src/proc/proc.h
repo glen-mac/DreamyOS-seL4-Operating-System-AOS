@@ -21,7 +21,7 @@
 #define MAX_PROCS 32
 
 /* process states enum */
-enum process_states {
+typedef enum {
     ZOMBIE,
     RUNNING
 } proc_states;

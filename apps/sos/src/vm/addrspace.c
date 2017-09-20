@@ -61,15 +61,6 @@ as_create(void)
 int 
 as_destroy(addrspace *as)
 {
-    region *curr = as->region_list;
-    for (region *curr = as->region_list; curr != NULL; curr = curr->next_region) {
-        if (as_destroy_region(curr) != 0) {
-            LOG_ERROR("Failed to destroy region");
-            return 1;
-        }
-    }
-    as->region_list = NULL;
-
     if (page_directory_destroy(as->directory) != 0) {
         LOG_ERROR("Failed to destroy page_directory");
         return 1;
@@ -86,6 +77,16 @@ as_destroy(addrspace *as)
     ut_free(as->vspace_addr, seL4_PageDirBits);
     as->vspace_addr = NULL;
 
+    region *curr = as->region_list;
+    for (region *curr = as->region_list; curr != NULL; curr = curr->next_region) {
+        if (as_destroy_region(curr) != 0) {
+            LOG_ERROR("Failed to destroy region");
+            return 1;
+        }
+    }
+    as->region_list = NULL;
+
+    free(as);
     return 0;
 }
 
