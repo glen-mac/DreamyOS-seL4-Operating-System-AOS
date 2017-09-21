@@ -74,6 +74,13 @@ int page_directory_insert(page_directory *directory, seL4_Word vaddr, seL4_CPtr 
 int page_directory_lookup(page_directory *dir, seL4_Word page_id, seL4_CPtr *cap);
 
 /*
+ * Given a process, counts the number of used pages
+ * @param curproc, the proc to count the pages in the PD
+ * @returns number of pages in the page table used
+ */
+unsigned page_directory_count(proc * curproc);
+
+/*
  * Given a vaddr, mark the page as evicted
  * @param directory, the page directory to insert into
  * @param vaddr, the virtual address of the page
@@ -108,5 +115,7 @@ seL4_Word vaddr_to_sos_vaddr(proc *curproc, seL4_Word vaddr, seL4_Word access_ty
  * @returns 0 on success else 1
  */
 int vm_map(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr);
+
+
 
 #endif /* _VM_H_ */

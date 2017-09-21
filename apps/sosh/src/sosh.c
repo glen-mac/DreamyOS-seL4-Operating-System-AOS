@@ -125,11 +125,17 @@ static int ps(int argc, char **argv) {
 
     processes = sos_process_status(process, MAX_PROCESSES);
 
-    printf("TID SIZE   STIME   CTIME COMMAND\n");
-
+    /* find max stime length for formatting */
+    int cur_stime, max_stime = 0;
     for (i = 0; i < processes; i++) {
-        printf("%3d %4d %7d %s\n", process[i].pid, process[i].size,
-                process[i].stime, process[i].command);
+        cur_stime = snprintf(NULL, 0, "%d", process[i].stime);
+        max_stime = (max_stime < cur_stime) ? cur_stime : max_stime;
+    }
+
+    printf("PID   SIZE %*s  COMMAND\n", ++max_stime, "STIME");
+    for (i = 0; i < processes; i++) {
+        printf("%3d %6d %*d  %s\n", process[i].pid, process[i].size,
+                max_stime, process[i].stime, process[i].command);
     }
 
     free(process);
