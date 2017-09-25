@@ -59,7 +59,7 @@ fdtable_create(void)
         return NULL;
     }
 
-    bzero(fdt->table, PROCESS_MAX_FILES);
+    bzero(fdt->table, sizeof(file *) * PROCESS_MAX_FILES);
     return fdt;
 }
 
@@ -130,7 +130,6 @@ fdtable_close_fd(fdtable *fdt, int fd, file **oft_file)
         return EBADF;
     }
 
-    LOG_INFO("fdt->table[fd] is %p", fdt->table[fd]);
     fdt->table[fd] = NULL;
     return 0;
 }

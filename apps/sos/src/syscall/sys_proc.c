@@ -45,7 +45,9 @@ syscall_proc_delete(proc *curproc)
 {
     pid_t pid = seL4_GetMR(1);
     LOG_INFO("Proc %d made proc_delete(%d)", curproc->pid, pid);
-    return do_proc_delete(pid);
+    int ret_val = do_proc_delete(pid);
+    proc_destroy(get_proc(pid));
+    return ret_val;
 }
 
 seL4_Word

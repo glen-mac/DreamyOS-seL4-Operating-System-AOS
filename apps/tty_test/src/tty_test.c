@@ -52,7 +52,7 @@ main(void)
     // test_m3();
     // test_m4();
     // test_m7();
-    while(1);
+    sleep(5);
 
     exit(0);
     printf("Should not print");    
