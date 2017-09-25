@@ -265,9 +265,20 @@ static int kill(int argc, char *argv[]) {
     return sos_process_delete(pid);
 }
 
-static int pid(int argc, char *argv[]) {
-    printf("my id: %d\n", sos_my_id());
+static int mypid(int argc, char *argv[]) {
+    printf("mypid: %d\n", sos_my_id());
     return 0;
+}
+
+static int fg(int argc, char *argv[]) {
+    pid_t pid;
+    if (argc != 2) {
+        printf("Usage: fg pid\n");
+        return 1;
+    }
+
+    pid = atoi(argv[1]);
+    return sos_process_wait(pid);
 }
 
 static int thrash(int argc, char *argv[]) {
@@ -319,8 +330,8 @@ struct command {
 
 struct command commands[] = { { "dir", dir }, { "ls", dir }, { "cat", cat }, {
         "cp", cp }, { "ps", ps }, { "exec", exec }, {"sleep",second_sleep}, {"msleep",milli_sleep},
-        {"time", second_time}, {"mtime", micro_time}, {"kill", kill}, {"pid", pid},
-        {"benchmark", benchmark}, {"thrash", thrash}, {"exit", sosh_exit}};
+        {"time", second_time}, {"mtime", micro_time}, {"kill", kill}, {"mypid", mypid},
+        {"fg", fg}, {"benchmark", benchmark}, {"thrash", thrash}, {"exit", sosh_exit}};
 
 int main(void) {
     char buf[BUF_SIZ];

@@ -104,9 +104,10 @@ syscall_proc_wait(proc *curproc)
             proc *child = get_proc(curr->data);
             if (child && child->p_state == ZOMBIE) {
                 ret_val = child->pid;
-                goto message_reply;
+                goto destroy;
             }
         }
+        goto wait;
     }
 
     if (!proc_is_child(curproc, pid)) {
@@ -121,14 +122,15 @@ syscall_proc_wait(proc *curproc)
         goto destroy;
     }
 
-    curproc->waiting_coro = coro_getcur();
-    curproc->waiting_on = pid;
-    ret_val = yield(NULL);
-    curproc->waiting_coro = NULL;
-    curproc->waiting_on = -1;
+    wait:
+        curproc->waiting_coro = coro_getcur();
+        curproc->waiting_on = pid;
+        ret_val = yield(NULL);
+        curproc->waiting_coro = NULL;
+        curproc->waiting_on = -1;
 
     destroy:
-        proc_destroy(child);
+        proc_destroy(get_proc(ret_val));
 
     message_reply:
         seL4_SetMR(0, ret_val);

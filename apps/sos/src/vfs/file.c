@@ -43,8 +43,6 @@ file_open(char *filename, fmode_t mode, file **open_file)
 void
 file_close(file *f)
 {
-    LOG_INFO("f is %p", f);
-    LOG_INFO("f->vn is %p", f->vn);
     vfs_close(f->vn);
     f->vn = NULL;
     free(f);
