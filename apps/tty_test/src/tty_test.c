@@ -51,7 +51,9 @@ main(void)
     printf(">>> tty_test program started <<<\n");
     // test_m3();
     // test_m4();
-    test_m7();
+    // test_m7();
+    while(1);
+
     exit(0);
     printf("Should not print");    
 }

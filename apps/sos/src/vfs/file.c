@@ -43,6 +43,8 @@ file_open(char *filename, fmode_t mode, file **open_file)
 void
 file_close(file *f)
 {
+    LOG_INFO("f is %p", f);
+    LOG_INFO("f->vn is %p", f->vn);
     vfs_close(f->vn);
     f->vn = NULL;
     free(f);
@@ -64,10 +66,13 @@ fdtable_create(void)
 int
 fdtable_destroy(fdtable *table)
 {
-    file *open_file;
+    file *open_file = NULL;
     for (size_t fd = 0; fd < PROCESS_MAX_FILES; ++fd) {
-        if (fdtable_close_fd(table, fd, &open_file) == 0)
+        LOG_INFO("table %p, fd %d", table, fd);
+        if (fdtable_close_fd(table, fd, &open_file) == 0) {
+            LOG_INFO("openfile is %p", open_file);
             file_close(open_file);
+        }
     }
 
     free(table);
@@ -112,7 +117,6 @@ fdtable_get_unused_fd(fdtable *fdt, int *fd)
     return 0;
 }
 
-
 int
 fdtable_close_fd(fdtable *fdt, int fd, file **oft_file)
 {
@@ -126,6 +130,7 @@ fdtable_close_fd(fdtable *fdt, int fd, file **oft_file)
         return EBADF;
     }
 
+    LOG_INFO("fdt->table[fd] is %p", fdt->table[fd]);
     fdt->table[fd] = NULL;
     return 0;
 }

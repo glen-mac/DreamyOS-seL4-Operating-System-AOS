@@ -251,7 +251,9 @@ main(void)
     sos_init(&_sos_ipc_ep_cap, &_sos_interrupt_ep_cap);
 
     /* Start the user application */
-    assert(proc_start(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap) == 0);
+    
+    // the parent id of -1 will break if sosh exits, we need to solve this nicer
+    assert(proc_start(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap, -1) == 0);
     
     /* Unit tests */
     // test_m2();

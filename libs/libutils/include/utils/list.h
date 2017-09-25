@@ -85,4 +85,10 @@ int list_append_node(list_t *l, struct list_node *node);
 int list_remove_node(list_t *l, void *data, int(*cmp)(void*, void*));
 int list_remove_all_nodes(list_t *l);
 
+static inline
+int list_cmp_equality(void *a, void *b)
+{
+    return (!a == b);
+}
+
 #endif

@@ -49,7 +49,7 @@ static proc *proc_create(seL4_CPtr fault_ep, pid_t new_pid);
 static int proc_next_pid(pid_t *new_pid);
 
 pid_t
-proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
+proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
 {
     int err;
     pid_t new_pid;
@@ -66,8 +66,6 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
         return -1;
     }
 
-    LOG_INFO("new_pid is %d", new_pid);
-
     /* Create a process struct */
     proc *new_proc = proc_create(fault_ep, new_pid);
     if (new_proc == NULL) {
@@ -76,7 +74,10 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
         return -1;
     }
 
+    new_proc->ppid = parent_pid;
     new_proc->pid = new_pid;
+    new_proc->waiting_on = -1;
+    new_proc->waiting_coro = NULL;
 
     /* Store new proc */
     sos_procs[new_pid] = new_proc;
@@ -151,9 +152,26 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep)
     memcpy(new_proc->proc_name, app_name, N_NAME);
     new_proc->proc_name[31] = NULL;
 
-
-
     return new_pid;
+}
+
+void
+proc_destroy(proc *current)
+{
+    sos_procs[current->pid] = NULL;
+    free(current);
+}
+
+bool
+proc_is_child(proc *curproc, pid_t pid)
+{
+    return list_exists(curproc->children, pid, list_cmp_equality);
+}
+
+bool
+proc_is_waiting(proc *parent, proc *child)
+{
+    return ((parent->waiting_on == -1 || parent->waiting_on == child->pid) && parent->waiting_coro);
 }
 
 static proc *
@@ -172,6 +190,12 @@ proc_create(seL4_CPtr fault_ep, pid_t new_pid)
         LOG_ERROR("fdtable_create failed");
         return NULL;
     }
+
+    if ((new_proc->children = malloc(sizeof(list_t))) == NULL) {
+        LOG_ERROR("failed to create list of children");
+        return NULL;
+    }
+    assert(list_init(new_proc->children) == 0);
 
     /* Create a simple 1 level CSpace */
     if ((new_proc->croot = cspace_create(1)) == NULL) {
