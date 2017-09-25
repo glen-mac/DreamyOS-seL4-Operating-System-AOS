@@ -265,6 +265,11 @@ static int kill(int argc, char *argv[]) {
     return sos_process_delete(pid);
 }
 
+static int pid(int argc, char *argv[]) {
+    printf("my id: %d\n", sos_my_id());
+    return 0;
+}
+
 static int thrash(int argc, char *argv[]) {
     if (argc != 2) {
         printf("Usage: thrash npage\n");
@@ -290,7 +295,7 @@ static int thrash(int argc, char *argv[]) {
 }
 
 static void sosh_exit(int argc, char *argv[]) {
-    printf("[SOS Exiting]\n");
+    printf("[SOSH Exiting]\n");
     exit(0);
 }
 
@@ -314,7 +319,7 @@ struct command {
 
 struct command commands[] = { { "dir", dir }, { "ls", dir }, { "cat", cat }, {
         "cp", cp }, { "ps", ps }, { "exec", exec }, {"sleep",second_sleep}, {"msleep",milli_sleep},
-        {"time", second_time}, {"mtime", micro_time}, {"kill", kill},
+        {"time", second_time}, {"mtime", micro_time}, {"kill", kill}, {"pid", pid},
         {"benchmark", benchmark}, {"thrash", thrash}, {"exit", sosh_exit}};
 
 int main(void) {
@@ -330,7 +335,7 @@ int main(void) {
     done = 0;
     new = 1;
 
-    printf("\n[SOS Starting]\n");
+    printf("\n[SOSH Starting]\n");
 
     while (!done) {
         if (new) {

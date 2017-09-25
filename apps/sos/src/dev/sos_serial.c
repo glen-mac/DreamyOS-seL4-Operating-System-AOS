@@ -110,6 +110,9 @@ sos_serial_write(vnode *node, uiovec *iov)
 int
 sos_serial_read(vnode *node, uiovec *iov)
 {
+    if (global_uio)
+        return -1;
+
     char *user_buf = iov->uiov_base;
     seL4_Word bytes_read = MIN(ring_buffer_num_items(input_buffer), iov->uiov_len);
 

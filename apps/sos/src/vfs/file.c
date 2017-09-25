@@ -68,9 +68,7 @@ fdtable_destroy(fdtable *table)
 {
     file *open_file = NULL;
     for (size_t fd = 0; fd < PROCESS_MAX_FILES; ++fd) {
-        LOG_INFO("table %p, fd %d", table, fd);
         if (fdtable_close_fd(table, fd, &open_file) == 0) {
-            LOG_INFO("openfile is %p", open_file);
             file_close(open_file);
         }
     }
