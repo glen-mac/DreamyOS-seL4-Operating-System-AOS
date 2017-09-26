@@ -310,6 +310,7 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
 
     /* Must be less than, as we use the highest bit to represent evicted or not */
     assert(cap < MAX_CAP_ID);
+    assert((cap >> 31) == 0);
 
     // I TURNED THIS OFF BECAUSE THIS WONT BE NULL FOR EVICTED PAGES
     // IDK IF THIS IS THE BEST THING THOUGH, ID BE MORE CONFIDENT WITH THE ERROR CHECKING
@@ -385,9 +386,11 @@ page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_id)
     }
 
     seL4_CPtr cap = second_level[table_index].page;
+    LOG_INFO("cap is %d", cap);
 
     /* Must be less than, as we use the highest bit to represent evicted or not */
     assert(free_id < MAX_CAP_ID);
+    assert((free_id >> 31) == 0);
 
     second_level[table_index].page = free_id;
     second_level[table_index].page |= EVICTED_BIT; /* Mark as evicted */
@@ -410,7 +413,6 @@ vm_translate(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *s
 
     if (page_table_is_evicted(curproc, page_id)) {
         LOG_INFO("page is evicted");
-        panic("this is happening");
         if (page_in(curproc, page_id, access_type) != 0) {
             LOG_ERROR("failed to page_in");
             return 1;

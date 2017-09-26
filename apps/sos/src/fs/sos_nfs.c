@@ -1,4 +1,3 @@
- 
 /*
  * Wrappers for the NFS file system
  * 
@@ -15,6 +14,7 @@
 #include <coro/picoro.h>
 #include <syscall/syscall.h>
 
+#include <sys/panic.h>
 
 #include <clock/clock.h>
 #include <lwip/ip_addr.h>
@@ -146,6 +146,7 @@ sos_nfs_write(vnode *node, uiovec *iov)
 
     /* Loop to make sure entire page is written, as nfs could break it up into small packets */
     while (iov->uiov_len > 0) {
+        LOG_INFO("write: handle is %p", node->vn_data);
         if (nfs_write(node->vn_data, iov->uiov_pos, iov->uiov_len, iov->uiov_base, sos_nfs_write_callback, (uintptr_t)coro_getcur()) != RPC_OK)
             return -1;
 
@@ -281,6 +282,7 @@ sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, in
     int ret_val = -1;
     if (status != NFS_OK) {
         LOG_ERROR("write error status: %d", status);
+        panic("ruh roh");
         goto coro_resume;
     }
 

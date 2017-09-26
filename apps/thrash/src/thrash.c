@@ -25,7 +25,11 @@ main(void)
         for (int i = 0; i < npages; i++) {
             // Just to test everything is being copied correctly
             for (int j = 0; j < MAX_IO_BUF; ++j) {
-                assert(buffer[(i * MAX_IO_BUF) + j] == (i * MAX_IO_BUF) + j);
+                if (buffer[(i * MAX_IO_BUF) + j] != (i * MAX_IO_BUF) + j) {
+                    printf("%d data was not what was written, expected %d, recieved %d at %d, %d", 
+                        sos_my_id(), ((i * MAX_IO_BUF) + j), buffer[(i * MAX_IO_BUF) + j], i, j);
+                    assert(!"Failure");
+                }
             }
         }
     }

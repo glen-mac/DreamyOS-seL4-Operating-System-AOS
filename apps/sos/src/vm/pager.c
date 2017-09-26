@@ -31,7 +31,7 @@ static volatile seL4_Word pager_initialised = FALSE;
 static fhandle_t pagefile_handle;
 
 static list_t *pagefile_free_pages = NULL;
-static list_t *pagefile_operations = NULL;
+list_t *pagefile_operations = NULL;
 
 static int pagefile_op_compare(void *a, void *b);
 static void pagefile_op_append(void *a);
@@ -94,7 +94,7 @@ init_pager(void)
 int
 page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
 {
-    LOG_INFO("paging in %p", page_id);
+    LOG_INFO("paging in %d", page_id);
 
     seL4_CPtr pagefile_id;
     if (page_directory_lookup(curproc->p_addrspace->directory, PAGE_ALIGN_4K(page_id), &pagefile_id) != 0) {
@@ -117,22 +117,34 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
     /* A page was just pushed to disk, page_id now corresponds to a legit page and 
      * sos_vaddr is where we can access that frame */
 
-    /* race condition cover */
-    pagefile_op_node * op_node = malloc(sizeof(pagefile_op_node));
-    op_node->pagefile_id = pagefile_id;
-    int add_result = list_action(pagefile_operations, (void *)op_node, pagefile_op_compare, pagefile_op_append);
-    LOG_INFO("Page in: add_result %d", add_result);
-    if (add_result == 1) {
-        /* add it to the operations list, and init the waiting coros
-           list so other coros can append themselves to it to be served later */
-        list_init(op_node->waiting_coros);
-        list_append(pagefile_operations, (void *)op_node);
-    } else {
-        /* so there is a current pagefile operation on the pageid, so we want
-           to yield so that the operation we are waiting on can resume us */
-        yield(NULL);
+    // /* race condition cover */
+    // pagefile_op_node * op_node = malloc(sizeof(pagefile_op_node));
+    // op_node->pagefile_id = pagefile_id;
+    // int add_result = list_action(pagefile_operations, (void *)op_node, pagefile_op_compare, pagefile_op_append);
+    // LOG_INFO("Page in: add_result %d", add_result);
+    // if (add_result == 1) {
+    //      add it to the operations list, and init the waiting coros
+    //        list so other coros can append themselves to it to be served later 
+    //     list_init(op_node->waiting_coros);
+    //     list_append(pagefile_operations, (void *)op_node);
+    // } else {
+    //     /* so there is a current pagefile operation on the pageid, so we want
+    //        to yield so that the operation we are waiting on can resume us */
+    //     yield(NULL);
+    // }
+    // /* race condition cover */
+
+    /* Queue paging operation */
+    if (list_append(pagefile_operations, (void *)coro_getcur()) != 0) {
+        LOG_ERROR("failed to queue paging operation");
+        return -1;
     }
-    /* race condition cover */
+    
+    /* If an operation is already happening, yield */
+    if (list_length(pagefile_operations) > 1) {
+        yield(NULL);
+        LOG_INFO("page_in: resumed coro");
+    }
 
 
     /* Read the page in from the pagefile and into memory */
@@ -147,17 +159,12 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
            .uiov_pos = (pagefile_id * PAGE_SIZE_4K) + (PAGE_SIZE_4K - bytes_remaining)
         };
 
-        LOG_INFO("READ: base %p, len %lu, pos %lu", iov.uiov_base, iov.uiov_len, iov.uiov_pos);
-
         if ((result = sos_nfs_read(&handle, &iov)) == -1) {
             LOG_ERROR("Error when reading from pagefile");
             return 1;
         }
 
-        LOG_INFO("READ: result was %d", result);
-
         char *data_ptr = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining));
-        LOG_INFO("data: %d", *data_ptr);
 
         bytes_remaining -= result;
     } while (bytes_remaining > 0);
@@ -166,12 +173,23 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
     pagefile_free_add(pagefile_id);
     seL4_ARM_Page_Unify_Instruction(frame_table_get_capability(frame_table_sos_vaddr_to_index(sos_vaddr)), 0, PAGE_SIZE_4K);
 
-    /* release all waiting coros */
-    if (op_node->waiting_coros) {
-        list_foreach(op_node->waiting_coros, pagefile_op_release);
-        list_remove_all(op_node->waiting_coros);
-        list_remove(pagefile_operations, op_node, pagefile_op_compare);        
-    }
+    /* Remove finished operation from the queue */
+    struct list_node *op = pagefile_operations->head;
+    pagefile_operations->head = op->next;
+    free(op);
+
+    /* Run the next pagefile operation if any */
+    if (!list_is_empty(pagefile_operations))
+        resume(pagefile_operations->head->data, NULL);
+
+    // /* release all waiting coros */
+    // if (op_node->waiting_coros) {
+    //     list_foreach(op_node->waiting_coros, pagefile_op_release);
+    //     list_remove_all(op_node->waiting_coros);
+    //     list_remove(pagefile_operations, op_node, pagefile_op_compare);        
+    // }
+
+    /* Remove finished operation from the queue */
 
     return 0;
 }
@@ -179,6 +197,20 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
 int
 page_out(seL4_Word *page_id)
 {
+    /* Queue paging operation */
+    if (list_append(pagefile_operations, (void *)coro_getcur()) != 0) {
+        LOG_ERROR("failed to queue paging operation");
+        return -1;
+    }
+    
+    LOG_INFO("Pageout length: %d", list_length(pagefile_operations));
+
+    /* If an operation is already happening, yield */
+    if (list_length(pagefile_operations) > 1) {
+        yield(NULL);
+        LOG_INFO("page_out: resumed coro");
+    }
+
     if (list_is_empty(pagefile_free_pages)) {
         LOG_ERROR("No more space in the pagefile");
         return -1;
@@ -201,12 +233,18 @@ page_out(seL4_Word *page_id)
     /* Zero out the frame and return the page_id / frame_id */
     *page_id = frame_table_index_to_sos_vaddr(frame_id);
     bzero((void *)(*page_id), PAGE_SIZE_4K);
-    // LOG_INFO("unmapping using %p", frame_table_get_capability(frame_id));
-    //seL4_ARM_Page_Unmap(frame_table_get_capability(frame_id)); /* Unmap because sos_map_page will map in again */
 
-    /* Apparently we dont need to map in again??? */
-
+    /* Reset the chance on the frame */
     assert(frame_table_set_chance(frame_id, FIRST_CHANCE) == 0);
+
+    /* Remove finished operation from the queue */
+    struct list_node *op = pagefile_operations->head;
+    pagefile_operations->head = op->next;
+    free(op);
+
+    /* Run the next pagefile operation if any */
+    if (!list_is_empty(pagefile_operations))
+        resume(pagefile_operations->head->data, NULL);
 
     return frame_id;
 }
@@ -228,8 +266,8 @@ next_victim(void)
             goto next;
 
         assert(frame_table_get_chance(current_page, &chance) == 0);
+        LOG_INFO("chance baby %d", current_page);
         switch (chance) {
-            
             /* Increment the chance of the current page and move on */
             case FIRST_CHANCE:
                 frame_table_set_chance(current_page, SECOND_CHANCE);
@@ -286,29 +324,28 @@ evict_frame(seL4_Word frame_id)
     pagefile_free_pages->head = pagefile_free_pages->head->next;
     free(free_node);
 
+    // /* race condition cover */
+    // pagefile_op_node *op_node = malloc(sizeof(pagefile_op_node));
+    // op_node->pagefile_id = pagefile_id;
+    // int add_result = list_action(pagefile_operations, (void *)op_node, pagefile_op_compare, pagefile_op_append);
+    // LOG_INFO("evict_frame: add_result %d", add_result);
+    // if (add_result == 1) {
+    //      add it to the operations list, and init the waiting coros
+    //        list so other coros can append themselves to it to be served later 
+    //     list_init(op_node->waiting_coros);
+    //     list_append(pagefile_operations, (void *)op_node);
+    // } else {
+    //     /* so there is a current pagefile operation on the pageid, so we want
+    //        to yield so that the operation we are waiting on can resume us */
+    //     yield(NULL);
+    // }
+    // /* race condition cover */
+
     LOG_INFO("Free page in file at %d", pagefile_id);
 
     assert(page_directory_evict(curproc->p_addrspace->directory, page_id, pagefile_id) == 0);
 
     LOG_INFO("page entry evicted");
-
-    /* race condition cover */
-    pagefile_op_node *op_node = malloc(sizeof(pagefile_op_node));
-    op_node->pagefile_id = pagefile_id;
-    int add_result = list_action(pagefile_operations, (void *)op_node, pagefile_op_compare, pagefile_op_append);
-    LOG_INFO("Page in: add_result %d", add_result);
-    if (add_result == 1) {
-        /* add it to the operations list, and init the waiting coros
-           list so other coros can append themselves to it to be served later */
-        list_init(op_node->waiting_coros);
-        list_append(pagefile_operations, (void *)op_node);
-    } else {
-        /* so there is a current pagefile operation on the pageid, so we want
-           to yield so that the operation we are waiting on can resume us */
-        yield(NULL);
-    }
-    /* race condition cover */
-
 
     /* Write the page to disk */
     /* TODO: DONT NEED TO WRITE PAGE IF ITS NOT DIRTY? */
@@ -352,11 +389,11 @@ evict_frame(seL4_Word frame_id)
     // frame_free(frame_id);
 
     /* release all waiting coros */
-    if (op_node->waiting_coros) {
-        list_foreach(op_node->waiting_coros, pagefile_op_release);
-        list_remove_all(op_node->waiting_coros);
-        list_remove(pagefile_operations, op_node, pagefile_op_compare);        
-    }
+    // if (op_node->waiting_coros) {
+    //     list_foreach(op_node->waiting_coros, pagefile_op_release);
+    //     list_remove_all(op_node->waiting_coros);
+    //     list_remove(pagefile_operations, op_node, pagefile_op_compare);        
+    // }
 
     return 0;
 }

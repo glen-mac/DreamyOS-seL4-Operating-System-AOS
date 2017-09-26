@@ -23,6 +23,8 @@ typedef struct {
 	list_t *waiting_coros;	/* a list of the coros waiting to be resumed */
 } pagefile_op_node;
 
+extern list_t *pagefile_operations;
+
 /*
  * Initialise the pager
  * @returns 0 on success else 1
