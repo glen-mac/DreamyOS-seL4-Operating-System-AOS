@@ -16,6 +16,8 @@
 #include <utils/util.h>
 #include "network.h"
 
+static void init_wait_on_children(proc *init);
+
 void
 event_loop(const seL4_CPtr ep)
 {
@@ -24,9 +26,10 @@ event_loop(const seL4_CPtr ep)
     seL4_MessageInfo_t message;
 
     while (TRUE) {
+        /* Wait on children if not already waiting */
         proc *init = get_proc(0);
-        for (struct list_node *curr = init->children->head; curr != NULL; curr = curr->next)
-            LOG_INFO("init child: %d", curr->data);
+        if (init->waiting_coro == NULL)
+            resume(coroutine(init_wait_on_children), init);
 
         message = seL4_Wait(ep, &badge);
         label = seL4_MessageInfo_get_label(message);
@@ -47,4 +50,14 @@ event_loop(const seL4_CPtr ep)
             LOG_INFO("Rootserver got an unknown message");
         }
     }
+}
+
+static void
+init_wait_on_children(proc *init)
+{
+    init->waiting_on = -1;
+    init->waiting_coro = coro_getcur();
+    int pid = yield(NULL);
+    init->waiting_coro = NULL;
+    proc_destroy(get_proc(pid));
 }

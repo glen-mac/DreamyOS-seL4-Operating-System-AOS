@@ -69,6 +69,7 @@ pid_t proc_bootstrap(void)
     init->stime = 0;
     init->p_state = RUNNING;
     init->protected = TRUE;
+    init->waiting_coro = NULL;
     sos_procs[init->pid] = init;
     return init->pid;
 }
@@ -424,8 +425,11 @@ proc_reparent_children(proc *cur_parent, pid_t new_parent)
     if (new_parent_proc == NULL)
         return 1;
 
-    for (struct list_node *curr = cur_parent->children->head; curr != NULL; curr = curr->next)
+    for (struct list_node *curr = cur_parent->children->head; curr != NULL; curr = curr->next) {
+        proc *child = get_proc(curr->data);
+        child->ppid = new_parent_proc->pid;
         list_prepend(new_parent_proc->children, curr->data);
+    }
 
     return 0;
 }
