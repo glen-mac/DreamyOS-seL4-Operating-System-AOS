@@ -3337,8 +3337,9 @@ long sys_process_vm_writev(va_list ap)
 }
 long sys_lseek(va_list ap)
 {
-    assert(!"sys_lseek not implemented");
-    return 0;
+    //assert(!"sys_lseek not implemented");
+    printf("sys_lseek not implemented, returning -1\n");
+    return -1;
 }
 long sys_access(va_list ap)
 {

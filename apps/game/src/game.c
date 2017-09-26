@@ -380,7 +380,9 @@ int main(int argc, char *argv[]) {
 	initBoard(board);
 	//setBufferedInput(false);
 	while (true) {
-		c=getchar();
+		do {
+			c=getchar();
+		} while (c < 32);
 		if (c == -1){ //TODO: maybe replace this -1 with a pre-defined constant(if it's in one of header files)
 		    	puts("\nError! Cannot read keyboard input!");
 			break;
@@ -416,7 +418,9 @@ int main(int argc, char *argv[]) {
 		}
 		if (c=='q') {
 			printf("        QUIT? (y/n)         \n");
-			c=getchar();
+			do {
+				c=getchar();
+			} while (c < 32);
 			if (c=='y') {
 				break;
 			}
@@ -424,7 +428,9 @@ int main(int argc, char *argv[]) {
 		}
 		if (c=='r') {
 			printf("       RESTART? (y/n)       \n");
-			c=getchar();
+			do {
+				c=getchar();
+			} while (c < 32);
 			if (c=='y') {
 				initBoard(board);
 			}
@@ -434,6 +440,5 @@ int main(int argc, char *argv[]) {
 	//setBufferedInput(true);
 
 	printf("\033[?25h\033[m");
-
 	return EXIT_SUCCESS;
 }
