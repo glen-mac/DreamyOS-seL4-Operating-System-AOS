@@ -1,0 +1,2 @@
+apps-$(CONFIG_APP_THRASH) += thrash
+thrash: $(libc) libsel4 libsos
