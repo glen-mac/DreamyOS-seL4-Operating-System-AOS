@@ -24,6 +24,10 @@ event_loop(const seL4_CPtr ep)
     seL4_MessageInfo_t message;
 
     while (TRUE) {
+        proc *init = get_proc(0);
+        for (struct list_node *curr = init->children->head; curr != NULL; curr = curr->next)
+            LOG_INFO("init child: %d", curr->data);
+
         message = seL4_Wait(ep, &badge);
         label = seL4_MessageInfo_get_label(message);
         if (badge & IRQ_EP_BADGE) {

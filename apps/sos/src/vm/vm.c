@@ -509,14 +509,18 @@ page_table_is_evicted(proc *curproc, seL4_Word page_id)
 }
 
 unsigned
-page_directory_count(proc * curproc) {
+page_directory_count(proc *curproc) {
     unsigned pages_count = 0;
-    seL4_Word * top_pd = curproc->p_addrspace->directory->directory;
+    /* If we are counting a zombie process */
+    if (!curproc->p_addrspace)
+        return pages_count;
+
+    seL4_Word *top_pd = curproc->p_addrspace->directory->directory;
     page_table_entry * sec_pd;
-    for (int i = 0; i < 1024; i++) {
+    for (int i = 0; i < PAGE_SIZE_4K / sizeof(seL4_Word); i++) {
         if (top_pd[i]) {
             sec_pd = (page_table_entry *)top_pd[i];
-            for (int j = 0; j < 1024; j++) {
+            for (int j = 0; j < PAGE_SIZE_4K / sizeof(seL4_Word); j++) {
                 if (sec_pd[j].page) {
                     pages_count++;
                 }

@@ -45,12 +45,19 @@ typedef struct _proc {
 
     pid_t ppid;                     /* parent pid */
     pid_t pid;                      /* pid of process */
-    char proc_name[N_NAME];         /* process name */
+    char *proc_name;                /* process name */
     int64_t stime;                  /* process start time */
     proc_states p_state;            /* enum of the process state */
 
     bool kill_flag;                 /* Flag to specify if this process has received a kill signal */
+    bool protected;                 /* Flag to specify if the process can be killed */
 } proc;
+
+/*
+ * Bootstrap the init process
+ * @returns pid of the init process
+ */
+pid_t proc_bootstrap(void);
 
 /*
  * Start a process
@@ -104,5 +111,13 @@ proc *get_proc(pid_t pid);
  * @param state, the new state of the proc
  */
 void proc_mark(proc *curproc, proc_states state);
+
+/*
+ * Reparent childre from curproc to pid
+ * @param cur_parent, the current parent
+ * @param new_parent, pid of the new parent
+ * @returns 0 on success, else 1
+ */
+int proc_reparent_children(proc *cur_parent, pid_t new_parent);
 
 #endif /* _PROC_H_ */

@@ -78,9 +78,10 @@ syscall_proc_status(proc *curproc)
         /* write proc info */
         num_found++;
         sos_procs->pid = c_proc->pid;
-        sos_procs->size = page_directory_count(curproc);
+        sos_procs->size = page_directory_count(c_proc);
         sos_procs->stime = c_proc->stime;
-        strcpy(sos_procs->command, c_proc->proc_name);  
+        strcpy(sos_procs->command, c_proc->proc_name);
+
         /* get next sos procs struct over in buffer */
         sos_procs++;
         proc_loop:
