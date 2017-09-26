@@ -31,6 +31,11 @@ static volatile seL4_Word pager_initialised = FALSE;
 static fhandle_t pagefile_handle;
 
 static list_t *pagefile_free_pages = NULL;
+static list_t *pagefile_operations = NULL;
+
+static int pagefile_op_compare(void *a, void *b);
+static void pagefile_op_append(void *a);
+static int pagefile_op_release(void *a);
 
 static void pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
 
@@ -64,7 +69,14 @@ init_pager(void)
         return 1;
     }
 
+    /* Page file operations */
+    if ((pagefile_operations = malloc(sizeof(list_t))) == NULL) {
+        LOG_ERROR("failed to malloc pagefile operations list");
+        return 1;
+    }
+
     list_init(pagefile_free_pages);
+    list_init(pagefile_operations);
 
     /* Mark every page on the file as empty */
     LOG_INFO("max pages is %d", PAGEFILE_MAX_PAGES);
@@ -105,7 +117,22 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
     /* A page was just pushed to disk, page_id now corresponds to a legit page and 
      * sos_vaddr is where we can access that frame */
 
-    // TODO: Grab the big page lock
+    /* race condition cover */
+    pagefile_op_node * op_node = malloc(sizeof(pagefile_op_node));
+    op_node->pagefile_id = pagefile_id;
+    int add_result = list_action(pagefile_operations, (void *)op_node, pagefile_op_compare, pagefile_op_append);
+    if (add_result == -1) {
+        /* add it to the operations list, and init the waiting coros
+           list so other coros can append themselves to it to be served later */
+        list_init(op_node->waiting_coros);
+        list_append(pagefile_operations, (void *)op_node);
+    } else {
+        /* so there is a current pagefile operation on the pageid, so we want
+           to yield so that the operation we are waiting on can resume us */
+        yield(NULL);
+    }
+    /* race condition cover */
+
 
     /* Read the page in from the pagefile and into memory */
     vnode handle = {.vn_data = &pagefile_handle};
@@ -135,8 +162,15 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
     } while (bytes_remaining > 0);
 
     /* Mark the page as free in the pagefile */
-	pagefile_free_add(pagefile_id);
+    pagefile_free_add(pagefile_id);
     seL4_ARM_Page_Unify_Instruction(frame_table_get_capability(frame_table_sos_vaddr_to_index(sos_vaddr)), 0, PAGE_SIZE_4K);
+
+    /* release all waiting coros */
+    if (op_node->waiting_coros) {
+        list_foreach(op_node->waiting_coros, pagefile_op_release);
+        list_remove_all(op_node->waiting_coros);
+        list_remove(pagefile_operations, op_node, pagefile_op_compare);        
+    }
 
     return 0;
 }
@@ -257,7 +291,22 @@ evict_frame(seL4_Word frame_id)
 
     LOG_INFO("page entry evicted");
 
-    // TODO: GRAB A BIG LOCK AROUND PAGING
+    /* race condition cover */
+    pagefile_op_node * op_node = malloc(sizeof(pagefile_op_node));
+    op_node->pagefile_id = pagefile_id;
+    int add_result = list_action(pagefile_operations, (void *)op_node, pagefile_op_compare, pagefile_op_append);
+    if (add_result == -1) {
+        /* add it to the operations list, and init the waiting coros
+           list so other coros can append themselves to it to be served later */
+        list_init(op_node->waiting_coros);
+        list_append(pagefile_operations, (void *)op_node);
+    } else {
+        /* so there is a current pagefile operation on the pageid, so we want
+           to yield so that the operation we are waiting on can resume us */
+        yield(NULL);
+    }
+    /* race condition cover */
+
 
     /* Write the page to disk */
     /* TODO: DONT NEED TO WRITE PAGE IF ITS NOT DIRTY? */
@@ -300,6 +349,13 @@ evict_frame(seL4_Word frame_id)
     // 5. UT Free the memory so we can reuse it for another frame 
     // frame_free(frame_id);
 
+    /* release all waiting coros */
+    if (op_node->waiting_coros) {
+        list_foreach(op_node->waiting_coros, pagefile_op_release);
+        list_remove_all(op_node->waiting_coros);
+        list_remove(pagefile_operations, op_node, pagefile_op_compare);        
+    }
+
     return 0;
 }
 
@@ -315,4 +371,21 @@ pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, f
 void
 pagefile_free_add(seL4_CPtr pagefile_id) {
     assert(list_prepend(pagefile_free_pages, (void *)pagefile_id) == 0);
+}
+
+static int
+pagefile_op_compare(void *a, void *b) {
+    return (((pagefile_op_node *)a)->pagefile_id != ((pagefile_op_node *)b)->pagefile_id);
+}
+
+static void
+pagefile_op_append(void *a) {
+    pagefile_op_node *cur_node = (pagefile_op_node *)a;
+    list_append(cur_node->waiting_coros, (void *)coro_getcur());
+}
+
+static int
+pagefile_op_release(void *a) {
+    coro op_coro = (coro)a;
+    resume(op_coro, NULL);
 }

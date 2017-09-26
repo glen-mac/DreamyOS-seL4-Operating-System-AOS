@@ -17,6 +17,12 @@ enum chance_type {
 	PINNED, /* Cannot be paged */
 };
 
+/* a pagefile operation node */
+typedef struct {
+	seL4_CPtr pagefile_id;	/* the id of the pagefile frame being operated on */
+	list_t *waiting_coros;	/* a list of the coros waiting to be resumed */
+} pagefile_op_node;
+
 /*
  * Initialise the pager
  * @returns 0 on success else 1
