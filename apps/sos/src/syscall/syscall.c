@@ -17,7 +17,7 @@
 #include "event.h"
 
 /* Currently dependent on syscall numbers ordering, might change this */
-static seL4_Word (*syscall_table[])(proc *) = {
+static int (*syscall_table[])(proc *) = {
     NULL,
     syscall_write,
     NULL,

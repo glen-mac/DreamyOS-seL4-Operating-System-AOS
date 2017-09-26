@@ -18,7 +18,7 @@
 static void callback_sys_usleep(uint32_t id, void *data);
 
 int
-syscall_usleep(proc * curproc)
+syscall_usleep(proc *curproc)
 {
     uint32_t ms_delay = seL4_GetMR(1);
  
@@ -26,14 +26,14 @@ syscall_usleep(proc * curproc)
 
     assert(register_timer(MILLISECONDS(ms_delay), callback_sys_usleep, (void *)coro_getcur()) != 0);
 
-    /* Unblock the process when timer callback is called */ 
+    /* Unblock the process when timer callback is called */
     yield(NULL);
 
     return 0;
 }
 
 int
-syscall_time_stamp(proc * curproc)
+syscall_time_stamp(proc *curproc)
 {
     LOG_INFO("syscall: thread made sos_time_stamp()");
 

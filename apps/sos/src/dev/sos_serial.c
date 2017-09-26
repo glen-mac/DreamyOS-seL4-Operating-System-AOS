@@ -110,6 +110,7 @@ sos_serial_write(vnode *node, uiovec *iov)
 int
 sos_serial_read(vnode *node, uiovec *iov)
 {
+    /* Enforce single reader policy */
     if (global_uio)
         return -1;
 

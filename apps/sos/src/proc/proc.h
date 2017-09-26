@@ -25,7 +25,8 @@
 /* process states enum */
 typedef enum {
     ZOMBIE,
-    RUNNING
+    RUNNING,
+    BLOCKED /* Blocked on SOS */
 } proc_states;
 
 /* Process Struct */

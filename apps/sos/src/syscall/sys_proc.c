@@ -138,7 +138,6 @@ syscall_proc_wait(proc *curproc)
         proc_destroy(get_proc(ret_val));
 
     message_reply:
-        LOG_INFO("message reply, ret_val %d", ret_val);
         seL4_SetMR(0, ret_val);
         return 1; /* Number of words to return */
 }
@@ -155,6 +154,11 @@ do_proc_delete(proc *curproc, pid_t victim_pid)
 {
     proc *victim = get_proc(victim_pid);
     int ret_val = -1;
+
+    if (!victim) {
+        LOG_ERROR("Invalid process");
+        goto message_reply;
+    }
 
     // TODO: Handle async requests
 
