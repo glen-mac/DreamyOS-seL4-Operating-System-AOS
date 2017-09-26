@@ -251,9 +251,9 @@ page_destroy(seL4_CPtr page_cap)
 {
     seL4_CPtr pagefile_id = page_cap;
     if (IS_EVICTED(page_cap)) {
-        panic("not implemented, how do I free an evicted page?");
         pagefile_id &= (~EVICTED_BIT);
         pagefile_free_add(pagefile_id);
+        return 0;
     }
 
     if (seL4_ARM_Page_Unmap(page_cap) != 0) {
