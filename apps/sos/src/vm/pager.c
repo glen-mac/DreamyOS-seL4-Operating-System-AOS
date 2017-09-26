@@ -135,8 +135,7 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
     } while (bytes_remaining > 0);
 
     /* Mark the page as free in the pagefile */
-    assert(list_prepend(pagefile_free_pages, (void *)pagefile_id) == 0);
-
+	pagefile_free_add(pagefile_id);
     seL4_ARM_Page_Unify_Instruction(frame_table_get_capability(frame_table_sos_vaddr_to_index(sos_vaddr)), 0, PAGE_SIZE_4K);
 
     return 0;
@@ -311,4 +310,9 @@ pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, f
     assert(status == NFS_OK);
     memcpy(&pagefile_handle, fh, sizeof(fhandle_t));
     pager_initialised = TRUE;
+}
+
+void
+pagefile_free_add(seL4_CPtr pagefile_id) {
+    assert(list_prepend(pagefile_free_pages, (void *)pagefile_id) == 0);
 }

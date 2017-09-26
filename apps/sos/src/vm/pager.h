@@ -51,4 +51,10 @@ int next_victim(void);
  */
 int evict_frame(seL4_Word frame_id);
 
+/* 
+ * Add a pagefile id to the pagefile freelist
+ * @param pagefile_id, the id of the page in the pagefile
+ */
+void pagefile_free_add(seL4_CPtr pagefile_id);
+
 #endif /* _PAGER_H_ */
