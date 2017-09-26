@@ -13,7 +13,7 @@ apps-$(CONFIG_APP_SOS) += sos
 sos-components-$(CONFIG_APP_SOSH) += sosh
 sos-components-$(CONFIG_APP_TTY_TEST) += tty_test
 sos-components=$(addprefix $(STAGE_BASE)/bin/, $(sos-components-y))
-sos-components-$(CONFIG_APP_NEWAPP) += newapp
+sos-components-$(CONFIG_APP_GAME) += game
 
 sos: export COMPONENTS=${sos-components}
 sos: ${sos-components-y} \

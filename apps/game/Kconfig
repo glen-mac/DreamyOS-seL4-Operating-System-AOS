@@ -1,0 +1,6 @@
+config APP_GAME
+    bool "Game"
+    depends on LIB_SEL4 && HAVE_LIBC && LIB_SOS
+    select HAVE_SEL4_APPS
+    help
+        A new app
