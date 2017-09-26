@@ -15,6 +15,7 @@ main(void)
 {
     size_t npages = 100;
     int buffer[npages * MAX_IO_BUF];
+    pid_t myid = sos_my_id();
 
     while(1) {
         for (int i = 0; i < npages; i++) {
@@ -26,8 +27,13 @@ main(void)
             // Just to test everything is being copied correctly
             for (int j = 0; j < MAX_IO_BUF; ++j) {
                 if (buffer[(i * MAX_IO_BUF) + j] != (i * MAX_IO_BUF) + j) {
-                    printf("%d data was not what was written, expected %d, recieved %d at %d, %d", 
-                        sos_my_id(), ((i * MAX_IO_BUF) + j), buffer[(i * MAX_IO_BUF) + j], i, j);
+                    printf("%d, %d is %d\n", i, j-2, buffer[(i * MAX_IO_BUF) + (j-2)]);
+                    printf("%d, %d is %d\n", i, j-1, buffer[(i * MAX_IO_BUF) + (j-1)]);
+                    printf("process %d: data was not what was written, expected %d, recieved %d at %d, %d\n",
+                        myid, ((i * MAX_IO_BUF) + j), buffer[(i * MAX_IO_BUF) + j], i, j);
+                    printf("receive is also %p\n", buffer[(i * MAX_IO_BUF) + j]);
+                    printf("%d, %d is %d\n", i, j+1, buffer[(i * MAX_IO_BUF) + (j+1)]);
+                    printf("%d, %d is %d\n", i, j+2, buffer[(i * MAX_IO_BUF) + (j+2)]);
                     assert(!"Failure");
                 }
             }

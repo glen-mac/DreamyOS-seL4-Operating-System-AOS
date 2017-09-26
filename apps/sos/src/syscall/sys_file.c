@@ -115,6 +115,12 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
             goto message_reply;
         }
 
+        /* Pin the frame, we dont want it paged out during these operations */
+        enum chance_type original_chance;
+        seL4_Word frame_id = frame_table_sos_vaddr_to_index(kvaddr);
+        assert(frame_table_get_chance(frame_id, &original_chance) == 0);
+        assert(frame_table_set_chance(frame_id, PINNED) == 0);
+
         bytes_this_round = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
         uiovec iov = {
             .uiov_base = (char *)kvaddr,
@@ -123,8 +129,10 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
         };
 
         if (access_mode == ACCESS_READ) {
-            if ((result = vn->vn_ops->vop_read(vn, &iov)) == -1)
+            if ((result = vn->vn_ops->vop_read(vn, &iov)) == -1) {
+                assert(frame_table_set_chance(frame_id, original_chance) == 0);
                 goto message_reply;
+            }
 
             /*
              * Difference between amount read and requested
@@ -139,10 +147,13 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
                 break;
             }
         } else {
-            if ((result = vn->vn_ops->vop_write(vn, &iov)) == -1)
+            if ((result = vn->vn_ops->vop_write(vn, &iov)) == -1) {
+                assert(frame_table_set_chance(frame_id, original_chance) == 0);
                 goto message_reply;
+            }
         }
 
+        assert(frame_table_set_chance(frame_id, original_chance) == 0);
         nbytes_remaining -= result;
         buf += result;
         open_file->fp += result;

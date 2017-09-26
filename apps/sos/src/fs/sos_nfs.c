@@ -146,7 +146,6 @@ sos_nfs_write(vnode *node, uiovec *iov)
 
     /* Loop to make sure entire page is written, as nfs could break it up into small packets */
     while (iov->uiov_len > 0) {
-        LOG_INFO("write: handle is %p", node->vn_data);
         if (nfs_write(node->vn_data, iov->uiov_pos, iov->uiov_len, iov->uiov_base, sos_nfs_write_callback, (uintptr_t)coro_getcur()) != RPC_OK)
             return -1;
 

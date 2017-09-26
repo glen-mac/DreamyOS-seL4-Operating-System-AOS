@@ -103,7 +103,7 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
     }
 
     pagefile_id &= (~EVICTED_BIT);
-    LOG_INFO("page is stored at %d", pagefile_id);
+    LOG_INFO("page is stored at %lu", pagefile_id);
 
     seL4_Word sos_vaddr;
 
