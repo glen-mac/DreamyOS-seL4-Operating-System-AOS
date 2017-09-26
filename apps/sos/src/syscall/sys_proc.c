@@ -14,9 +14,9 @@
 #include <utils/util.h>
 #include <utils/list.h>
 
-static seL4_Word do_proc_delete(pid_t pid);
+static int do_proc_delete(proc *curproc, pid_t victim_pid);
 
-seL4_Word
+int
 syscall_proc_create(proc *curproc)
 {
     LOG_INFO("proc %d made syscall_proc_create", curproc->pid);
@@ -40,17 +40,21 @@ syscall_proc_create(proc *curproc)
         return 1; /* nwords in message */
 }
 
-seL4_Word
+int
 syscall_proc_delete(proc *curproc)
 {
-    pid_t pid = seL4_GetMR(1);
-    LOG_INFO("Proc %d made proc_delete(%d)", curproc->pid, pid);
-    int ret_val = do_proc_delete(pid);
-    proc_destroy(get_proc(pid));
+    pid_t victim_pid = seL4_GetMR(1);
+    LOG_INFO("Proc %d made proc_delete(%d)", curproc->pid, victim_pid);
+    int ret_val = do_proc_delete(curproc, victim_pid);
+
+    /* TODO: This could be a problem, I dont think we want to destroy here */
+    /* I think we only want to destroy when a parent collects the process *
+    /* try doing tty_test with sleep 20 in the background, then kill it, then fg it */
+    // proc_destroy(get_proc(victim_pid));
     return ret_val;
 }
 
-seL4_Word
+int
 syscall_proc_id(proc *curproc)
 {
     LOG_INFO("syscall proc_id: PID %d", curproc->pid);
@@ -58,7 +62,7 @@ syscall_proc_id(proc *curproc)
     return 1; 
 }
 
-seL4_Word
+int
 syscall_proc_status(proc *curproc)
 {
     //TODO: currently might write over page boundary
@@ -90,7 +94,7 @@ syscall_proc_status(proc *curproc)
     return 1;
 }
 
-seL4_Word
+int
 syscall_proc_wait(proc *curproc)
 {
     pid_t pid = seL4_GetMR(1);
@@ -107,6 +111,7 @@ syscall_proc_wait(proc *curproc)
                 goto destroy;
             }
         }
+        /* Need to wait on a child */
         goto wait;
     }
 
@@ -133,21 +138,22 @@ syscall_proc_wait(proc *curproc)
         proc_destroy(get_proc(ret_val));
 
     message_reply:
+        LOG_INFO("message reply, ret_val %d", ret_val);
         seL4_SetMR(0, ret_val);
         return 1; /* Number of words to return */
 }
 
-seL4_Word
+int
 syscall_exit(proc *curproc)
 {
     LOG_INFO("proc %d called exit", curproc->pid);
-    return do_proc_delete(curproc->pid);
+    return do_proc_delete(curproc, curproc->pid);
 }
 
-static seL4_Word
-do_proc_delete(pid_t pid)
+static int
+do_proc_delete(proc *curproc, pid_t victim_pid)
 {
-    proc *victim = get_proc(pid);
+    proc *victim = get_proc(victim_pid);
     int ret_val = -1;
 
     // TODO: Handle async requests
@@ -208,6 +214,7 @@ do_proc_delete(pid_t pid)
     if (!parent) {
         LOG_ERROR("Unable to find parent");
         ret_val = -1;
+        goto message_reply;
     }
 
     if (proc_is_waiting(parent, victim)) {
@@ -217,5 +224,9 @@ do_proc_delete(pid_t pid)
 
     message_reply:
         seL4_SetMR(0, (seL4_Word)ret_val);
+        /* We dont want to reply if we destroyed ourselves, as the cap will be invalid */
+        if (curproc->pid == victim_pid)
+            return -1;
+
         return 1; /* nwords in message */
 }

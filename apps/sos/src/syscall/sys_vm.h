@@ -15,6 +15,6 @@
  * msg(1) newbrk
  * @returns nwords in return message
  */
-seL4_Word syscall_brk(proc * curproc);
+int syscall_brk(proc * curproc);
 
 #endif /* _SYS_VM_H_ */

@@ -17,7 +17,7 @@
 
 static void callback_sys_usleep(uint32_t id, void *data);
 
-seL4_Word
+int
 syscall_usleep(proc * curproc)
 {
     uint32_t ms_delay = seL4_GetMR(1);
@@ -32,7 +32,7 @@ syscall_usleep(proc * curproc)
     return 0;
 }
 
-seL4_Word
+int
 syscall_time_stamp(proc * curproc)
 {
     LOG_INFO("syscall: thread made sos_time_stamp()");

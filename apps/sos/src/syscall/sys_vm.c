@@ -9,7 +9,7 @@
 #include <proc/proc.h>
 #include <utils/util.h>
 
-seL4_Word
+int
 syscall_brk(proc *curproc)
 {
     seL4_Word newbrk = seL4_GetMR(1);

@@ -16,7 +16,7 @@
  * msg(2) mode
  * @returns nwords in return message
  */
-seL4_Word syscall_open(proc *curproc);
+int syscall_open(proc *curproc);
 
 /*
  * Syscall to write to a file
@@ -25,7 +25,7 @@ seL4_Word syscall_open(proc *curproc);
  * msg(3) buff_size
  * @returns nwords in return message
  */
-seL4_Word syscall_write(proc *curproc);
+int syscall_write(proc *curproc);
 
 /*
  * Syscall to read from a file
@@ -34,14 +34,14 @@ seL4_Word syscall_write(proc *curproc);
  * msg(3) buff_size
  * @returns nwords in return message 
  */
-seL4_Word syscall_read(proc *curproc);
+int syscall_read(proc *curproc);
 
 /*
  * Syscall to close to a file
  * msg(1) fd
  * @returns nwords in return message
  */
-seL4_Word syscall_close(proc *curproc);
+int syscall_close(proc *curproc);
 
 /*
  * Syscall to stat to a file
@@ -49,7 +49,7 @@ seL4_Word syscall_close(proc *curproc);
  * msg(2) buf_vaddr
  * @returns nwords in return message
  */
-seL4_Word syscall_stat(proc *curproc);
+int syscall_stat(proc *curproc);
 
 /*
  * Syscall to stat to a file
@@ -57,7 +57,7 @@ seL4_Word syscall_stat(proc *curproc);
  * msg(2) buf_vaddr
  * @returns nwords in return message
  */
-seL4_Word syscall_stat(proc *curproc);
+int syscall_stat(proc *curproc);
 
 /*
  * Syscall to list all files
@@ -65,6 +65,6 @@ seL4_Word syscall_stat(proc *curproc);
  * msg(2) nfiles
  * @returns nwords in return message
  */
-seL4_Word syscall_listdir(proc *curproc);
+int syscall_listdir(proc *curproc);
 
 #endif /* _SYS_FILE_H_ */

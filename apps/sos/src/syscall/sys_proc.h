@@ -16,20 +16,20 @@
  * msg(2) path_len
  * @returns nwords in return message
  */
-seL4_Word syscall_proc_create(proc *curproc);
+int syscall_proc_create(proc *curproc);
 
 /*
  * Syscall to delete a process
  * msg(1) pid
  * @returns nwords in return message
  */
-seL4_Word syscall_proc_delete(proc *curproc);
+int syscall_proc_delete(proc *curproc);
 
 /*
  * Syscall to return current proc pid
  * @returns nwords in return message 
  */
-seL4_Word syscall_proc_id(proc *curproc);
+int syscall_proc_id(proc *curproc);
 
 /*
  * Syscall to return status of current procs
@@ -37,20 +37,20 @@ seL4_Word syscall_proc_id(proc *curproc);
  * msg(2) max
  * @returns nwords in return message
  */
-seL4_Word syscall_proc_status(proc *curproc);
+int syscall_proc_status(proc *curproc);
 
 /*
  * Syscall to wait for a proc to exit
  * msg(1) pid
  * @returns nwords in return message
  */
-seL4_Word syscall_proc_wait(proc *curproc);
+int syscall_proc_wait(proc *curproc);
 
 /*
  * Syscall to exit a process
  * Called when a process calls exit()
  * Process terminates after this call, but the process struct is still intact
  */
-seL4_Word syscall_exit(proc *curproc);
+int syscall_exit(proc *curproc);
 
 #endif /* _SYS_PRC_H_ */

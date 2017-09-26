@@ -56,8 +56,10 @@ handle_syscall(seL4_Word pid)
     /* If syscall number is valid and function pointer is not NULL */
     if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) &&
         syscall_table[syscall_number]) {
-        seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, syscall_table[syscall_number](curproc));
-        if (syscall_number != SOS_SYS_EXIT) {
+        int nwords = syscall_table[syscall_number](curproc);
+        /* Only reply if nwords is non negative */
+        if (nwords >= 0) {
+            seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, nwords);
             seL4_Send(reply_cap, reply);
         }
     } else {

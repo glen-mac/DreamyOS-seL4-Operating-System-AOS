@@ -16,21 +16,21 @@
 #include <vm/vm.h>
 #include <utils/util.h>
 
-static seL4_Word syscall_do_read_write(seL4_Word access_mode, proc *curproc);
+static int syscall_do_read_write(seL4_Word access_mode, proc *curproc);
 
-seL4_Word
+int
 syscall_write(proc *curproc)
 {
     return syscall_do_read_write(ACCESS_WRITE, curproc);
 }
 
-seL4_Word
+int
 syscall_read(proc *curproc)
 {
     return syscall_do_read_write(ACCESS_READ, curproc);
 }
 
-seL4_Word
+int
 syscall_open(proc *curproc)
 {
     LOG_INFO("syscall: thread made sos_open");
@@ -63,7 +63,7 @@ syscall_open(proc *curproc)
         return 1; /* nwords in message */
 }
 
-seL4_Word
+int
 syscall_close(proc *curproc)
 {
     int fd = seL4_GetMR(1);
@@ -78,7 +78,7 @@ syscall_close(proc *curproc)
     return 1; /* nwords in message */
 }
 
-static seL4_Word
+static int
 syscall_do_read_write(seL4_Word access_mode, proc *curproc)
 {
     int result;
@@ -154,7 +154,7 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
         return 1;
 }
 
-seL4_Word
+int
 syscall_stat(proc * curproc)
 {
     LOG_INFO("syscall: thread made sos_stat");
@@ -181,7 +181,7 @@ syscall_stat(proc * curproc)
         return 1;
 }
 
-seL4_Word
+int
 syscall_listdir(proc * curproc)
 {
     LOG_INFO("syscall: thread made sos_getdirent");
