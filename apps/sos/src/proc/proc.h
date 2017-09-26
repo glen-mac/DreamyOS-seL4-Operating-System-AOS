@@ -48,6 +48,8 @@ typedef struct _proc {
     char proc_name[N_NAME];         /* process name */
     int64_t stime;                  /* process start time */
     proc_states p_state;            /* enum of the process state */
+
+    bool kill_flag;                 /* Flag to specify if this process has received a kill signal */
 } proc;
 
 /*
@@ -58,6 +60,14 @@ typedef struct _proc {
  * @return -1 on error, pid on success
  */
 pid_t proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent_pid);
+
+/*
+ * Delete a process
+ * Remove all metadata except the proc struct itself
+ * @param victim, the proc to delete
+ * @returns 0 on success, else 1
+ */
+int proc_delete(proc *victim);
 
 /*
  * Destroy a process
@@ -87,5 +97,12 @@ bool proc_is_waiting(proc *parent, proc *child);
  * @returns process struct pointer
  */
 proc *get_proc(pid_t pid);
+
+/*
+ * Change proc state
+ * @param pid, the pid of the process to mark
+ * @param state, the new state of the proc
+ */
+void proc_mark(proc *curproc, proc_states state);
 
 #endif /* _PROC_H_ */

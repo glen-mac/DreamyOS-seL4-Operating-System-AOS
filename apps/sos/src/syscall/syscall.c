@@ -56,7 +56,16 @@ handle_syscall(seL4_Word pid)
     /* If syscall number is valid and function pointer is not NULL */
     if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) &&
         syscall_table[syscall_number]) {
+        proc_mark(curproc, BLOCKED);
         int nwords = syscall_table[syscall_number](curproc);
+        proc_mark(curproc, RUNNING);
+
+        if (curproc->kill_flag) {
+            LOG_INFO("%d being killed", curproc->pid);
+            proc_delete(curproc);
+            nwords = -1;
+        }
+
         /* Only reply if nwords is non negative */
         if (nwords >= 0) {
             seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, nwords);

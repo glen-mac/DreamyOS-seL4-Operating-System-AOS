@@ -12,6 +12,7 @@
 #include <sys/debug.h>
 #include <sys/panic.h>
 #include <syscall/syscall.h>
+#include <proc/proc.h>
 #include <utils/util.h>
 #include "network.h"
 

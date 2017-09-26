@@ -14,7 +14,7 @@
 #include <utils/util.h>
 #include <utils/list.h>
 
-static int do_proc_delete(proc *curproc, pid_t victim_pid);
+static int proc_delete_async_check(proc *curproc, pid_t victim_pid);
 
 int
 syscall_proc_create(proc *curproc)
@@ -45,12 +45,7 @@ syscall_proc_delete(proc *curproc)
 {
     pid_t victim_pid = seL4_GetMR(1);
     LOG_INFO("Proc %d made proc_delete(%d)", curproc->pid, victim_pid);
-    int ret_val = do_proc_delete(curproc, victim_pid);
-
-    /* TODO: This could be a problem, I dont think we want to destroy here */
-    /* I think we only want to destroy when a parent collects the process *
-    /* try doing tty_test with sleep 20 in the background, then kill it, then fg it */
-    // proc_destroy(get_proc(victim_pid));
+    int ret_val = proc_delete_async_check(curproc, victim_pid);
     return ret_val;
 }
 
@@ -65,7 +60,8 @@ syscall_proc_id(proc *curproc)
 int
 syscall_proc_status(proc *curproc)
 {
-    //TODO: currently might write over page boundary
+    // TODO: currently might write over page boundary
+
     LOG_INFO("syscall proc_status: PID %d", curproc->pid);
     sos_process_t * sos_procs = (sos_process_t *)vaddr_to_sos_vaddr(curproc, seL4_GetMR(1), ACCESS_READ);
     seL4_Word procs_max = seL4_GetMR(2);
@@ -146,90 +142,44 @@ int
 syscall_exit(proc *curproc)
 {
     LOG_INFO("proc %d called exit", curproc->pid);
-    return do_proc_delete(curproc, curproc->pid);
+    return proc_delete_async_check(curproc, curproc->pid);
 }
 
-static int
-do_proc_delete(proc *curproc, pid_t victim_pid)
+int
+proc_delete_async_check(proc *curproc, pid_t victim_pid)
 {
-    proc *victim = get_proc(victim_pid);
     int ret_val = -1;
-
+    bool no_reply = FALSE;
+    proc *victim = get_proc(victim_pid);
     if (!victim) {
         LOG_ERROR("Invalid process");
         goto message_reply;
     }
 
-    // TODO: Handle async requests
-
-    if (victim->p_state != RUNNING) {
-        LOG_ERROR("Can only delete running processes");
-        goto message_reply;
-    }
-    victim->p_state = ZOMBIE;
-
-    /* Stop the thread */
-    if (seL4_TCB_Suspend(victim->tcb_cap) != 0) {
-        LOG_ERROR("Failed to suspend thread");
+    if (victim->p_state == BLOCKED) {
+        /* 
+         * If the proc is blocked, we mark it for death
+         * It will be deleted when it becomes unblocked
+         */
+        LOG_INFO("Process is blocked");
+        victim->kill_flag = TRUE;
+        ret_val = victim->pid;
         goto message_reply;
     }
 
-    // TODO Destroy TCB???
-    victim->tcb_cap = NULL;
-
-    /* IPC destroy */
-    if (seL4_ARM_Page_Unmap(victim->ipc_buffer_cap) != 0) {
-        LOG_ERROR("Failed to unmap IPC buffer");
+    if (proc_delete(victim) != 0) {
+        LOG_ERROR("Failed to delete process");
         goto message_reply;
     }
 
-    if (cspace_delete_cap(cur_cspace, victim->ipc_buffer_cap) != 0) {
-        LOG_ERROR("Failed to delete IPC buffer cap");
-        goto message_reply;
-    }
-    victim->ipc_buffer_cap = NULL;
-
-    /* Destroy the Cspace */
-    if (cspace_destroy(victim->croot) != CSPACE_NOERROR) {
-        LOG_ERROR("Failed to destroy cspace");
-        goto message_reply;
-    }
-    victim->croot = NULL;
-
-    /* Destroy the address space */
-    if (as_destroy(victim->p_addrspace) != 0) {
-        LOG_ERROR("Failed to destroy addrspace");
-        goto message_reply;
-    }
-    victim->p_addrspace = NULL;
-
-    /* Destroy the file table */
-    if (fdtable_destroy(victim->file_table) != 0) {
-        LOG_ERROR("Failed to destroy file table");
-        goto message_reply;
-    }
-
-    victim->file_table = NULL;
-
-    /* victim is not running but the struct is still needed for wait pid */
     ret_val = victim->pid;
-
-    proc *parent = get_proc(victim->ppid);
-    if (!parent) {
-        LOG_ERROR("Unable to find parent");
-        ret_val = -1;
-        goto message_reply;
-    }
-
-    if (proc_is_waiting(parent, victim)) {
-        LOG_INFO("resuming coroutine");
-        resume(parent->waiting_coro, victim->pid);
-    }
+    if (curproc->pid == victim_pid)
+        no_reply = TRUE;
 
     message_reply:
         seL4_SetMR(0, (seL4_Word)ret_val);
         /* We dont want to reply if we destroyed ourselves, as the cap will be invalid */
-        if (curproc->pid == victim_pid)
+        if (no_reply)
             return -1;
 
         return 1; /* nwords in message */

@@ -78,6 +78,7 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     new_proc->pid = new_pid;
     new_proc->waiting_on = -1;
     new_proc->waiting_coro = NULL;
+    new_proc->kill_flag = FALSE;
 
     /* Store new proc */
     sos_procs[new_pid] = new_proc;
@@ -153,6 +154,77 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     new_proc->proc_name[31] = NULL;
 
     return new_pid;
+}
+
+int
+proc_delete(proc *victim)
+{
+    int ret_val = 1;
+
+    if (victim->p_state == ZOMBIE) {
+        LOG_ERROR("Cannot delete zombie processes");
+        goto error;
+    }
+    victim->p_state = ZOMBIE;
+
+    /* Stop the thread */
+    if (seL4_TCB_Suspend(victim->tcb_cap) != 0) {
+        LOG_ERROR("Failed to suspend thread");
+        goto error;
+    }
+
+    // TODO Destroy TCB???
+
+    victim->tcb_cap = NULL;
+
+    /* IPC destroy */
+    if (seL4_ARM_Page_Unmap(victim->ipc_buffer_cap) != 0) {
+        LOG_ERROR("Failed to unmap IPC buffer");
+        goto error;
+    }
+
+    if (cspace_delete_cap(cur_cspace, victim->ipc_buffer_cap) != 0) {
+        LOG_ERROR("Failed to delete IPC buffer cap");
+        goto error;
+    }
+    victim->ipc_buffer_cap = NULL;
+
+    /* Destroy the Cspace */
+    if (cspace_destroy(victim->croot) != CSPACE_NOERROR) {
+        LOG_ERROR("Failed to destroy cspace");
+        goto error;
+    }
+    victim->croot = NULL;
+
+    /* Destroy the address space */
+    if (as_destroy(victim->p_addrspace) != 0) {
+        LOG_ERROR("Failed to destroy addrspace");
+        goto error;
+    }
+    victim->p_addrspace = NULL;
+
+    /* Destroy the file table */
+    if (fdtable_destroy(victim->file_table) != 0) {
+        LOG_ERROR("Failed to destroy file table");
+        goto error;
+    }
+
+    victim->file_table = NULL;
+
+    proc *parent = get_proc(victim->ppid);
+    if (!parent) {
+        LOG_ERROR("Unable to find parent");
+        goto error;
+    }
+
+    if (proc_is_waiting(parent, victim)) {
+        LOG_INFO("resuming coroutine");
+        resume(parent->waiting_coro, victim->pid);
+    }
+
+    ret_val = 0;
+    error:
+        return ret_val;
 }
 
 void
@@ -283,4 +355,10 @@ get_proc(pid_t pid)
     }
 
     return sos_procs[pid];
+}
+
+void
+proc_mark(proc *curproc, proc_states state)
+{
+    curproc->p_state = state;
 }

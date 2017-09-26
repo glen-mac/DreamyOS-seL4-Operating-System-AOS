@@ -73,6 +73,8 @@ vm_fault(seL4_Word pid)
 
     LOG_INFO("vm_fault by process %d", pid);
     proc *curproc = get_proc(pid);
+    assert(curproc != NULL);
+    proc_mark(curproc, BLOCKED);
 
     /* Ordering defined by seL4 */
     seL4_Word fault_pc = seL4_GetMR(0);
@@ -113,6 +115,13 @@ vm_fault(seL4_Word pid)
     }
 
     thread_restart:
+        proc_mark(curproc, RUNNING);
+        if (curproc->kill_flag) {
+            LOG_INFO("%d being killed", curproc->pid);
+            proc_delete(curproc);
+            return;
+        }
+
         reply = seL4_MessageInfo_new(0, 0, 0, 0);
         seL4_Send(reply_cap, reply);
         cspace_free_slot(cur_cspace, reply_cap);
