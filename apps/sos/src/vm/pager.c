@@ -121,7 +121,8 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
     pagefile_op_node * op_node = malloc(sizeof(pagefile_op_node));
     op_node->pagefile_id = pagefile_id;
     int add_result = list_action(pagefile_operations, (void *)op_node, pagefile_op_compare, pagefile_op_append);
-    if (add_result == -1) {
+    LOG_INFO("Page in: add_result %d", add_result);
+    if (add_result == 1) {
         /* add it to the operations list, and init the waiting coros
            list so other coros can append themselves to it to be served later */
         list_init(op_node->waiting_coros);
@@ -292,10 +293,11 @@ evict_frame(seL4_Word frame_id)
     LOG_INFO("page entry evicted");
 
     /* race condition cover */
-    pagefile_op_node * op_node = malloc(sizeof(pagefile_op_node));
+    pagefile_op_node *op_node = malloc(sizeof(pagefile_op_node));
     op_node->pagefile_id = pagefile_id;
     int add_result = list_action(pagefile_operations, (void *)op_node, pagefile_op_compare, pagefile_op_append);
-    if (add_result == -1) {
+    LOG_INFO("Page in: add_result %d", add_result);
+    if (add_result == 1) {
         /* add it to the operations list, and init the waiting coros
            list so other coros can append themselves to it to be served later */
         list_init(op_node->waiting_coros);
