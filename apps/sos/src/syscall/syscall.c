@@ -57,10 +57,17 @@ handle_syscall(seL4_Word pid)
     if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) &&
         syscall_table[syscall_number]) {
         proc_mark(curproc, BLOCKED);
+
+        LOG_INFO("%d 1 blocked_ref is %d", curproc->pid, curproc->blocked_ref);
+        curproc->blocked_ref += 1;
+        LOG_INFO("%d 2 blocked_ref is %d", curproc->pid, curproc->blocked_ref);
         int nwords = syscall_table[syscall_number](curproc);
         proc_mark(curproc, RUNNING);
+        LOG_INFO("%d 3 blocked_ref is %d", curproc->pid, curproc->blocked_ref);
+        curproc->blocked_ref -= 1;
+        LOG_INFO("%d 4 blocked_ref is %d", curproc->pid, curproc->blocked_ref);
 
-        if (curproc->kill_flag) {
+        if (curproc->kill_flag && curproc->blocked_ref == 0) {
             LOG_INFO("%d being killed", curproc->pid);
             proc_delete(curproc);
             nwords = -1;

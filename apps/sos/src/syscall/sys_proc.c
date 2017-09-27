@@ -30,11 +30,6 @@ syscall_proc_create(proc *curproc)
         goto message_reply;
     }
 
-    if (list_prepend(curproc->children, pid) != 0) {
-        LOG_ERROR("Error creating child");
-        pid = -1;
-    }
-
     message_reply:
         seL4_SetMR(0, (seL4_Word)pid);
         return 1; /* nwords in message */

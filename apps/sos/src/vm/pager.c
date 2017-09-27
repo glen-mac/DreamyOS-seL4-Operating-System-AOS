@@ -23,7 +23,7 @@
 #include <sys/panic.h>
 #include <strings.h>
 
-#define PAGEFILE_MAX_PAGES 1000 // BYTES_TO_4K_PAGES(BIT(31)) // 2 GB pagefile size
+#define PAGEFILE_MAX_PAGES 5000 // BYTES_TO_4K_PAGES(BIT(31)) // 2 GB pagefile size
 
 /* Variable to represent where we are up to in our search for a victim page */
 static volatile seL4_Word current_page = 0;
@@ -126,6 +126,7 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
     
     /* If an operation is already happening, yield */
     if (list_length(pagefile_operations) > 1) {
+        LOG_INFO("yielding");
         yield(NULL);
         LOG_INFO("page_in: resumed coro");
     }

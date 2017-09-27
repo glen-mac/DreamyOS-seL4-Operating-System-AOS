@@ -75,6 +75,8 @@ vm_fault(seL4_Word pid)
     proc *curproc = get_proc(pid);
     assert(curproc != NULL);
     proc_mark(curproc, BLOCKED);
+    curproc->blocked_ref += 1;
+    LOG_INFO("%d vm_fault start blocked_ref is %d", curproc->pid, curproc->blocked_ref);
 
     /* Ordering defined by seL4 */
     seL4_Word fault_pc = seL4_GetMR(0);
@@ -116,7 +118,9 @@ vm_fault(seL4_Word pid)
 
     thread_restart:
         proc_mark(curproc, RUNNING);
-        if (curproc->kill_flag) {
+        curproc->blocked_ref -= 1;
+        LOG_INFO("%d vm_fault restart blocked_ref is %d", curproc->pid, curproc->blocked_ref);
+        if (curproc->kill_flag && curproc->blocked_ref == 0) {
             LOG_INFO("%d being killed", curproc->pid);
             proc_delete(curproc);
             return;
@@ -128,6 +132,8 @@ vm_fault(seL4_Word pid)
         return;
 
     fault_error:
+        // TODO: maybe we need the kill flag logic here?
+        curproc->blocked_ref -= 1;
         cspace_free_slot(cur_cspace, reply_cap);
         LOG_INFO("%d being killed", curproc->pid);
         proc_delete(curproc);

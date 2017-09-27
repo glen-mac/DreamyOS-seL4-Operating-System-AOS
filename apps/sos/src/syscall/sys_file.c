@@ -34,6 +34,7 @@ int
 syscall_open(proc *curproc)
 {
     LOG_INFO("syscall: thread made sos_open");
+    LOG_INFO("MODE IS %d", seL4_GetMR(2));
 
     // TODO: Hard copy the filename because it might cross a page boundary
 

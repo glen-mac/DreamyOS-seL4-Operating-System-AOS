@@ -31,7 +31,7 @@ typedef enum {
 
 /* Process Struct */
 typedef struct _proc {
-    seL4_Word tcp_addr;
+    seL4_Word tcb_addr;
     seL4_TCB tcb_cap;               /* thread control block cap */
     seL4_CPtr ipc_buffer_cap;       /* ipc buffer cap */
 
@@ -50,6 +50,7 @@ typedef struct _proc {
     int64_t stime;                  /* process start time */
     proc_states p_state;            /* enum of the process state */
 
+    size_t blocked_ref;             /* Number of blocks on this process */
     bool kill_flag;                 /* Flag to specify if this process has received a kill signal */
     bool protected;                 /* Flag to specify if the process can be killed */
 } proc;

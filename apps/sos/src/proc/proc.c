@@ -105,13 +105,14 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     seL4_Word paddr = ut_alloc(seL4_PageBits);
     if (paddr == NULL) {
         LOG_ERROR("No memory for IPC buffer");
-        return NULL;
+        return -1;
     }
     
     /* Allocate IPC buffer */
     if (cspace_ut_retype_addr(paddr, seL4_ARM_SmallPageObject, seL4_PageBits,
                               cur_cspace, &new_proc->ipc_buffer_cap) != 0) {
         LOG_ERROR("Unable to allocate page for IPC buffer");
+        return -1;
     }
 
     /* Copy the fault endpoint to the user app to enable IPC */
@@ -124,14 +125,14 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     assert(user_ep_cap == 1);
 
     /* Create a new TCB object */
-    if ((new_proc->tcp_addr = ut_alloc(seL4_TCBBits)) == NULL) {
+    if ((new_proc->tcb_addr = ut_alloc(seL4_TCBBits)) == NULL) {
         LOG_ERROR("No memory for TCB");
-        return NULL;
+        return -1;
     }
     
-    if (cspace_ut_retype_addr(new_proc->tcp_addr, seL4_TCBObject, seL4_TCBBits, cur_cspace, &(new_proc->tcb_cap)) != 0) {
+    if (cspace_ut_retype_addr(new_proc->tcb_addr, seL4_TCBObject, seL4_TCBBits, cur_cspace, &(new_proc->tcb_cap)) != 0) {
         LOG_ERROR("Failed to create TCB");
-        return NULL;
+        return -1;
     }
 
     /* Configure the TCB */
@@ -140,7 +141,7 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
                              new_proc->p_addrspace->vspace, seL4_NilData, PROCESS_IPC_BUFFER,
                              new_proc->ipc_buffer_cap)) {
         LOG_ERROR("Unable to configure new TCB");
-        return NULL;
+        return -1;
     }
 
     new_proc->ppid = parent_pid;
@@ -199,6 +200,7 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
         LOG_ERROR("Unable to open STDIN");
         proc_delete(new_proc);
         proc_destroy(new_proc);
+        return -1;
     }
     fdtable_insert(new_proc->file_table, STDIN_FILENO, open_file);
 
@@ -207,6 +209,7 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
         LOG_ERROR("Unable to open STDOUT");
         proc_delete(new_proc);
         proc_destroy(new_proc);
+        return -1;
     }
     fdtable_insert(new_proc->file_table, STDOUT_FILENO, open_file);
 
@@ -215,6 +218,7 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
         LOG_ERROR("Unable to open STDERR");
         proc_delete(new_proc);
         proc_destroy(new_proc);
+        return -1;
     }
     fdtable_insert(new_proc->file_table, STDERR_FILENO, open_file);    
 
@@ -234,6 +238,15 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     
     /* Copy the name and null terminate */
     new_proc->proc_name = strdup(app_name);
+
+    proc *parent = get_proc(parent_pid);
+    assert(parent != NULL);
+    if (list_prepend(parent->children, new_pid) != 0) {
+        LOG_ERROR("Error creating child");
+        proc_delete(new_proc);
+        proc_destroy(new_proc);
+        return -1;
+    }
 
     /* Store new proc */
     sos_procs[new_pid] = new_proc;
@@ -268,8 +281,8 @@ proc_delete(proc *victim)
         goto error;
     }
     victim->tcb_cap = NULL;
-    ut_free(victim->tcp_addr, seL4_TCBBits);
-    victim->tcp_addr = NULL;
+    ut_free(victim->tcb_addr, seL4_TCBBits);
+    victim->tcb_addr = NULL;
 
     /* IPC destroy */
     if (seL4_ARM_Page_Unmap(victim->ipc_buffer_cap) != 0) {
@@ -304,11 +317,15 @@ proc_delete(proc *victim)
     }
     victim->file_table = NULL;
 
+    LOG_INFO("BEFORE REPARENT");
+
     /* Reparent all children to the init process */
     if (proc_reparent_children(victim, 0) != 0) {
         LOG_ERROR("Failed to reparent children");
         goto error;
     }
+
+    LOG_INFO("AFTER REPARENT");
 
     proc *parent = get_proc(victim->ppid);
     if (!parent) {
@@ -329,6 +346,11 @@ proc_delete(proc *victim)
 void
 proc_destroy(proc *current)
 {
+    /* Remove proc as child from parent */
+    proc *parent = get_proc(current->ppid);
+    LOG_INFO("removing %d from %d", current->pid, parent->pid);
+    list_remove(parent->children, current->pid, list_cmp_equality);
+
     sos_procs[current->pid] = NULL;
     free(current);
 }
@@ -375,6 +397,7 @@ proc_create(void)
     }
 
     new_proc->protected = FALSE;
+    new_proc->blocked_ref = 0;
 
     return new_proc;
 }
@@ -429,8 +452,13 @@ proc_reparent_children(proc *cur_parent, pid_t new_parent)
     if (new_parent_proc == NULL)
         return 1;
 
+    LOG_INFO("cur_parent is %p", cur_parent);
+    LOG_INFO("cur_parent children is %p", cur_parent->children);
     for (struct list_node *curr = cur_parent->children->head; curr != NULL; curr = curr->next) {
+        LOG_INFO("curr is %p", curr);
+        LOG_INFO("curr->data is %d", curr->data);
         proc *child = get_proc(curr->data);
+        LOG_INFO("child is %p", child);
         child->ppid = new_parent_proc->pid;
         list_prepend(new_parent_proc->children, curr->data);
     }

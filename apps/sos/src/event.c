@@ -59,5 +59,6 @@ init_wait_on_children(proc *init)
     init->waiting_coro = coro_getcur();
     int pid = yield(NULL);
     init->waiting_coro = NULL;
+    LOG_INFO("SOS Cleaning up %d", pid);
     proc_destroy(get_proc(pid));
 }
