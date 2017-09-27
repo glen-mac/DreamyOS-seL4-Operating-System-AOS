@@ -31,6 +31,7 @@ typedef enum {
 
 /* Process Struct */
 typedef struct _proc {
+    seL4_Word tcp_addr;
     seL4_TCB tcb_cap;               /* thread control block cap */
     seL4_CPtr ipc_buffer_cap;       /* ipc buffer cap */
 

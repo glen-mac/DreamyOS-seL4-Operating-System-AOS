@@ -128,13 +128,10 @@ vm_fault(seL4_Word pid)
         return;
 
     fault_error:
-        syscall_exit(curproc);
-        proc_mark(curproc, RUNNING);
-        if (curproc->kill_flag) {
-            LOG_INFO("%d being killed", curproc->pid);
-            proc_delete(curproc);
-            return;
-        }
+        cspace_free_slot(cur_cspace, reply_cap);
+        LOG_INFO("%d being killed", curproc->pid);
+        proc_delete(curproc);
+        return;
 }
 
 page_directory *

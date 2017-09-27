@@ -124,13 +124,12 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     assert(user_ep_cap == 1);
 
     /* Create a new TCB object */
-    paddr = ut_alloc(seL4_TCBBits);
-    if (paddr == NULL) {
+    if ((new_proc->tcp_addr = ut_alloc(seL4_TCBBits)) == NULL) {
         LOG_ERROR("No memory for TCB");
         return NULL;
     }
     
-    if (cspace_ut_retype_addr(paddr, seL4_TCBObject, seL4_TCBBits, cur_cspace, &new_proc->tcb_cap) != 0) {
+    if (cspace_ut_retype_addr(new_proc->tcp_addr, seL4_TCBObject, seL4_TCBBits, cur_cspace, &(new_proc->tcb_cap)) != 0) {
         LOG_ERROR("Failed to create TCB");
         return NULL;
     }
@@ -263,9 +262,14 @@ proc_delete(proc *victim)
         goto error;
     }
 
-    // TODO Destroy TCB???
-
+    /* TCB Destroy */
+    if (cspace_delete_cap(cur_cspace, victim->tcb_cap) != CSPACE_NOERROR) {
+        LOG_ERROR("Failed to delete cap for TCB");
+        goto error;
+    }
     victim->tcb_cap = NULL;
+    ut_free(victim->tcp_addr, seL4_TCBBits);
+    victim->tcp_addr = NULL;
 
     /* IPC destroy */
     if (seL4_ARM_Page_Unmap(victim->ipc_buffer_cap) != 0) {
