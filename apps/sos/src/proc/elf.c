@@ -102,9 +102,8 @@ load_segment_into_vspace(proc *curproc,
     while (pos < segment_size) {
         seL4_Word vpage = PAGE_ALIGN_4K(dst);
 
-        err = sos_map_page(curproc, vpage, permissions, &kdst);
-        // TODO: Return error instead of panicing
-        conditional_panic(err, "mapping elf segment failed failed");
+        if (sos_map_page(curproc, vpage, permissions, &kdst) != 0)
+            return 1;
 
         /* Now copy our data into the destination vspace. */
         nbytes = PAGE_SIZE_4K - (dst & PAGE_MASK_4K);
@@ -159,9 +158,9 @@ elf_load(proc *curproc, char *elf_file)
         /* Copy into the address space */
         // TODO: Should probably return error here instead of panicing.
         LOG_INFO("Loading segment %08x-->%08x", (int)vaddr, (int)(vaddr + segment_size));
-        err = load_segment_into_vspace(curproc, source_addr, segment_size, file_size, vaddr,
-                                       get_sel4_rights_from_elf(flags), pin);
-        conditional_panic(err != 0, "Elf loading failed!\n");
+        if (load_segment_into_vspace(curproc, source_addr, segment_size, file_size, vaddr,
+                                       get_sel4_rights_from_elf(flags), pin) != 0)
+            return 1;
         pin = FALSE;
     }
 

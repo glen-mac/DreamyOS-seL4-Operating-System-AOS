@@ -128,8 +128,13 @@ vm_fault(seL4_Word pid)
         return;
 
     fault_error:
-        // TODO SEGFAULT MESSAGE
         syscall_exit(curproc);
+        proc_mark(curproc, RUNNING);
+        if (curproc->kill_flag) {
+            LOG_INFO("%d being killed", curproc->pid);
+            proc_delete(curproc);
+            return;
+        }
 }
 
 page_directory *
