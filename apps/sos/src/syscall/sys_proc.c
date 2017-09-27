@@ -21,8 +21,10 @@ syscall_proc_create(proc *curproc)
 {
     LOG_INFO("proc %d made syscall_proc_create", curproc->pid);
 
+    seL4_Word name = seL4_GetMR(1);
+
     // TODO: Hard copy the filename because it might cross a page boundary
-    seL4_Word name = vaddr_to_sos_vaddr(curproc, seL4_GetMR(1), ACCESS_READ);
+    name = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ);
 
     pid_t pid = proc_start(_cpio_archive, name, _sos_ipc_ep_cap, curproc->pid);
     if (pid == -1) {
@@ -58,8 +60,10 @@ syscall_proc_status(proc *curproc)
     // TODO: currently might write over page boundary
 
     LOG_INFO("syscall proc_status: PID %d", curproc->pid);
-    sos_process_t * sos_procs = (sos_process_t *)vaddr_to_sos_vaddr(curproc, seL4_GetMR(1), ACCESS_READ);
+    seL4_Word sos_procs_addr = seL4_GetMR(1);
     seL4_Word procs_max = seL4_GetMR(2);
+
+    sos_process_t *sos_procs = (sos_process_t *)vaddr_to_sos_vaddr(curproc, sos_procs_addr, ACCESS_READ);
     seL4_Word num_found = 0;
     pid_t c_id = 0;
     proc *c_proc;
@@ -173,6 +177,7 @@ proc_delete_async_check(proc *curproc, pid_t victim_pid)
         no_reply = TRUE;
 
     message_reply:
+        LOG_INFO("SETTING RETVAL %d", ret_val);
         seL4_SetMR(0, (seL4_Word)ret_val);
         /* We dont want to reply if we destroyed ourselves, as the cap will be invalid */
         if (no_reply)

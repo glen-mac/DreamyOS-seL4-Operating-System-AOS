@@ -434,6 +434,7 @@ vm_translate(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *s
 
     seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(page_cap);
     *sos_vaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
+
     return 0;
 }
 

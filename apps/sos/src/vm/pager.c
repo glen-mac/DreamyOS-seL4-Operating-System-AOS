@@ -123,14 +123,13 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
         LOG_ERROR("failed to queue paging operation");
         goto next_operation;
     }
-    
+ 
     /* If an operation is already happening, yield */
     if (list_length(pagefile_operations) > 1) {
         LOG_INFO("yielding");
         yield(NULL);
         LOG_INFO("page_in: resumed coro");
     }
-
 
     /* Read the page in from the pagefile and into memory */
     vnode handle = {.vn_data = &pagefile_handle};
@@ -150,7 +149,6 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
         }
 
         char *data_ptr = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining));
-
         bytes_remaining -= result;
     } while (bytes_remaining > 0);
 
@@ -249,7 +247,6 @@ next_victim(void)
             goto next;
 
         assert(frame_table_get_chance(current_page, &chance) == 0);
-        LOG_INFO("chance baby %d", current_page);
         switch (chance) {
             /* Increment the chance of the current page and move on */
             case FIRST_CHANCE:

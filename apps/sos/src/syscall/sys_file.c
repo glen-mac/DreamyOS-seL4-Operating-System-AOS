@@ -34,17 +34,16 @@ int
 syscall_open(proc *curproc)
 {
     LOG_INFO("syscall: thread made sos_open");
-    LOG_INFO("MODE IS %d", seL4_GetMR(2));
+
+    seL4_Word name = seL4_GetMR(1);
+    fmode_t mode = seL4_GetMR(2);
 
     // TODO: Hard copy the filename because it might cross a page boundary
-
-    seL4_Word name = vaddr_to_sos_vaddr(curproc, seL4_GetMR(1), ACCESS_READ);
-    fmode_t mode = seL4_GetMR(2);
-    LOG_INFO("sycall: thread made open(%s, %d)", (char *)name, mode);
+    name = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ); 
 
     int result;
-
     int fd;
+
     if ((result = fdtable_get_unused_fd(curproc->file_table, &fd)) != 0) {
         result = -1;
         goto message_reply;
@@ -201,8 +200,10 @@ syscall_listdir(proc * curproc)
     int result = -1;
 
     seL4_Word pos = seL4_GetMR(1);
-    seL4_Word uname = vaddr_to_sos_vaddr(curproc, seL4_GetMR(2), ACCESS_WRITE);
+    seL4_Word uname = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
+
+    uname = vaddr_to_sos_vaddr(curproc, uname, ACCESS_WRITE);
 
     char **dir;
     size_t nfiles = 0;
