@@ -165,6 +165,10 @@ int
 sos_nfs_read(vnode *node, uiovec *iov)
 {
     nfs_cb *cb = (nfs_cb *)malloc(sizeof(nfs_cb));
+    if (cb == NULL) {
+        LOG_ERROR("Error creating callback struct");
+        return -1;
+    }
     cb->routine = coro_getcur();
     cb->iv = iov;
 
@@ -173,8 +177,10 @@ sos_nfs_read(vnode *node, uiovec *iov)
 
     /* Loop to make sure entire page is written, as nfs could break it up into small packets */
     while (iov->uiov_len > 0) {
-        if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)cb) != RPC_OK)
+        if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)cb) != RPC_OK) {
+            LOG_ERROR("Error in nfs_read");
             return -1;
+        }
 
         ret = yield(NULL);
         if (*ret == 0 || *ret == -1)

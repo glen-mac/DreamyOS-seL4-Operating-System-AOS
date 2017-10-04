@@ -69,7 +69,7 @@ frame_table_init(seL4_Word paddr, seL4_Word size_in_bits, seL4_Word low, seL4_Wo
      *
      * We set aside 80% of the memory for user application frames, and 20% of UT for SOS.
      */
-    frame_table_max = 1400;//BYTES_TO_4K_PAGES(ut_top - ut_base) * FT_PORTION;
+    frame_table_max = BYTES_TO_4K_PAGES(ut_top - ut_base) * FT_PORTION;
     LOG_INFO("frame_table_max is %d", frame_table_max);
 
     seL4_ARM_Page frame_cap;

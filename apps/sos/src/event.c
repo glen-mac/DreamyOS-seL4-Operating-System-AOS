@@ -16,6 +16,7 @@
 #include <utils/util.h>
 #include "network.h"
 
+static void start_first_proc(void);
 static void init_wait_on_children(proc *init);
 
 void
@@ -24,6 +25,11 @@ event_loop(const seL4_CPtr ep)
     seL4_Word badge;
     seL4_Word label;
     seL4_MessageInfo_t message;
+
+    /* Start the startup user application */
+    resume(coroutine(start_first_proc), NULL);
+
+    LOG_INFO("returned from start_first_proc");
 
     while (TRUE) {
         /* Wait on children if not already waiting */
@@ -61,4 +67,10 @@ init_wait_on_children(proc *init)
     init->waiting_coro = NULL;
     LOG_INFO("SOS Cleaning up %d", pid);
     proc_destroy(get_proc(pid));
+}
+
+static void
+start_first_proc(void)
+{
+    assert(proc_start(CONFIG_SOS_STARTUP_APP, _sos_ipc_ep_cap, 0) != -1);
 }

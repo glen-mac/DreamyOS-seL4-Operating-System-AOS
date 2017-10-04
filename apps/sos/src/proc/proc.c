@@ -75,7 +75,7 @@ pid_t proc_bootstrap(void)
 }
 
 pid_t
-proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
+proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
 {
     int err;
     pid_t new_pid;
@@ -155,14 +155,8 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     seL4_DebugNameThread(new_proc->tcb_cap, app_name);
 #endif
 
-    if ((elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size)) == NULL) {
-        LOG_ERROR("Unable to locate cpio header");
-        proc_delete(new_proc);
-        proc_destroy(new_proc);
-        return -1;
-    }
-
-    if (elf_load(new_proc, elf_base) != 0) {
+    uint64_t elf_pc = 0;
+    if (elf_load(new_proc, app_name, &elf_pc) != 0) {
         LOG_ERROR("Error loading elf");
         proc_delete(new_proc);
         proc_destroy(new_proc);
@@ -176,6 +170,8 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
         return -1;
     }
 
+    LOG_INFO("MEOW");
+
     /* Map in the IPC buffer for the thread */
     seL4_CPtr pt_cap;
     if (map_page(new_proc->ipc_buffer_cap, new_proc->p_addrspace->vspace,
@@ -186,6 +182,8 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
         return -1;
     }
 
+    LOG_INFO("MEOW2");
+
     /* create region for the ipc buffer */
     region *ipc_region = as_create_region(PROCESS_IPC_BUFFER, PAGE_SIZE_4K, seL4_CanRead | seL4_CanWrite);
     as_add_region(new_proc->p_addrspace, ipc_region);
@@ -194,6 +192,8 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
 
     /* Open stdin, stdout and stderr */
     file *open_file;
+
+    LOG_INFO("MEOW3");
 
     /* STDIN */
     if (file_open("console", O_RDONLY, &open_file) != 0) {
@@ -204,6 +204,8 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     }
     fdtable_insert(new_proc->file_table, STDIN_FILENO, open_file);
 
+    LOG_INFO("MEOW4");
+
     /* STDOUT */
     if (file_open("console", O_WRONLY, &open_file) != 0) {
         LOG_ERROR("Unable to open STDOUT");
@@ -213,6 +215,8 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     }
     fdtable_insert(new_proc->file_table, STDOUT_FILENO, open_file);
 
+    LOG_INFO("MEOW5");
+
     /* STDERR */
     if (file_open("console", O_WRONLY, &open_file) != 0) {
         LOG_ERROR("Unable to open STDERR");
@@ -220,7 +224,9 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
         proc_destroy(new_proc);
         return -1;
     }
-    fdtable_insert(new_proc->file_table, STDERR_FILENO, open_file);    
+    fdtable_insert(new_proc->file_table, STDERR_FILENO, open_file);  
+
+    LOG_INFO("MEOW6");  
 
     /* ------------------------------ START PROC --------------------------- */
 
@@ -228,13 +234,17 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     new_proc->stime = time_stamp();
     new_proc->p_state = RUNNING;
 
+    LOG_INFO("MEOW7");  
+
     /* Start the new process */
     seL4_UserContext context;
     memset(&context, 0, sizeof(context));
-    context.pc = elf_getEntryPoint(elf_base);
+    context.pc = elf_pc; // elf_getEntryPoint(elf_base);
     context.sp = PROCESS_STACK_TOP;
 
     seL4_TCB_WriteRegisters(new_proc->tcb_cap, 1, 0, 2, &context);
+
+    LOG_INFO("MEOW8");
     
     /* Copy the name and null terminate */
     new_proc->proc_name = strdup(app_name);
@@ -247,6 +257,8 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
         proc_destroy(new_proc);
         return -1;
     }
+
+    LOG_INFO("MEOW9");
 
     /* Store new proc */
     sos_procs[new_pid] = new_proc;
