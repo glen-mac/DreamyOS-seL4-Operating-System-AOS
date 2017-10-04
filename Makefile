@@ -31,7 +31,7 @@ include tools/common/project.mk
 
 all: app-images
 	mkdir -p $(TFTPROOT);
-	for f in $(IMAGE_ROOT)/*; do cp $$f $(TFTPROOT)/`echo "$${f##*/}" | cut -f1 -d"-"`.elf; done
+	cp -a stage/arm/imx6/bin/. $(TFTPROOT)/;
 	$(MAKE) reset
 
 .PHONY: reset
