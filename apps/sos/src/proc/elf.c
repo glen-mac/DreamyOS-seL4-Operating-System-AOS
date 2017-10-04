@@ -100,13 +100,19 @@ load_segment_into_vspace(proc *curproc, vnode *file, uint64_t offset,
     while (pos < segment_size) {
         /* Create a mapping inside curproc, and a frame */
         seL4_Word vpage = PAGE_ALIGN_4K(dst);
-        if (sos_map_page(curproc, vpage, permissions, &kdst) != 0)
+        if (sos_map_page(curproc, vpage, permissions, &kdst) != 0) {
+            LOG_ERROR("sos_map_page failed");
             return 1;
+        }
 
         /* Now copy our data into the destination vspace. */
         nbytes = PAGE_SIZE_4K - (dst & PAGE_MASK_4K);
         if (pos < file_size) {
-            // TODO: PIN FRAME
+            /* Pin frame because operation is now asynchronous */
+            enum chance_type original_chance;
+            seL4_Word frame_id = frame_table_sos_vaddr_to_index(kdst);
+            assert(frame_table_get_chance(frame_id, &original_chance) == 0);
+            assert(frame_table_set_chance(frame_id, PINNED) == 0);
 
             /* Read data from file and into frame */
             seL4_Word len = MIN(nbytes, file_size - pos);
@@ -117,11 +123,11 @@ load_segment_into_vspace(proc *curproc, vnode *file, uint64_t offset,
             };
             if (sos_nfs_read(file, &iov) != len) {
                 LOG_ERROR("Failed to read from file");
-                // TODO: UNPIN FRAME
+                assert(frame_table_set_chance(frame_id, original_chance) == 0);
                 return 1;
             }
 
-            // TODO: UNPIN FRAME
+            assert(frame_table_set_chance(frame_id, original_chance) == 0);
         }
 
         /* Not observable to I-cache yet so flush the frame */
@@ -167,14 +173,16 @@ elf_load(proc *curproc, char *app_name, uint64_t *elf_pc)
     };
     if (sos_nfs_read(file, &iov) != PAGE_SIZE_4K) {
         LOG_ERROR("Failed to read from file");
+        sos_nfs_close(file);
         return 1;
     }
 
-
     /* Ensure that the ELF file looks sane. */
-    if (elf_checkFile(elf_header))
+    if (elf_checkFile(elf_header)) {
+        LOG_ERROR("Invalid header");
+        sos_nfs_close(file);
         return seL4_InvalidArgument;
-
+    }
 
     num_headers = elf_getNumProgramHeaders(elf_header);
     for (int i = 0; i < num_headers; i++) {
@@ -195,6 +203,7 @@ elf_load(proc *curproc, char *app_name, uint64_t *elf_pc)
         if (load_segment_into_vspace(curproc, file, offset, segment_size, file_size, vaddr,
                                        get_sel4_rights_from_elf(flags)) != 0) {
             LOG_ERROR("Failed to load segment");
+            sos_nfs_close(file);
             return 1;
         }
     }
@@ -202,7 +211,7 @@ elf_load(proc *curproc, char *app_name, uint64_t *elf_pc)
     *elf_pc = elf_getEntryPoint(elf_header);
 
     /* Map in the heap region after all other regions were added */
-    // TOOD: Might be able to move this into create_proc and just grab the info from the end of LL of regions
+    // TOOD: Might be able to move this into create_proc and just grab the info from the end of LL of region
 
     addrspace *as = curproc->p_addrspace;
 
@@ -212,5 +221,6 @@ elf_load(proc *curproc, char *app_name, uint64_t *elf_pc)
     as_add_region(as, heap);
     as->region_heap = heap;
 
+    sos_nfs_close(file);
     return 0;
 }
