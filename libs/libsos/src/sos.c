@@ -110,7 +110,7 @@ sos_stat(const char *name, sos_stat_t *buf)
 pid_t
 sos_process_create(const char *path)
 {
-    MAKE_SYSCALL(SOS_SYS_PROC_CREATE, path, strlen(path));
+    MAKE_SYSCALL(SOS_SYS_PROC_CREATE, path);
     return (pid_t)seL4_GetMR(0); /* -1 on error, 0 on success */
 }
 

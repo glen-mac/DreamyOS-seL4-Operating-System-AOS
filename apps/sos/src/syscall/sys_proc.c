@@ -20,20 +20,24 @@ int
 syscall_proc_create(proc *curproc)
 {
     LOG_INFO("proc %d made syscall_proc_create", curproc->pid);
+    int result = -1;
 
     seL4_Word name = seL4_GetMR(1);
-
-    // TODO: Hard copy the filename because it might cross a page boundary
-    name = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ);
-
-    pid_t pid = proc_start(name, _sos_ipc_ep_cap, curproc->pid);
-    if (pid == -1) {
-        LOG_ERROR("Error starting process");
+    char kname[NAME_MAX];
+    if (copy_in(curproc, kname, name, NAME_MAX) != 0) {
+        LOG_ERROR("Error copying in path name");
         goto message_reply;
     }
 
+    /* Explicit null terminate in case one is not provided */
+    kname[NAME_MAX - 1] = '\0';
+
+    // TODO: Hard copy the filename because it might cross a page boundary
+    // name = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ);
+
+    result = proc_start(kname, _sos_ipc_ep_cap, curproc->pid);
     message_reply:
-        seL4_SetMR(0, (seL4_Word)pid);
+        seL4_SetMR(0, result);
         return 1; /* nwords in message */
 }
 
