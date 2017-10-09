@@ -16,18 +16,27 @@
 #include <stdlib.h>
 
 static void callback_sys_usleep(uint32_t id, void *data);
+static bool timer_fired;
 
 int
 syscall_usleep(proc *curproc)
 {
-    uint32_t ms_delay = seL4_GetMR(1);
- 
+    int32_t ms_delay = seL4_GetMR(1);
     LOG_INFO("syscall: thread made sos_usleep(%d)", ms_delay);
 
-    assert(register_timer(MILLISECONDS(ms_delay), callback_sys_usleep, (void *)coro_getcur()) != 0);
+    /* Only sleep for positive delays */
+    if (ms_delay <= 0)
+        return 0;
 
-    /* Unblock the process when timer callback is called */
-    yield(NULL);
+    timer_fired = FALSE;
+    if (register_timer(MILLISECONDS(ms_delay), callback_sys_usleep, (void *)coro_getcur()) != 0)
+        /* Only happens if out of memory */
+        return 0;
+
+    /* Only yield if the event hasnt fired */
+    if (!timer_fired)
+        /* Unblock the process when timer callback is called */
+        yield(NULL);
 
     return 0;
 }
@@ -49,5 +58,7 @@ syscall_time_stamp(proc *curproc)
 void
 callback_sys_usleep(uint32_t id, void *data)
 {
-    resume((coro)data, NULL);
+    timer_fired = TRUE;
+    if (resumable((coro)data))
+        resume((coro)data, NULL);
 }
