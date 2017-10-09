@@ -41,6 +41,9 @@ menu "seL4 Applications"
     source "apps/tty_test/Kconfig"
     source "apps/game/Kconfig"
     source "apps/thrash/Kconfig"
+    source "apps/error_test/Kconfig"
+    source "apps/execstack/Kconfig"
+    source "apps/pagingdemo/Kconfig"
 endmenu
 
 menu "Tools"
@@ -48,4 +51,3 @@ menu "Tools"
 endmenu
 
 source "$COMMON_PATH/Kconfig"
-

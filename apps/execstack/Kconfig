@@ -1,0 +1,6 @@
+config APP_EXEC_STACK
+	bool "New execstack"
+	depends on LIB_SEL4 && HAVE_LIBC && LIB_SOS
+	select HAVE_SEL4_APPS
+	help
+		Tries to execute stack pointer
