@@ -21,7 +21,8 @@ typedef struct {
 typedef struct _vnode vnode;
 
 typedef struct {
-    int (*vop_close)(vnode *vnode);
+    int (*vop_open)(vnode *vnode, fmode_t mode);
+    int (*vop_close)(vnode *vnode, fmode_t mode);
     int (*vop_read)(vnode *node, uiovec *iov);
     int (*vop_write)(vnode *node, uiovec *iov);
     int (*vop_stat)(vnode *node, sos_stat_t **buf);
@@ -33,6 +34,8 @@ typedef struct {
 typedef struct _vnode {
     void *vn_data; /* Implementation specific data */
     const vnode_ops *vn_ops; /* Operations on a vnode */
+    seL4_Word readcount; /* Number of read references on this node */
+    seL4_Word writecount; /* Number of read references on this node */
 } vnode;
 
 /*
@@ -55,7 +58,6 @@ int vfs_mount(vnode *vn);
  * @param name, the name of the file
  * @param mode, the mode of access
  * @param[out] ret, the returned vnode
- * 
  * @returns 0 on success else 1
  */
 int vfs_open(char *name, fmode_t mode, vnode **ret);
@@ -64,8 +66,9 @@ int vfs_open(char *name, fmode_t mode, vnode **ret);
  * Close a 'file' in the VFS
  * calls vop_close on the vnode
  * @param vn, the node
+ * @param mode, the mode the vnode was opened with
  */
-void vfs_close(vnode *vn);
+void vfs_close(vnode *vn, fmode_t mode);
 
 /*
  * Get the attributes of a file

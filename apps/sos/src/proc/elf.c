@@ -173,14 +173,16 @@ elf_load(proc *curproc, char *app_name, uint64_t *elf_pc)
     };
     if (sos_nfs_read(file, &iov) != PAGE_SIZE_4K) {
         LOG_ERROR("Failed to read from file");
-        sos_nfs_close(file);
+        free(file->vn_data);
+        free(file);
         return 1;
     }
 
     /* Ensure that the ELF file looks sane. */
     if (elf_checkFile(elf_header)) {
         LOG_ERROR("Invalid header");
-        sos_nfs_close(file);
+        free(file->vn_data);
+        free(file);
         return seL4_InvalidArgument;
     }
 
@@ -203,7 +205,8 @@ elf_load(proc *curproc, char *app_name, uint64_t *elf_pc)
         if (load_segment_into_vspace(curproc, file, offset, segment_size, file_size, vaddr,
                                        get_sel4_rights_from_elf(flags)) != 0) {
             LOG_ERROR("Failed to load segment");
-            sos_nfs_close(file);
+            free(file->vn_data);
+            free(file);
             return 1;
         }
     }
@@ -221,6 +224,7 @@ elf_load(proc *curproc, char *app_name, uint64_t *elf_pc)
     as_add_region(as, heap);
     as->region_heap = heap;
 
-    sos_nfs_close(file);
+    free(file->vn_data);
+    free(file);
     return 0;
 }

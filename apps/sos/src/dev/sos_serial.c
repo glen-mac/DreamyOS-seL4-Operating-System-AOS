@@ -28,7 +28,7 @@ static sos_stat_t *stat = NULL;
  * Operations for a serial vnode
  */
 static const vnode_ops serial_vnode_ops = {
-    /* Dont really need open as device vnodes are already open when they are registered */
+    .vop_open = sos_serial_open,
     .vop_close = sos_serial_close,
     .vop_read = sos_serial_read,
     .vop_write = sos_serial_write,
@@ -70,6 +70,8 @@ sos_serial_init(void)
 
     node->vn_data = port;
     node->vn_ops = &serial_vnode_ops;
+    node->readcount = 0;
+    node->writecount = 0;
 
     if (device_register("console", node) != 0) {
         LOG_ERROR("device_register failed");
@@ -97,6 +99,23 @@ sos_serial_init(void)
     stat->st_ctime = 3; /* TODO: Grab the system timestamp and convert to ms */
     stat->st_atime = 4; /* TODO: update this on open() */
 
+    return 0;
+}
+
+int
+sos_serial_open(vnode *vnode, fmode_t mode)
+{
+    if (mode == O_RDONLY || mode == O_RDWR) {
+        if (vnode->readcount > 0) {
+            LOG_ERROR("Enforcing single reader policy on serial");
+            return 1;
+        }
+        vnode->readcount += 1;
+        if (mode == O_RDONLY)
+            return 0;
+    }
+    /* O_RDWR or O_WRONLY */
+    vnode->writecount += 1;
     return 0;
 }
 
@@ -145,12 +164,21 @@ sos_serial_read(vnode *node, uiovec *iov)
 }
 
 int
-sos_serial_close(vnode *node)
+sos_serial_close(vnode *node, fmode_t mode)
 {   
     /* 
      * We dont want to close the device as that would unintiailise it
      * The vnode is permanent and lives as a registered device so we dont want to free it
      */
+    if (mode == O_RDONLY) {
+        node->readcount -= 1;
+    } else if (mode == O_RDWR) {
+        node->readcount -= 1;
+        node->writecount -= 1;
+    } else if (mode == O_WRONLY) {
+        node->writecount -= 1;
+    }
+
     return 0;
 }
 

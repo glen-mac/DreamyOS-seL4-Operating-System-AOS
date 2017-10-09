@@ -34,6 +34,14 @@ int sos_nfs_lookup(char *name, int create_file, vnode **result);
 int sos_nfs_list(char ***list, size_t *nfiles);
 
 /*
+ * Open an NFS file
+ * @param vnode, vnode of the file
+ * @param mode, mode of access
+ * @returns 0 on success else 1
+ */
+int sos_nfs_open(vnode *vnode, fmode_t mode);
+
+/*
  * Write to an NFS file
  * @param node, the vnode of the file
  * @param iov, the io vector
@@ -60,8 +68,9 @@ int sos_nfs_stat(vnode *node, sos_stat_t **stat);
 /*
  * Close an NFS file
  * @param node, the vnode of the file
+ * @param mode, the mode of access held
  * @returns 0 on success else -1
  */
-int sos_nfs_close(vnode *node);
+int sos_nfs_close(vnode *node, fmode_t mode);
 
 #endif /*_SOS_NFS_H_ */

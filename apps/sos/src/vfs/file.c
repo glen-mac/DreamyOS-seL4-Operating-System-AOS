@@ -43,7 +43,7 @@ file_open(char *filename, fmode_t mode, file **open_file)
 void
 file_close(file *f)
 {
-    vfs_close(f->vn);
+    vfs_close(f->vn, f->mode);
     f->vn = NULL;
     free(f);
 }

@@ -181,14 +181,14 @@ proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
     /* Open stdin, stdout and stderr */
     file *open_file;
 
-    /* STDIN */
-    if (file_open("console", O_RDONLY, &open_file) != 0) {
-        LOG_ERROR("Unable to open STDIN");
-        proc_delete(new_proc);
-        proc_destroy(new_proc);
-        return -1;
-    }
-    fdtable_insert(new_proc->file_table, STDIN_FILENO, open_file);
+    // /* STDIN */
+    // if (file_open("console", O_RDONLY, &open_file) != 0) {
+    //     LOG_ERROR("Unable to open STDIN");
+    //     proc_delete(new_proc);
+    //     proc_destroy(new_proc);
+    //     return -1;
+    // }
+    // fdtable_insert(new_proc->file_table, STDIN_FILENO, open_file);
 
     /* STDOUT */
     if (file_open("console", O_WRONLY, &open_file) != 0) {

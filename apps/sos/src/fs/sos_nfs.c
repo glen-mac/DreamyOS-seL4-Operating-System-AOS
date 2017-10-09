@@ -8,8 +8,8 @@
 #include "event.h"
 
 #include <string.h>
-
 #include <network.h>
+#include <fcntl.h>
 
 #include <coro/picoro.h>
 #include <syscall/syscall.h>
@@ -29,6 +29,7 @@ static const vnode_ops nfs_dir_ops = {
 };
 
 static const vnode_ops nfs_vnode_ops = {
+    .vop_open = sos_nfs_open,
     .vop_close = sos_nfs_close,
     .vop_read = sos_nfs_read,
     .vop_write = sos_nfs_write,
@@ -139,6 +140,19 @@ sos_nfs_list(char ***list, size_t *nfiles)
 }
 
 int
+sos_nfs_open(vnode *vnode, fmode_t mode)
+{
+    if (mode == O_RDONLY || mode == O_RDWR) {
+        vnode->readcount += 1;
+        if (mode == O_RDONLY)
+            return 0;
+    }
+    /* O_RDWR or O_WRONLY */
+    vnode->writecount += 1;
+    return 0;
+}
+
+int
 sos_nfs_write(vnode *node, uiovec *iov)
 {
     int *ret;
@@ -208,12 +222,23 @@ sos_nfs_stat(vnode *node, sos_stat_t **stat)
 }
 
 int
-sos_nfs_close(vnode *node)
+sos_nfs_close(vnode *node, fmode_t mode)
 {
-    /* Free the handle */
-    free(node->vn_data);
-    free(node);
-    return 0;
+    if (mode == O_RDONLY || mode == O_RDWR) {
+        node->readcount -= 1;
+        if (mode == O_RDONLY)
+            goto close_file;
+    }
+    /* O_RDWR or O_WRONLY */
+    node->writecount -= 1;
+
+    close_file:
+        /* Free the handle */
+        if (node->readcount > 0 || node->writecount > 0) {
+            free(node->vn_data);
+            free(node);
+        }
+        return 0;
 }
 
 /*

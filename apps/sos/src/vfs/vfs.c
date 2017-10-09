@@ -97,23 +97,21 @@ vfs_open(char *name, fmode_t mode, vnode **ret)
         return result;
     }
 
-    // Not actually necessary now, lookup sort of opens it for us..?
-    // We dont share vnodes and have refcount, so this might change? idk
-
-    // TODO: I think we do need vop_open, because we need to update the access time and things for files
-
-    // if (vn->vn_ops->vop_open(vn, mode) == 0)
-    //     return 0;
+    /* Open the vnode */
+    if (vn->vn_ops->vop_open(vn, mode) != 0) {
+        LOG_ERROR("Failed to open file");
+        return 1;
+    }
 
     *ret = vn;
     return 0;
 }
 
 void
-vfs_close(vnode *vn)
+vfs_close(vnode *vn, fmode_t mode)
 {
     /* Delegate to the close operation */
-    vn->vn_ops->vop_close(vn);
+    vn->vn_ops->vop_close(vn, mode);
 }
 
 int

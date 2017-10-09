@@ -219,8 +219,12 @@ syscall_listdir(proc * curproc)
 
     seL4_Word pos = seL4_GetMR(1);
     seL4_Word uname = seL4_GetMR(2);
-    seL4_Word nbytes = seL4_GetMR(3);
+    int nbytes = seL4_GetMR(3);
 
+    if (nbytes <= 0)
+        goto message_reply;
+
+    // TODO NEED MULTI PAGE WRITE HERE
     uname = vaddr_to_sos_vaddr(curproc, uname, ACCESS_WRITE);
 
     char **dir;
@@ -239,6 +243,7 @@ syscall_listdir(proc * curproc)
         goto message_reply;
 
     /* Copy the name into the user process */
+    // AND HERE
     size_t bytes_returned = MIN(nbytes, strlen(dir[pos])) + 1; /* + 1 for the null terminator */
     memcpy((void *)uname, (void *)dir[pos], bytes_returned);
     result = bytes_returned;

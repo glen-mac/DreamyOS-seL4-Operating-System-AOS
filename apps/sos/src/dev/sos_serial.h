@@ -18,6 +18,15 @@
 int sos_serial_init(void);
 
 /*
+ * Open the serial device
+ * Enforces single reader policy
+ * @param vnode, vnode of the device
+ * @param mode, mode of access
+ * @returns 0 on success else 1
+ */
+int sos_serial_open(vnode *vnode, fmode_t mode);
+
+/*
  * Write to the serial device
  * @param node, the vnode of the device
  * @param iov, the io vector
@@ -36,9 +45,10 @@ int sos_serial_read(vnode *node, uiovec *iov);
 /*
  * Close a serial device
  * @param node, the vnode of the device
+ * @param mode, the mode of access held
  * @returns 0 on success else 1
  */
-int sos_serial_close(vnode *node);
+int sos_serial_close(vnode *node, fmode_t mode);
 
 /*
  * Stat the console
