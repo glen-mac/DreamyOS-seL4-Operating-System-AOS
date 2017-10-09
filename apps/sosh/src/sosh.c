@@ -125,11 +125,17 @@ static int ps(int argc, char **argv) {
 
     processes = sos_process_status(process, MAX_PROCESSES);
 
-    printf("TID SIZE   STIME   CTIME COMMAND\n");
-
+    /* find max stime length for formatting */
+    int cur_stime, max_stime = 0;
     for (i = 0; i < processes; i++) {
-        printf("%3d %4d %7d %s\n", process[i].pid, process[i].size,
-                process[i].stime, process[i].command);
+        cur_stime = snprintf(NULL, 0, "%d", process[i].stime);
+        max_stime = (max_stime < cur_stime) ? cur_stime : max_stime;
+    }
+
+    printf("PID   SIZE %*s  COMMAND\n", ++max_stime, "STIME");
+    for (i = 0; i < processes; i++) {
+        printf("%3d %6d %*d  %s\n", process[i].pid, process[i].size,
+                max_stime, process[i].stime, process[i].command);
     }
 
     free(process);
@@ -259,6 +265,22 @@ static int kill(int argc, char *argv[]) {
     return sos_process_delete(pid);
 }
 
+static int mypid(int argc, char *argv[]) {
+    printf("mypid: %d\n", sos_my_id());
+    return 0;
+}
+
+static int fg(int argc, char *argv[]) {
+    pid_t pid;
+    if (argc != 2) {
+        printf("Usage: fg pid\n");
+        return 1;
+    }
+
+    pid = atoi(argv[1]);
+    return sos_process_wait(pid);
+}
+
 static int thrash(int argc, char *argv[]) {
     if (argc != 2) {
         printf("Usage: thrash npage\n");
@@ -283,6 +305,11 @@ static int thrash(int argc, char *argv[]) {
     return 0;
 }
 
+static void sosh_exit(int argc, char *argv[]) {
+    printf("[SOSH Exiting]\n");
+    exit(0);
+}
+
 static int benchmark(int argc, char *argv[]) {
     if(argc == 2 && strcmp(argv[1], "-d") == 0) {
         printf("Running benchmark in DEBUG mode\n");
@@ -303,8 +330,8 @@ struct command {
 
 struct command commands[] = { { "dir", dir }, { "ls", dir }, { "cat", cat }, {
         "cp", cp }, { "ps", ps }, { "exec", exec }, {"sleep",second_sleep}, {"msleep",milli_sleep},
-        {"time", second_time}, {"mtime", micro_time}, {"kill", kill},
-        {"benchmark", benchmark}, {"thrash", thrash}};
+        {"time", second_time}, {"mtime", micro_time}, {"kill", kill}, {"mypid", mypid},
+        {"fg", fg}, {"benchmark", benchmark}, {"thrash", thrash}, {"exit", sosh_exit}};
 
 int main(void) {
     char buf[BUF_SIZ];
@@ -319,7 +346,7 @@ int main(void) {
     done = 0;
     new = 1;
 
-    printf("\n[SOS Starting]\n");
+    printf("\n[SOSH Starting]\n");
 
     while (!done) {
         if (new) {

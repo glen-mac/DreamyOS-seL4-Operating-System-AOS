@@ -6,9 +6,11 @@
 
 #include "vm.h"
 
+#include "event.h"
 #include "frametable.h"
 #include "mapping.h"
 #include <proc/proc.h>
+#include <syscall/sys_proc.h>
 
 #include <utils/arith.h>
 #include <utils/util.h>
@@ -57,13 +59,24 @@
 #define PERMISSION_FAULT_SECTION 0b001101
 #define PERMISSION_FAULT_PAGE 0b001111
 
+#define IS_EVICTED(x) (x & EVICTED_BIT)
+
 static seL4_Word get_fault_status(seL4_Word fault_cause);
-static int page_table_is_evicted(seL4_Word page_id);
+static int page_table_is_evicted(proc *curproc, seL4_Word page_id);
+static int page_table_destroy(page_table_entry *table);
+static int page_destroy(seL4_CPtr page_cap);
 
 void 
-vm_fault(void)
+vm_fault(seL4_Word pid)
 {
     seL4_MessageInfo_t reply;
+
+    LOG_INFO("vm_fault by process %d", pid);
+    proc *curproc = get_proc(pid);
+    assert(curproc != NULL);
+    proc_mark(curproc, BLOCKED);
+    curproc->blocked_ref += 1;
+    LOG_INFO("%d vm_fault start blocked_ref is %d", curproc->pid, curproc->blocked_ref);
 
     /* Ordering defined by seL4 */
     seL4_Word fault_pc = seL4_GetMR(0);
@@ -89,8 +102,8 @@ vm_fault(void)
     }
 
     /* If the page is marked as evicted, page it in */
-    if (page_table_is_evicted(fault_addr)) {
-        if (page_in(fault_addr, access_type) != 0) {
+    if (page_table_is_evicted(curproc, fault_addr)) {
+        if (page_in(curproc, fault_addr, access_type) != 0) {
             LOG_ERROR("failed to page in");
             goto fault_error;
         }
@@ -98,19 +111,33 @@ vm_fault(void)
     }
 
     seL4_Word kvaddr;
-    if (vm_map(PAGE_ALIGN_4K(fault_addr), access_type, &kvaddr) != 0) {
+    if (vm_map(curproc, PAGE_ALIGN_4K(fault_addr), access_type, &kvaddr) != 0) {
         LOG_ERROR("failed to map in a new page");
         goto fault_error;
     }
 
     thread_restart:
+        proc_mark(curproc, RUNNING);
+        curproc->blocked_ref -= 1;
+        LOG_INFO("%d vm_fault restart blocked_ref is %d", curproc->pid, curproc->blocked_ref);
+        if (curproc->kill_flag && curproc->blocked_ref == 0) {
+            LOG_INFO("%d being killed", curproc->pid);
+            proc_delete(curproc);
+            return;
+        }
+
         reply = seL4_MessageInfo_new(0, 0, 0, 0);
         seL4_Send(reply_cap, reply);
         cspace_free_slot(cur_cspace, reply_cap);
         return;
 
     fault_error:
-        panic("TODO: Kill the process");
+        // TODO: maybe we need the kill flag logic here?
+        curproc->blocked_ref -= 1;
+        cspace_free_slot(cur_cspace, reply_cap);
+        LOG_INFO("%d being killed", curproc->pid);
+        proc_delete(curproc);
+        return;
 }
 
 page_directory *
@@ -151,6 +178,112 @@ page_directory_create(void)
     return top_level;
 }
 
+int
+page_directory_destroy(page_directory *dir)
+{
+    if (!dir) {
+        LOG_ERROR("Directory is null");
+        return 1;
+    }
+
+    if (!dir->kernel_page_table_caps) {
+        LOG_ERROR("kernel page table is null");
+        return 1;
+    }
+
+    if (!dir->directory) {
+        LOG_ERROR("Directory is null");
+        return 1;
+    }
+
+    /* Free the directory */
+
+    /* Free all second levels in the page table */
+    for (seL4_Word second_level = 0; second_level < PAGE_SIZE_4K / sizeof(seL4_Word); ++second_level) {
+        if (!dir->directory[second_level])
+            continue;
+
+        if (page_table_destroy((struct page_table_entry *)dir->directory[second_level]) != 0) {
+            LOG_ERROR("Failed to destroy page table");
+            return 1;
+        }
+    }
+
+    /* Free the top level */
+    frame_free(frame_table_sos_vaddr_to_index(dir->directory));
+
+    /* Free the hardware page table caps */
+
+    /* Destroy kernel page table caps */
+    seL4_Word nframes = BIT(seL4_PageDirBits - seL4_PageBits);
+    for (size_t i = 0; i < (PAGE_SIZE_4K * nframes) / sizeof(seL4_CPtr); ++i) {
+        if (dir->kernel_page_table_caps[i] && (seL4_ARM_PageTable_Unmap(dir->kernel_page_table_caps[i]) != 0)) {
+            LOG_ERROR("PageTable Unmap failed");
+            return 1;
+        }
+    }
+
+    /* Since frames are contigous, we can get the start id and then increment */
+    for (seL4_Word id = frame_table_sos_vaddr_to_index(&(dir->kernel_page_table_caps)); id < nframes; ++id)
+        frame_free(id);
+
+    free(dir);
+    return 0;
+}
+
+/*
+ * Destroy a page table
+ * @returns 0 on success else 1
+ */
+static int
+page_table_destroy(page_table_entry *table)
+{
+    for (size_t i = 0; i < PAGE_SIZE_4K / sizeof(seL4_CPtr); ++i) {
+        if (table[i].page && (page_destroy(table[i].page) != 0)) {
+            LOG_ERROR("Failed to destroy page");
+            return 1;
+        }
+    }
+
+    /* Free the frame backing the page table */
+    frame_free(frame_table_sos_vaddr_to_index((seL4_Word)table));
+    return 0;
+}
+
+/*
+ * Destroy a page
+ * @returns 0 on success else 1
+ */
+static int
+page_destroy(seL4_CPtr page_cap)
+{
+    seL4_CPtr pagefile_id = page_cap;
+    if (IS_EVICTED(page_cap)) {
+        pagefile_id &= (~EVICTED_BIT);
+        pagefile_free_add(pagefile_id);
+        return 0;
+    }
+
+    if (seL4_ARM_Page_Unmap(page_cap) != 0) {
+        LOG_ERROR("Failed to unmap page");
+        return 1;
+    }
+
+    seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(page_cap);
+    seL4_Word paddr = paddr_obj.paddr;
+
+    if (cspace_delete_cap(cur_cspace, page_cap) != CSPACE_NOERROR) {
+        LOG_ERROR("Failed to delete cap for frame");
+        return 1;
+    }
+
+    /* Free the frame */
+    seL4_Word frame_id = frame_table_sos_vaddr_to_index(frame_table_paddr_to_sos_vaddr(paddr));
+    frame_free(frame_id);
+
+    return 0;
+}
+
 int 
 page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL4_CPtr kernel_cap)
 {
@@ -185,6 +318,7 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
 
     /* Must be less than, as we use the highest bit to represent evicted or not */
     assert(cap < MAX_CAP_ID);
+    assert((cap >> 31) == 0);
 
     // I TURNED THIS OFF BECAUSE THIS WONT BE NULL FOR EVICTED PAGES
     // IDK IF THIS IS THE BEST THING THOUGH, ID BE MORE CONFIDENT WITH THE ERROR CHECKING
@@ -197,8 +331,9 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
 
         seL4_CPtr *cap_table = dir->kernel_page_table_caps;
         assert(!cap_table[index]);
-        cap_table[index] = cap;
+        cap_table[index] = kernel_cap;
         LOG_INFO("kernel cap inserted into %u", index);
+        LOG_INFO("Kernel cap is %d", kernel_cap);
     }
 
     return 0;
@@ -259,9 +394,11 @@ page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_id)
     }
 
     seL4_CPtr cap = second_level[table_index].page;
+    LOG_INFO("cap is %d", cap);
 
     /* Must be less than, as we use the highest bit to represent evicted or not */
     assert(free_id < MAX_CAP_ID);
+    assert((free_id >> 31) == 0);
 
     second_level[table_index].page = free_id;
     second_level[table_index].page |= EVICTED_BIT; /* Mark as evicted */
@@ -274,7 +411,7 @@ page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_id)
 }
 
 int
-vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
+vm_translate(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
 {
     int err;
 
@@ -282,10 +419,9 @@ vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
     seL4_ARM_Page page_cap;
 
-    if (page_table_is_evicted(page_id)) {
+    if (page_table_is_evicted(curproc, page_id)) {
         LOG_INFO("page is evicted");
-        panic("this is happening");
-        if (page_in(page_id, access_type) != 0) {
+        if (page_in(curproc, page_id, access_type) != 0) {
             LOG_ERROR("failed to page_in");
             return 1;
         }
@@ -298,12 +434,12 @@ vm_translate(seL4_Word vaddr, seL4_Word access_type, seL4_Word *sos_vaddr)
 
     seL4_ARM_Page_GetAddress_t paddr_obj = seL4_ARM_Page_GetAddress(page_cap);
     *sos_vaddr = frame_table_paddr_to_sos_vaddr(paddr_obj.paddr + offset);
+
     return 0;
 }
 
-// TODO: I dont think we need this here, its only used sys_file so we can put it back there
 seL4_Word
-vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
+vaddr_to_sos_vaddr(proc *curproc, seL4_Word vaddr, seL4_Word access_type)
 {
     seL4_Word offset = (vaddr & PAGE_MASK_4K);
     seL4_Word page_id = PAGE_ALIGN_4K(vaddr);
@@ -314,12 +450,12 @@ vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
      * If it failed, try to map in the addr
      * Then the translation should succeed
      */
-    if (vm_translate(vaddr, access_type, &sos_vaddr) != 0) {
-        if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
+    if (vm_translate(curproc, vaddr, access_type, &sos_vaddr) != 0) {
+        if (vm_map(curproc, page_id, access_type, &sos_vaddr) != 0) {
             LOG_ERROR("Mapping failed");
             return (seL4_Word)NULL;
         }
-        assert(vm_translate(vaddr, access_type, &sos_vaddr) == 0);
+        assert(vm_translate(curproc, vaddr, access_type, &sos_vaddr) == 0);
     } else {
         /* Check address has permission for access type */
         addrspace *as = curproc->p_addrspace;
@@ -337,7 +473,7 @@ vaddr_to_sos_vaddr(seL4_Word vaddr, seL4_Word access_type)
 }
 
 int
-vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
+vm_map(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
 {
     addrspace *as = curproc->p_addrspace;
 
@@ -356,10 +492,12 @@ vm_map(seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
         return 1;
     }
 
-    if (sos_map_page(PAGE_ALIGN_4K(vaddr), as, vaddr_region->permissions, kvaddr) != 0) {
+    if (sos_map_page(curproc, PAGE_ALIGN_4K(vaddr), vaddr_region->permissions, kvaddr) != 0) {
         LOG_ERROR("sos_map_page failed");
         return 1;
     }
+
+    return 0;
 }
 
 /* The status of the fault is indicated by bits 12, 10 and 3:0 all strung together */
@@ -373,14 +511,36 @@ get_fault_status(seL4_Word fault_cause)
 }
 
 static int
-page_table_is_evicted(seL4_Word page_id)
+page_table_is_evicted(proc *curproc, seL4_Word page_id)
 {
     seL4_CPtr cap;
-
     if (page_directory_lookup(curproc->p_addrspace->directory, PAGE_ALIGN_4K(page_id), &cap) != 0) {
         LOG_INFO("Page entry doesnt exist, cannot be evicted");
         return FALSE;
     }
 
-    return cap & EVICTED_BIT;
+    return IS_EVICTED(cap);
 }
+
+unsigned
+page_directory_count(proc *curproc) {
+    unsigned pages_count = 0;
+    /* If we are counting a zombie process */
+    if (!curproc->p_addrspace)
+        return pages_count;
+
+    seL4_Word *top_pd = curproc->p_addrspace->directory->directory;
+    page_table_entry * sec_pd;
+    for (int i = 0; i < PAGE_SIZE_4K / sizeof(seL4_Word); i++) {
+        if (top_pd[i]) {
+            sec_pd = (page_table_entry *)top_pd[i];
+            for (int j = 0; j < PAGE_SIZE_4K / sizeof(seL4_Word); j++) {
+                if (sec_pd[j].page) {
+                    pages_count++;
+                }
+            }
+        }
+    }
+    return pages_count;
+}
+

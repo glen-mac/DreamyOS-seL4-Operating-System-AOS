@@ -92,6 +92,18 @@ int list_foreach(list_t *l, int(*action)(void*)) {
     return 0;
 }
 
+int list_action(list_t *l, void *data, int(*cmp)(void*, void*), void(*action)(void*)) {
+    assert(l != NULL);
+    int cur_index = 0;
+    for (node_t *n = l->head; n != NULL; n = n->next) {
+        if (!cmp(n->data, data)) {
+            action(n->data);
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static int remove(list_t *l, void *data, int (*cmp)(void*, void*),
         bool should_free) {
     assert(l != NULL);

@@ -14,8 +14,6 @@
 
 #include <sel4/sel4.h>
 #include <inttypes.h>
-#include <sos.h>
-
 
 /**
  * The size of a ring buffer.
@@ -23,7 +21,7 @@
  * can be contained in the buffer.
  * The buffer size must be a power of two.
 */
-#define RING_BUFFER_SIZE MAX_IO_BUF
+#define RING_BUFFER_SIZE 0x1000
 
 #if (RING_BUFFER_SIZE & (RING_BUFFER_SIZE - 1)) != 0
 #error "RING_BUFFER_SIZE must be a power of two"

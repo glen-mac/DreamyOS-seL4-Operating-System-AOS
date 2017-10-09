@@ -8,18 +8,15 @@
  * @TAG(NICTA_BSD)
  */
 
-#include <sel4/sel4.h>
+#include <stddef.h>
 #include <syscall_stubs_sel4.h>
-#include <stdlib.h>
-#include <sos.h>
 
 MUSLC_SYSCALL_TABLE;
 
 int main(void);
 void exit(int code);
 
-void __attribute__((externally_visible)) _sel4_main(seL4_BootInfo *bi) {
-    seL4_InitBootInfo(bi);
+void __attribute__((externally_visible)) _start(void) {
     SET_MUSLC_SYSCALL_TABLE;
     int ret = main();
     exit(ret);

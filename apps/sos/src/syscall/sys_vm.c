@@ -9,8 +9,8 @@
 #include <proc/proc.h>
 #include <utils/util.h>
 
-seL4_Word
-syscall_brk(void)
+int
+syscall_brk(proc *curproc)
 {
     seL4_Word newbrk = seL4_GetMR(1);
     LOG_INFO("syscall: thread made sos_brk(%d)", newbrk);

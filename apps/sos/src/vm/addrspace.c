@@ -7,6 +7,7 @@
 #include "addrspace.h"
 
 #include "vm.h"
+#include "layout.h"
 
 #include <cspace/cspace.h>
 #include <sel4/sel4.h>
@@ -25,6 +26,8 @@ as_create(void)
     }
 
     as->region_list = NULL;
+    as->region_stack = NULL;
+    as->region_heap = NULL;
 
     /* Create a VSpace */
     if ((as->vspace_addr = ut_alloc(seL4_PageDirBits)) == (seL4_Word)NULL) {
@@ -53,7 +56,38 @@ as_create(void)
     }
 
     return as;
+}
 
+int 
+as_destroy(addrspace *as)
+{
+    if (page_directory_destroy(as->directory) != 0) {
+        LOG_ERROR("Failed to destroy page_directory");
+        return 1;
+    }
+    as->directory = NULL;
+
+    /* Destroy hardware page table */
+    if (cspace_delete_cap(cur_cspace, as->vspace) == CSPACE_ERROR) {
+        LOG_ERROR("Failed to delete vspace cap");
+        return 1;
+    }
+    as->vspace = NULL;
+
+    ut_free(as->vspace_addr, seL4_PageDirBits);
+    as->vspace_addr = NULL;
+
+    region *curr = as->region_list;
+    for (region *curr = as->region_list; curr != NULL; curr = curr->next_region) {
+        if (as_destroy_region(curr) != 0) {
+            LOG_ERROR("Failed to destroy region");
+            return 1;
+        }
+    }
+    as->region_list = NULL;
+
+    free(as);
+    return 0;
 }
 
 region *
@@ -70,6 +104,16 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
     new_region->end = start + size;
     new_region->permissions = permissions;
     return new_region;
+}
+
+int
+as_destroy_region(region *reg)
+{
+    if (!reg)
+        return 1;
+
+    free(reg);
+    return 0;
 }
 
 int
@@ -130,4 +174,31 @@ as_region_permission_check(region *reg, seL4_Word access_type)
         return 1;
 
     return 0;
+}
+
+int
+as_define_stack(addrspace *as)
+{
+    if (!as) {
+        LOG_ERROR("as not defined");
+        return 1;
+    }
+
+    if (as->region_stack) {
+        LOG_ERROR("region_stack already defined");
+        return 1;
+    }
+
+    region *stack = as_create_region(
+        PROCESS_STACK_TOP - PAGE_SIZE_4K,
+        PAGE_SIZE_4K,
+        seL4_CanRead | seL4_CanWrite
+    );
+    if (stack == NULL) {
+        LOG_ERROR("as_create_region failed");
+        return 1;
+    }
+
+    as->region_stack = stack;
+    return as_add_region(as, stack);
 }

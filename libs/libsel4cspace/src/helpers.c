@@ -115,6 +115,9 @@ seL4_CPtr cspace_alloc_level2_slot(cspace_t *c)
 
 cspace_err_t cspace_free_level2_slot(cspace_t *c, seL4_CPtr s)
 {
+    if (s < 0 || s > (CSPACE_NODE_SIZE_IN_SLOTS * CSPACE_NODE_SIZE_IN_SLOTS))
+        printf("cameron: s is %d", s);
+
     assert(s >= 0 && s < (CSPACE_NODE_SIZE_IN_SLOTS * CSPACE_NODE_SIZE_IN_SLOTS));
     c->level2_alloc_tables[s>>CSPACE_NODE_SIZE_IN_SLOTS_BITS]
 	[s & (CSPACE_NODE_SIZE_IN_SLOTS -1)] = c->next_level2_free_slot;

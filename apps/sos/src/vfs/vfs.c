@@ -114,7 +114,6 @@ vfs_close(vnode *vn)
 {
     /* Delegate to the close operation */
     vn->vn_ops->vop_close(vn);
-    return;
 }
 
 int

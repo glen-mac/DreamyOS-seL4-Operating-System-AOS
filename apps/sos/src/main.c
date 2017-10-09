@@ -42,14 +42,6 @@
  */
 #define USER_EP_CAP (1)
 
-#define TTY_NAME CONFIG_SOS_STARTUP_APP
-
-/*
- * The linker will link this symbol to the start address
- * of an archive of attached applications.
- */
-extern char _cpio_archive[];
-
 const seL4_BootInfo *_boot_info;
 
 /*
@@ -256,8 +248,12 @@ main(void)
     /* Initialise the operating system */
     sos_init(&_sos_ipc_ep_cap, &_sos_interrupt_ep_cap);
 
-    /* Start the user application */
-    start_first_process(_cpio_archive, TTY_NAME, _sos_ipc_ep_cap);
+    /* Create the init process */
+    pid_t init = proc_bootstrap();
+    assert(init == 0);
+
+    /* Start the startup user application */
+    assert(proc_start(_cpio_archive, CONFIG_SOS_STARTUP_APP, _sos_ipc_ep_cap, init) != -1);
     
     /* Unit tests */
     // test_m2();

@@ -110,36 +110,36 @@ sos_stat(const char *name, sos_stat_t *buf)
 pid_t
 sos_process_create(const char *path)
 {
-    assert(!"You need to implement this");
-    return -1;
+    MAKE_SYSCALL(SOS_SYS_PROC_CREATE, path, strlen(path));
+    return (pid_t)seL4_GetMR(0); /* -1 on error, 0 on success */
 }
 
 int
 sos_process_delete(pid_t pid)
 {
-    assert(!"You need to implement this");
-    return -1;
+    MAKE_SYSCALL(SOS_SYS_PROC_DELETE, pid);
+    return (int)seL4_GetMR(0); /* -1 on error, 0 on success */
 }
 
 pid_t
 sos_my_id(void)
 {
-    assert(!"You need to implement this");
-    return -1;
+    MAKE_SYSCALL(SOS_SYS_PROC_ID);
+    return (pid_t)seL4_GetMR(0);
 }
 
 int
 sos_process_status(sos_process_t *processes, unsigned max)
 {
-    assert(!"You need to implement this");
-    return -1;
+    MAKE_SYSCALL(SOS_SYS_PROC_STATUS, processes, max);
+    return (int)seL4_GetMR(0); /* num processes returned */
 }
 
 pid_t
 sos_process_wait(pid_t pid)
 {
-    assert(!"You need to implement this");
-    return -1;
+    MAKE_SYSCALL(SOS_SYS_PROC_WAIT, pid);
+    return (int)seL4_GetMR(0); /* PID of process which exited */
 }
 
 void
@@ -165,4 +165,10 @@ sos_sys_brk(seL4_Word newbrk)
 {
     MAKE_SYSCALL(SOS_SYS_BRK, newbrk);
     return seL4_GetMR(1); /* could contain newbrk, or the original brk */
+}
+
+void
+sos_sys_exit(void)
+{
+    MAKE_SYSCALL(SOS_SYS_EXIT);
 }

@@ -1,4 +1,3 @@
- 
 /*
  * Wrappers for the NFS file system
  * 
@@ -15,6 +14,7 @@
 #include <coro/picoro.h>
 #include <syscall/syscall.h>
 
+#include <sys/panic.h>
 
 #include <clock/clock.h>
 #include <lwip/ip_addr.h>
@@ -281,6 +281,7 @@ sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, in
     int ret_val = -1;
     if (status != NFS_OK) {
         LOG_ERROR("write error status: %d", status);
+        panic("ruh roh");
         goto coro_resume;
     }
 

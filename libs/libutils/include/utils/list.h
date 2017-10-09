@@ -56,6 +56,12 @@ int list_index(list_t *l, void *data, int(*cmp)(void*, void*));
  */
 int list_foreach(list_t *l, int(*action)(void*));
 
+/* Call the given function on every list element that meets a certain
+ * condition while traversing the list. Will return after it has performed
+ * the action once.
+ */
+int list_action(list_t *l, void *data, int(*cmp)(void*, void*), void(*action)(void*));
+
 /* Remove the given element from the list. Returns non-zero if the element is
  * not found.
  */
@@ -84,5 +90,11 @@ int list_prepend_node(list_t *l, struct list_node *node);
 int list_append_node(list_t *l, struct list_node *node);
 int list_remove_node(list_t *l, void *data, int(*cmp)(void*, void*));
 int list_remove_all_nodes(list_t *l);
+
+static inline
+int list_cmp_equality(void *a, void *b)
+{
+    return (!a == b);
+}
 
 #endif

@@ -101,7 +101,7 @@ map_device(void *paddr, int size)
 
 
 int
-sos_map_page(seL4_Word page_id, addrspace *as, unsigned long permissions, seL4_Word *kvaddr)
+sos_map_page(proc *curproc, seL4_Word page_id, unsigned long permissions, seL4_Word *kvaddr)
 {
     assert(IS_ALIGNED_4K(page_id));
 
@@ -125,6 +125,8 @@ sos_map_page(seL4_Word page_id, addrspace *as, unsigned long permissions, seL4_W
         return 1;
     }
 
+    addrspace *as = curproc->p_addrspace;
+
     seL4_CPtr pt_cap;
     if (map_page(new_frame_cap, as->vspace, page_id, permissions, seL4_ARM_Default_VMAttributes, &pt_cap) != 0) {
         LOG_ERROR("Error mapping page");
@@ -143,8 +145,6 @@ sos_map_page(seL4_Word page_id, addrspace *as, unsigned long permissions, seL4_W
     }
 
     /* For demand paging, we need to know what process vaddr is mapped to this frame in the frame table entry */
-    /* TOOD: HACK PID FOR NOW */
-    assert(frame_table_set_page_id(frame_id, 1337, page_id) == 0);
-
+    assert(frame_table_set_page_id(frame_id, curproc->pid, page_id) == 0);
     return 0;
 }

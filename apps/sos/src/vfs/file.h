@@ -49,10 +49,16 @@ void file_close(file *f);
 
 /*
  * Initialises a per-process file descriptor table.
- *
  * @returns a pointer to the new fdt, or NULL
  */
 fdtable *fdtable_create(void);
+
+/*
+ * Initialises a per-process file descriptor table.
+ * @param table, the fdtable to destroy
+ * @returns 0 on success else 1
+ */
+int fdtable_destroy(fdtable *table);
 
 /*
  * For a particular process, return the file corresponding to a file

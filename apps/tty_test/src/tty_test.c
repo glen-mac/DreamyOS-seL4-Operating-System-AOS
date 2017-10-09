@@ -39,6 +39,7 @@
 
 static void test_m3(void);
 static void test_m4(void);
+static void test_m7(void);
 static void thread_block(void);
 
 char *file_name = "test_file_name";
@@ -46,10 +47,15 @@ char *file_name = "test_file_name";
 int
 main(void)
 {
+    // thread_block();
     printf(">>> tty_test program started <<<\n");
     // test_m3();
-    test_m4();
-    return 0;
+    // test_m4();
+    // test_m7();
+    sleep(30);
+
+    exit(0);
+    printf("Should not print");    
 }
 
 static void
@@ -166,6 +172,20 @@ test_m4(void)
     assert(result == -1);
 
     printf("\nM4 Tests pass\n");
+}
+
+static void
+test_m7(void)
+{
+    printf("my id is %d\n", sos_my_id());
+
+    pid_t pid = sos_process_create("sosh");
+    printf("pid is %d", pid);
+
+    printf("waiting for exit");
+
+    /* Assert process that exited was one we were waiting for */
+    assert(sos_process_wait(pid) == pid);
 }
 
 /* 

@@ -12,8 +12,11 @@
 #include <sys/debug.h>
 #include <sys/panic.h>
 #include <syscall/syscall.h>
+#include <proc/proc.h>
 #include <utils/util.h>
 #include "network.h"
+
+static void init_wait_on_children(proc *init);
 
 void
 event_loop(const seL4_CPtr ep)
@@ -23,6 +26,11 @@ event_loop(const seL4_CPtr ep)
     seL4_MessageInfo_t message;
 
     while (TRUE) {
+        /* Wait on children if not already waiting */
+        proc *init = get_proc(0);
+        if (init->waiting_coro == NULL)
+            resume(coroutine(init_wait_on_children), init);
+
         message = seL4_Wait(ep, &badge);
         label = seL4_MessageInfo_get_label(message);
         if (badge & IRQ_EP_BADGE) {
@@ -35,11 +43,22 @@ event_loop(const seL4_CPtr ep)
                 timer_interrupt();
 
         } else if (label == seL4_VMFault) {
-            resume(coroutine(vm_fault), NULL);
+            resume(coroutine(vm_fault), GET_PROCID_BADGE(badge));
         } else if (label == seL4_NoFault) {
-            resume(coroutine(handle_syscall), badge);
+            resume(coroutine(handle_syscall), GET_PROCID_BADGE(badge));
         } else {
             LOG_INFO("Rootserver got an unknown message");
         }
     }
+}
+
+static void
+init_wait_on_children(proc *init)
+{
+    init->waiting_on = -1;
+    init->waiting_coro = coro_getcur();
+    int pid = yield(NULL);
+    init->waiting_coro = NULL;
+    LOG_INFO("SOS Cleaning up %d", pid);
+    proc_destroy(get_proc(pid));
 }

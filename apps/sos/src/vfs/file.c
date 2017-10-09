@@ -57,8 +57,22 @@ fdtable_create(void)
         return NULL;
     }
 
-    bzero(fdt->table, PROCESS_MAX_FILES);
+    bzero(fdt->table, sizeof(file *) * PROCESS_MAX_FILES);
     return fdt;
+}
+
+int
+fdtable_destroy(fdtable *table)
+{
+    file *open_file = NULL;
+    for (size_t fd = 0; fd < PROCESS_MAX_FILES; ++fd) {
+        if (fdtable_close_fd(table, fd, &open_file) == 0) {
+            file_close(open_file);
+        }
+    }
+
+    free(table);
+    return 0;
 }
 
 
@@ -98,7 +112,6 @@ fdtable_get_unused_fd(fdtable *fdt, int *fd)
 
     return 0;
 }
-
 
 int
 fdtable_close_fd(fdtable *fdt, int fd, file **oft_file)

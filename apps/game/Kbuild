@@ -1,0 +1,2 @@
+apps-$(CONFIG_APP_GAME) += game
+game: $(libc) libsel4 libsos

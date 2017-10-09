@@ -16,34 +16,34 @@
 #include <vm/vm.h>
 #include <utils/util.h>
 
-static seL4_Word syscall_do_read_write(seL4_Word access_mode);
+static int syscall_do_read_write(seL4_Word access_mode, proc *curproc);
 
-seL4_Word
-syscall_write(void)
+int
+syscall_write(proc *curproc)
 {
-    return syscall_do_read_write(ACCESS_WRITE);
+    return syscall_do_read_write(ACCESS_WRITE, curproc);
 }
 
-seL4_Word
-syscall_read(void)
+int
+syscall_read(proc *curproc)
 {
-    return syscall_do_read_write(ACCESS_READ);
+    return syscall_do_read_write(ACCESS_READ, curproc);
 }
 
-seL4_Word
-syscall_open(void)
+int
+syscall_open(proc *curproc)
 {
     LOG_INFO("syscall: thread made sos_open");
 
-    // TODO: Hard copy the filename because it might cross a page boundary
-
-    seL4_Word name = vaddr_to_sos_vaddr(seL4_GetMR(1), ACCESS_READ);
+    seL4_Word name = seL4_GetMR(1);
     fmode_t mode = seL4_GetMR(2);
-    LOG_INFO("sycall: thread made open(%s, %d)", (char *)name, mode);
+
+    // TODO: Hard copy the filename because it might cross a page boundary
+    name = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ); 
 
     int result;
-
     int fd;
+
     if ((result = fdtable_get_unused_fd(curproc->file_table, &fd)) != 0) {
         result = -1;
         goto message_reply;
@@ -63,8 +63,8 @@ syscall_open(void)
         return 1; /* nwords in message */
 }
 
-seL4_Word
-syscall_close(void)
+int
+syscall_close(proc *curproc)
 {
     int fd = seL4_GetMR(1);
     LOG_INFO("thread made close(%d)", fd);
@@ -78,8 +78,8 @@ syscall_close(void)
     return 1; /* nwords in message */
 }
 
-static seL4_Word
-syscall_do_read_write(seL4_Word access_mode)
+static int
+syscall_do_read_write(seL4_Word access_mode, proc *curproc)
 {
     int result;
 
@@ -109,11 +109,17 @@ syscall_do_read_write(seL4_Word access_mode)
     seL4_Word kvaddr;
 
     while (nbytes_remaining > 0) {
-        if (!(kvaddr = vaddr_to_sos_vaddr(buf, !access_mode))) {
+        if (!(kvaddr = vaddr_to_sos_vaddr(curproc, buf, !access_mode))) {
             LOG_ERROR("Address translation failed");
             result = -1;
             goto message_reply;
         }
+
+        /* Pin the frame, we dont want it paged out during these operations */
+        enum chance_type original_chance;
+        seL4_Word frame_id = frame_table_sos_vaddr_to_index(kvaddr);
+        assert(frame_table_get_chance(frame_id, &original_chance) == 0);
+        assert(frame_table_set_chance(frame_id, PINNED) == 0);
 
         bytes_this_round = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
         uiovec iov = {
@@ -123,8 +129,10 @@ syscall_do_read_write(seL4_Word access_mode)
         };
 
         if (access_mode == ACCESS_READ) {
-            if ((result = vn->vn_ops->vop_read(vn, &iov)) == -1)
+            if ((result = vn->vn_ops->vop_read(vn, &iov)) == -1) {
+                assert(frame_table_set_chance(frame_id, original_chance) == 0);
                 goto message_reply;
+            }
 
             /*
              * Difference between amount read and requested
@@ -139,10 +147,13 @@ syscall_do_read_write(seL4_Word access_mode)
                 break;
             }
         } else {
-            if ((result = vn->vn_ops->vop_write(vn, &iov)) == -1)
+            if ((result = vn->vn_ops->vop_write(vn, &iov)) == -1) {
+                assert(frame_table_set_chance(frame_id, original_chance) == 0);
                 goto message_reply;
+            }
         }
 
+        assert(frame_table_set_chance(frame_id, original_chance) == 0);
         nbytes_remaining -= result;
         buf += result;
         open_file->fp += result;
@@ -154,8 +165,8 @@ syscall_do_read_write(seL4_Word access_mode)
         return 1;
 }
 
-seL4_Word
-syscall_stat(void)
+int
+syscall_stat(proc * curproc)
 {
     LOG_INFO("syscall: thread made sos_stat");
 
@@ -164,8 +175,8 @@ syscall_stat(void)
     seL4_Word name = seL4_GetMR(1);
     seL4_Word stat_buf = seL4_GetMR(2);
     
-    seL4_Word kname = vaddr_to_sos_vaddr(name, ACCESS_READ); // TODO: Copy this in, it could cross page boundary, same for open() and others that use name
-    seL4_Word kbuf = vaddr_to_sos_vaddr(stat_buf, ACCESS_WRITE); // same
+    seL4_Word kname = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ); // TODO: Copy this in, it could cross page boundary, same for open() and others that use name
+    seL4_Word kbuf = vaddr_to_sos_vaddr(curproc, stat_buf, ACCESS_WRITE); // same
 
     sos_stat_t *kstat;
     if (vfs_stat((char *)kname, &kstat) != 0)
@@ -181,16 +192,18 @@ syscall_stat(void)
         return 1;
 }
 
-seL4_Word
-syscall_listdir(void)
+int
+syscall_listdir(proc * curproc)
 {
     LOG_INFO("syscall: thread made sos_getdirent");
 
     int result = -1;
 
     seL4_Word pos = seL4_GetMR(1);
-    seL4_Word uname = vaddr_to_sos_vaddr(seL4_GetMR(2), ACCESS_WRITE);
+    seL4_Word uname = seL4_GetMR(2);
     seL4_Word nbytes = seL4_GetMR(3);
+
+    uname = vaddr_to_sos_vaddr(curproc, uname, ACCESS_WRITE);
 
     char **dir;
     size_t nfiles = 0;

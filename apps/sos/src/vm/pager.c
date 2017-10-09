@@ -31,6 +31,11 @@ static volatile seL4_Word pager_initialised = FALSE;
 static fhandle_t pagefile_handle;
 
 static list_t *pagefile_free_pages = NULL;
+list_t *pagefile_operations = NULL;
+
+static int pagefile_op_compare(void *a, void *b);
+static void pagefile_op_append(void *a);
+static int pagefile_op_release(void *a);
 
 static void pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, fattr_t* fattr);
 
@@ -64,7 +69,14 @@ init_pager(void)
         return 1;
     }
 
+    /* Page file operations */
+    if ((pagefile_operations = malloc(sizeof(list_t))) == NULL) {
+        LOG_ERROR("failed to malloc pagefile operations list");
+        return 1;
+    }
+
     list_init(pagefile_free_pages);
+    list_init(pagefile_operations);
 
     /* Mark every page on the file as empty */
     LOG_INFO("max pages is %d", PAGEFILE_MAX_PAGES);
@@ -80,32 +92,44 @@ init_pager(void)
 }
 
 int
-page_in(seL4_Word page_id, seL4_Word access_type)
+page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
 {
-    LOG_INFO("paging in %p", page_id);
+    LOG_INFO("paging in %lu", page_id);
+    int ret_val = 1;
 
     seL4_CPtr pagefile_id;
     if (page_directory_lookup(curproc->p_addrspace->directory, PAGE_ALIGN_4K(page_id), &pagefile_id) != 0) {
         LOG_ERROR("lookup of pagefile id failed");
-        return 1;
+        goto next_operation;
     }
 
     pagefile_id &= (~EVICTED_BIT);
-    LOG_INFO("page is stored at %d", pagefile_id);
+    LOG_INFO("page is stored at %lu", pagefile_id);
 
     seL4_Word sos_vaddr;
 
     LOG_INFO("access type is %d", access_type);
 
-    if (vm_map(page_id, access_type, &sos_vaddr) != 0) {
+    if (vm_map(curproc, page_id, access_type, &sos_vaddr) != 0) {
         LOG_INFO("failed to map in a page");
-        return 1;
+        goto next_operation;
     }
 
     /* A page was just pushed to disk, page_id now corresponds to a legit page and 
      * sos_vaddr is where we can access that frame */
 
-    // TODO: Grab the big page lock
+    /* Queue paging operation */
+    if (list_append(pagefile_operations, (void *)coro_getcur()) != 0) {
+        LOG_ERROR("failed to queue paging operation");
+        goto next_operation;
+    }
+ 
+    /* If an operation is already happening, yield */
+    if (list_length(pagefile_operations) > 1) {
+        LOG_INFO("yielding");
+        yield(NULL);
+        LOG_INFO("page_in: resumed coro");
+    }
 
     /* Read the page in from the pagefile and into memory */
     vnode handle = {.vn_data = &pagefile_handle};
@@ -119,41 +143,61 @@ page_in(seL4_Word page_id, seL4_Word access_type)
            .uiov_pos = (pagefile_id * PAGE_SIZE_4K) + (PAGE_SIZE_4K - bytes_remaining)
         };
 
-        LOG_INFO("READ: base %p, len %lu, pos %lu", iov.uiov_base, iov.uiov_len, iov.uiov_pos);
-
         if ((result = sos_nfs_read(&handle, &iov)) == -1) {
             LOG_ERROR("Error when reading from pagefile");
-            return 1;
+            goto remove_current_operation;
         }
 
-        LOG_INFO("READ: result was %d", result);
-
         char *data_ptr = (char *)(sos_vaddr + (PAGE_SIZE_4K - bytes_remaining));
-        LOG_INFO("data: %d", *data_ptr);
-
         bytes_remaining -= result;
     } while (bytes_remaining > 0);
 
     /* Mark the page as free in the pagefile */
-    assert(list_prepend(pagefile_free_pages, (void *)pagefile_id) == 0);
-
+    pagefile_free_add(pagefile_id);
     seL4_ARM_Page_Unify_Instruction(frame_table_get_capability(frame_table_sos_vaddr_to_index(sos_vaddr)), 0, PAGE_SIZE_4K);
 
-    return 0;
+    ret_val = 0;
+    remove_current_operation:;
+        /* Remove finished operation from the queue */
+        struct list_node *op = pagefile_operations->head;
+        pagefile_operations->head = op->next;
+        free(op);
+
+    next_operation:
+        /* Run the next pagefile operation if any */
+        if (!list_is_empty(pagefile_operations))
+            resume(pagefile_operations->head->data, NULL);
+
+    return ret_val;
 }
 
 int
 page_out(seL4_Word *page_id)
 {
-    if (list_is_empty(pagefile_free_pages)) {
-        LOG_ERROR("No more space in the pagefile");
-        return -1;
+    int frame_id = -1;
+    /* Queue paging operation */
+    if (list_append(pagefile_operations, (void *)coro_getcur()) != 0) {
+        LOG_ERROR("failed to queue paging operation");
+        goto next_operation;
+    }
+    
+    LOG_INFO("Pageout length: %d", list_length(pagefile_operations));
+
+    /* If an operation is already happening, yield */
+    if (list_length(pagefile_operations) > 1) {
+        yield(NULL);
+        LOG_INFO("page_out: resumed coro");
     }
 
-    seL4_Word frame_id = next_victim();
+    if (list_is_empty(pagefile_free_pages)) {
+        LOG_ERROR("No more space in the pagefile");
+        goto remove_current_operation;
+    }
+
+    frame_id = next_victim();
     if (frame_id == -1) {
         LOG_ERROR("Unable to choose a victim");
-        return -1; /* We're unable to choose a vicitm, all pages are pinned */
+        goto remove_current_operation; /* We're unable to choose a vicitm, all pages are pinned */
     }
 
     LOG_INFO("victim frame is %d", frame_id);
@@ -161,18 +205,27 @@ page_out(seL4_Word *page_id)
     /* Evict the frame from memory and push it to the disk */
     if (evict_frame(frame_id) == -1) {
         LOG_ERROR("Evicting frame failed");
-        return -1;
+        frame_id = -1;
+        goto remove_current_operation;
     }
 
     /* Zero out the frame and return the page_id / frame_id */
     *page_id = frame_table_index_to_sos_vaddr(frame_id);
     bzero((void *)(*page_id), PAGE_SIZE_4K);
-    // LOG_INFO("unmapping using %p", frame_table_get_capability(frame_id));
-    //seL4_ARM_Page_Unmap(frame_table_get_capability(frame_id)); /* Unmap because sos_map_page will map in again */
 
-    /* Apparently we dont need to map in again??? */
-
+    /* Reset the chance on the frame */
     assert(frame_table_set_chance(frame_id, FIRST_CHANCE) == 0);
+
+    remove_current_operation:;
+        /* Remove finished operation from the queue */
+        struct list_node *op = pagefile_operations->head;
+        pagefile_operations->head = op->next;
+        free(op);
+
+    next_operation:
+        /* Run the next pagefile operation if any */
+        if (!list_is_empty(pagefile_operations))
+            resume(pagefile_operations->head->data, NULL);
 
     return frame_id;
 }
@@ -195,7 +248,6 @@ next_victim(void)
 
         assert(frame_table_get_chance(current_page, &chance) == 0);
         switch (chance) {
-            
             /* Increment the chance of the current page and move on */
             case FIRST_CHANCE:
                 frame_table_set_chance(current_page, SECOND_CHANCE);
@@ -240,7 +292,11 @@ evict_frame(seL4_Word frame_id)
     LOG_INFO("Evicting pid is %d; page_id is %p", pid, page_id);
 
     /* Get the page cap for the process */
-    // TODO: Instead of curproc, index into the proc array with pid
+    proc *curproc = get_proc(pid);
+    if (curproc == NULL) {
+        LOG_ERROR("Invalid pid");
+        return 1;
+    }
 
     /* Pop the next free page off the list */
     void *free_node = pagefile_free_pages->head;
@@ -248,13 +304,28 @@ evict_frame(seL4_Word frame_id)
     pagefile_free_pages->head = pagefile_free_pages->head->next;
     free(free_node);
 
+    // /* race condition cover */
+    // pagefile_op_node *op_node = malloc(sizeof(pagefile_op_node));
+    // op_node->pagefile_id = pagefile_id;
+    // int add_result = list_action(pagefile_operations, (void *)op_node, pagefile_op_compare, pagefile_op_append);
+    // LOG_INFO("evict_frame: add_result %d", add_result);
+    // if (add_result == 1) {
+    //      add it to the operations list, and init the waiting coros
+    //        list so other coros can append themselves to it to be served later 
+    //     list_init(op_node->waiting_coros);
+    //     list_append(pagefile_operations, (void *)op_node);
+    // } else {
+    //     /* so there is a current pagefile operation on the pageid, so we want
+    //        to yield so that the operation we are waiting on can resume us */
+    //     yield(NULL);
+    // }
+    // /* race condition cover */
+
     LOG_INFO("Free page in file at %d", pagefile_id);
 
     assert(page_directory_evict(curproc->p_addrspace->directory, page_id, pagefile_id) == 0);
 
     LOG_INFO("page entry evicted");
-
-    // TODO: GRAB A BIG LOCK AROUND PAGING
 
     /* Write the page to disk */
     /* TODO: DONT NEED TO WRITE PAGE IF ITS NOT DIRTY? */
@@ -297,6 +368,13 @@ evict_frame(seL4_Word frame_id)
     // 5. UT Free the memory so we can reuse it for another frame 
     // frame_free(frame_id);
 
+    /* release all waiting coros */
+    // if (op_node->waiting_coros) {
+    //     list_foreach(op_node->waiting_coros, pagefile_op_release);
+    //     list_remove_all(op_node->waiting_coros);
+    //     list_remove(pagefile_operations, op_node, pagefile_op_compare);        
+    // }
+
     return 0;
 }
 
@@ -307,4 +385,26 @@ pagefile_create_callback(uintptr_t token, enum nfs_stat status, fhandle_t* fh, f
     assert(status == NFS_OK);
     memcpy(&pagefile_handle, fh, sizeof(fhandle_t));
     pager_initialised = TRUE;
+}
+
+void
+pagefile_free_add(seL4_CPtr pagefile_id) {
+    assert(list_prepend(pagefile_free_pages, (void *)pagefile_id) == 0);
+}
+
+static int
+pagefile_op_compare(void *a, void *b) {
+    return (((pagefile_op_node *)a)->pagefile_id != ((pagefile_op_node *)b)->pagefile_id);
+}
+
+static void
+pagefile_op_append(void *a) {
+    pagefile_op_node *cur_node = (pagefile_op_node *)a;
+    list_append(cur_node->waiting_coros, (void *)coro_getcur());
+}
+
+static int
+pagefile_op_release(void *a) {
+    coro op_coro = (coro)a;
+    resume(op_coro, NULL);
 }

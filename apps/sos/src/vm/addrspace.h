@@ -3,13 +3,12 @@
  * 
  * Glenn McGuire & Cameron Lonsdale
  */
-
 #ifndef _ADDRSPACE_H_
 #define _ADDRSPACE_H_
 
 #include <sel4/sel4.h>
 
-#include "vm.h"
+typedef struct page_dir page_directory;
 
 /*
  * Region structure to specify regions in an address space
@@ -44,13 +43,27 @@ typedef struct {
 addrspace *as_create(void);
 
 /*
+ * Destroy an address space
+ * @param as, the addrspace to destroy
+ * @returns 0 on success else 1
+ */
+int as_destroy(addrspace *as);
+
+/*
  * Create a region
  * @param start, the starting virtual address of the region
  * @param size, the size of the region
  * @param permissions, encoded permissions of the region
- * @returns 0 on success else 1
+ * @returns region pointer, or NULL on error
  */
 region *as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions);
+
+/*
+ * Destroy a region
+ * @param reg, the region to destroy
+ * @returns 0 on success else 1
+ */
+int as_destroy_region(region *reg);
 
 /*
  * Add a region to an address space
@@ -85,5 +98,12 @@ int as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end);
  * @return 0 on success, else 1
  */ 
 int as_region_permission_check(region *reg, seL4_Word access_type);
+
+/*
+ * Define a stack region for an address space
+ * @param as, the address space to define the stack in
+ * @returns 0 on success, else 1
+ */
+int as_define_stack(addrspace *as);
 
 #endif /* _ADDRSPACE_H_ */
