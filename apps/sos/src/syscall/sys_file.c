@@ -74,15 +74,26 @@ int
 syscall_close(proc *curproc)
 {
     int fd = seL4_GetMR(1);
+    file *open_file;
+    int ret_val = -1;
+
     LOG_INFO("thread made close(%d)", fd);
 
-    file *open_file;
-    int ret_val;
-    if ((ret_val = fdtable_close_fd(curproc->file_table, fd, &open_file)) == 0)
-        file_close(open_file);
+    if (fd < 0) {
+        LOG_ERROR("fd must be negative");
+        goto message_reply;
+    }
 
-    seL4_SetMR(0, ret_val);
-    return 1; /* nwords in message */
+    if (fdtable_close_fd(curproc->file_table, fd, &open_file) != 0) {
+        LOG_ERROR("Invalid file descriptor");
+        goto message_reply;
+    }
+
+    file_close(open_file);
+    ret_val = 0;
+    message_reply:
+        seL4_SetMR(0, ret_val);
+        return 1; /* nwords in message */
 }
 
 static int
