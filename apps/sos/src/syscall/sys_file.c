@@ -33,16 +33,23 @@ syscall_read(proc *curproc)
 int
 syscall_open(proc *curproc)
 {
+    int result;
+    int fd;
+
     LOG_INFO("syscall: thread made sos_open");
 
     seL4_Word name = seL4_GetMR(1);
     fmode_t mode = seL4_GetMR(2);
 
-    // TODO: Hard copy the filename because it might cross a page boundary
-    name = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ); 
+    char kname[NAME_MAX];
+    if (copy_in(curproc, kname, name, NAME_MAX) != 0) {
+        LOG_ERROR("Error copying in path name");
+        result = -1;
+        goto message_reply;
+    }
 
-    int result;
-    int fd;
+    /* Explicit null terminate in case one is not provided */
+    kname[NAME_MAX - 1] = '\0';
 
     if ((result = fdtable_get_unused_fd(curproc->file_table, &fd)) != 0) {
         result = -1;
@@ -50,7 +57,7 @@ syscall_open(proc *curproc)
     }
 
     file *open_file;
-    if ((result = file_open((char *)name, mode, &open_file) != 0)) {
+    if ((result = file_open((char *)kname, mode, &open_file) != 0)) {
         result = -1;
         goto message_reply;
     }

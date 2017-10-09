@@ -108,6 +108,17 @@ int vm_translate(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Wor
 seL4_Word vaddr_to_sos_vaddr(proc *curproc, seL4_Word vaddr, seL4_Word access_type);
 
 /*
+ * Copy in nbytes (or less) from a path
+ * specified by a vaddr, into dst.
+ * @param curproc, the current process
+ * @param dst, destination buffer, of size nbytes
+ * @param vaddr_src, virtual source address
+ * @param nbytes, the maximum number of bytes to copy
+ * @returns 0 on success, else 1
+ */
+int copy_in(proc *curproc, void *dst, seL4_Word vaddr_src, seL4_Word nbytes);
+
+/*
  * Given a vaddr, try to map in that page 
  * @param as, the address space to map into
  * @param vaddr, the vaddr of the page to map in

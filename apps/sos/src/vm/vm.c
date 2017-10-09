@@ -473,6 +473,27 @@ vaddr_to_sos_vaddr(proc *curproc, seL4_Word vaddr, seL4_Word access_type)
 }
 
 int
+copy_in(proc *curproc, void *dst, seL4_Word vaddr_src, seL4_Word nbytes)
+{
+    seL4_Word bytes_remaining = nbytes;
+    seL4_Word sos_vaddr = NULL;
+    while (bytes_remaining > 0) {
+        seL4_Word bytes_this_round = MIN((PAGE_ALIGN_4K(vaddr_src) + PAGE_SIZE_4K) - vaddr_src, bytes_remaining);
+        if ((sos_vaddr = vaddr_to_sos_vaddr(curproc, vaddr_src, ACCESS_READ)) == NULL) {
+            LOG_ERROR("Error translating vaddr to sos_vaddr");
+            return 1;
+        }
+
+        memcpy(dst, (char *)sos_vaddr, bytes_this_round);
+        dst += bytes_this_round;
+        vaddr_src += bytes_this_round;
+        bytes_remaining -= bytes_this_round;
+    }
+
+    return 0;
+}
+
+int
 vm_map(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
 {
     addrspace *as = curproc->p_addrspace;
