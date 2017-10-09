@@ -17,9 +17,9 @@
 /*
  * Load an elf binary into an address space
  * @param proc, the destination process
- * @param elf_file, name of the elf binary
+ * @param app_name, name of the binary
  * @returns 0 on success, else error
  */
-int elf_load(proc *curproc, char *elf_file);
+int elf_load(proc *curproc, char *app_name, uint64_t *elf_pc);
 
 #endif /* _LIBOS_ELF_H_ */

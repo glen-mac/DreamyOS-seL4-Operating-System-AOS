@@ -251,9 +251,6 @@ main(void)
     /* Create the init process */
     pid_t init = proc_bootstrap();
     assert(init == 0);
-
-    /* Start the startup user application */
-    assert(proc_start(_cpio_archive, CONFIG_SOS_STARTUP_APP, _sos_ipc_ep_cap, init) != -1);
     
     /* Unit tests */
     // test_m2();

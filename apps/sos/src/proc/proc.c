@@ -75,7 +75,7 @@ pid_t proc_bootstrap(void)
 }
 
 pid_t
-proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
+proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
 {
     int err;
     pid_t new_pid;
@@ -155,20 +155,6 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
     seL4_DebugNameThread(new_proc->tcb_cap, app_name);
 #endif
 
-    if ((elf_base = cpio_get_file(_cpio_archive, app_name, &elf_size)) == NULL) {
-        LOG_ERROR("Unable to locate cpio header");
-        proc_delete(new_proc);
-        proc_destroy(new_proc);
-        return -1;
-    }
-
-    if (elf_load(new_proc, elf_base) != 0) {
-        LOG_ERROR("Error loading elf");
-        proc_delete(new_proc);
-        proc_destroy(new_proc);
-        return -1;
-    }
-
     if (as_define_stack(new_proc->p_addrspace) != 0) {
         LOG_ERROR("Error defining stack");
         proc_delete(new_proc);
@@ -220,21 +206,13 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
         proc_destroy(new_proc);
         return -1;
     }
-    fdtable_insert(new_proc->file_table, STDERR_FILENO, open_file);    
+    fdtable_insert(new_proc->file_table, STDERR_FILENO, open_file);  
 
     /* ------------------------------ START PROC --------------------------- */
 
     /* Set the start time */
     new_proc->stime = time_stamp();
     new_proc->p_state = RUNNING;
-
-    /* Start the new process */
-    seL4_UserContext context;
-    memset(&context, 0, sizeof(context));
-    context.pc = elf_getEntryPoint(elf_base);
-    context.sp = PROCESS_STACK_TOP;
-
-    seL4_TCB_WriteRegisters(new_proc->tcb_cap, 1, 0, 2, &context);
     
     /* Copy the name and null terminate */
     new_proc->proc_name = strdup(app_name);
@@ -250,6 +228,22 @@ proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent
 
     /* Store new proc */
     sos_procs[new_pid] = new_proc;
+
+    uint64_t elf_pc = 0;
+    if (elf_load(new_proc, app_name, &elf_pc) != 0) {
+        LOG_ERROR("Error loading elf");
+        proc_delete(new_proc);
+        proc_destroy(new_proc);
+        return -1;
+    }
+
+    /* Start the new process */
+    seL4_UserContext context;
+    memset(&context, 0, sizeof(context));
+    context.pc = elf_pc; // elf_getEntryPoint(elf_base);
+    context.sp = PROCESS_STACK_TOP;
+
+    seL4_TCB_WriteRegisters(new_proc->tcb_cap, 1, 0, 2, &context);
 
     return new_pid;
 }

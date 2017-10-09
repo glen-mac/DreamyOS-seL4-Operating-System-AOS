@@ -309,7 +309,7 @@ int elf_getMemoryBounds(void *elfFile, int phys, uint64_t *min, uint64_t *max);
  *
  * @param elfFile Pointer to a valid ELF header
  *
- * \return The entry point address as a 64-bit integer.
+ * return The entry point address as a 64-bit integer.
  */
 uint64_t elf_getEntryPoint(void *elfFile);
 

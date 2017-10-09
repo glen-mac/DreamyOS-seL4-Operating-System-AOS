@@ -68,7 +68,7 @@ pid_t proc_bootstrap(void);
  * @param fault_ep, endpoint for IPC
  * @return -1 on error, pid on success
  */
-pid_t proc_start(char *_cpio_archive, char *app_name, seL4_CPtr fault_ep, pid_t parent_pid);
+pid_t proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid);
 
 /*
  * Delete a process

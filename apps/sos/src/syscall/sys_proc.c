@@ -26,7 +26,7 @@ syscall_proc_create(proc *curproc)
     // TODO: Hard copy the filename because it might cross a page boundary
     name = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ);
 
-    pid_t pid = proc_start(_cpio_archive, name, _sos_ipc_ep_cap, curproc->pid);
+    pid_t pid = proc_start(name, _sos_ipc_ep_cap, curproc->pid);
     if (pid == -1) {
         LOG_ERROR("Error starting process");
         goto message_reply;
