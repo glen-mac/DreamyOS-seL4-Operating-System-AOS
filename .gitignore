@@ -7,3 +7,4 @@ cscope.out
 /null.i
 .config*
 tags
+*.diff
