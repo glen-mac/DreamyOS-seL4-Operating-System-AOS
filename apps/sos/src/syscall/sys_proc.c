@@ -46,9 +46,19 @@ int
 syscall_proc_delete(proc *curproc)
 {
     pid_t victim_pid = seL4_GetMR(1);
+    int ret_val;    
+
     LOG_INFO("Proc %d made proc_delete(%d)", curproc->pid, victim_pid);
-    int ret_val = proc_delete_async_check(curproc, victim_pid);
-    return ret_val;
+
+    if ((ret_val = proc_delete_async_check(curproc, victim_pid)) != -1)
+        ret_val = 0;
+
+    /* No reply if process deleted itself */
+    if (curproc->pid == victim_pid)
+        return -1;
+
+    seL4_SetMR(0, (seL4_Word)ret_val);
+    return 1;
 }
 
 int
@@ -156,18 +166,19 @@ int
 syscall_exit(proc *curproc)
 {
     LOG_INFO("proc %d called exit", curproc->pid);
-    return proc_delete_async_check(curproc, curproc->pid);
+    proc_delete_async_check(curproc, curproc->pid);
+    /* No reply to self as we have exited */
+    return -1;
 }
 
 int
 proc_delete_async_check(proc *curproc, pid_t victim_pid)
 {
     int ret_val = -1;
-    bool no_reply = FALSE;
     proc *victim = get_proc(victim_pid);
     if (!victim) {
         LOG_ERROR("Invalid process");
-        goto message_reply;
+        return ret_val;
     }
 
     if (victim->p_state == BLOCKED) {
@@ -177,25 +188,15 @@ proc_delete_async_check(proc *curproc, pid_t victim_pid)
          */
         LOG_INFO("Process is blocked");
         victim->kill_flag = TRUE;
-        ret_val = victim->pid;
-        goto message_reply;
+        ret_val = 0;
+        return ret_val;
     }
 
     if (proc_delete(victim) != 0) {
         LOG_ERROR("Failed to delete process");
-        goto message_reply;
+        return ret_val;
     }
 
-    ret_val = victim->pid;
-    if (curproc->pid == victim_pid)
-        no_reply = TRUE;
-
-    message_reply:
-        LOG_INFO("SETTING RETVAL %d", ret_val);
-        seL4_SetMR(0, (seL4_Word)ret_val);
-        /* We dont want to reply if we destroyed ourselves, as the cap will be invalid */
-        if (no_reply)
-            return -1;
-
-        return 1; /* nwords in message */
+    ret_val = 0;
+    return ret_val;
 }
