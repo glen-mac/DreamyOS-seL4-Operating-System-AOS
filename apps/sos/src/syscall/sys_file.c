@@ -80,7 +80,7 @@ syscall_close(proc *curproc)
     LOG_INFO("thread made close(%d)", fd);
 
     if (fd < 0) {
-        LOG_ERROR("fd must be negative");
+        LOG_ERROR("fd must be positive");
         goto message_reply;
     }
 
@@ -193,18 +193,30 @@ syscall_stat(proc * curproc)
     seL4_Word name = seL4_GetMR(1);
     seL4_Word stat_buf = seL4_GetMR(2);
     
-    seL4_Word kname = vaddr_to_sos_vaddr(curproc, name, ACCESS_READ); // TODO: Copy this in, it could cross page boundary, same for open() and others that use name
-    seL4_Word kbuf = vaddr_to_sos_vaddr(curproc, stat_buf, ACCESS_WRITE); // same
+
+    /* Copy in name from userland */
+    char kname[NAME_MAX];
+    if (copy_in(curproc, kname, name, NAME_MAX) != 0) {
+        LOG_ERROR("Error copying in path name");
+        result = -1;
+        goto message_reply;
+    }
+
+    /* Explicit null terminate in case one is not provided */
+    kname[NAME_MAX - 1] = '\0';
 
     sos_stat_t *kstat;
     if (vfs_stat((char *)kname, &kstat) != 0)
         goto message_reply;
 
-    // then copy out to the one specified by the user (using our page boundary special copy)
-    memcpy((sos_stat_t *)kbuf, (sos_stat_t *)kstat, sizeof(sos_stat_t)); // fix this
-    result = 0;
-    free(kstat);
+    /* Copy out stat to user process */
+    if (copy_out(curproc, stat_buf, kstat, sizeof(sos_stat_t)) != 0) {
+        LOG_ERROR("Error copying out");
+        goto message_reply;
+    }
 
+    free(kstat);
+    result = 0;
     message_reply:
         seL4_SetMR(0, result);
         return 1;
@@ -213,43 +225,50 @@ syscall_stat(proc * curproc)
 int
 syscall_listdir(proc * curproc)
 {
-    LOG_INFO("syscall: thread made sos_getdirent");
-
     int result = -1;
 
     seL4_Word pos = seL4_GetMR(1);
     seL4_Word uname = seL4_GetMR(2);
     int nbytes = seL4_GetMR(3);
 
-    if (nbytes <= 0)
-        goto message_reply;
+    LOG_INFO("syscall: thread made sos_getdirent(%d, %d)", pos, nbytes);
 
-    // TODO NEED MULTI PAGE WRITE HERE
-    uname = vaddr_to_sos_vaddr(curproc, uname, ACCESS_WRITE);
+    if (nbytes <= 0) {
+        LOG_ERROR("nbytes must be positive");
+        goto message_reply;
+    }
 
     char **dir;
     size_t nfiles = 0;
-    if (vfs_list(&dir, &nfiles) != 0)
+    if (vfs_list(&dir, &nfiles) != 0) {
+        LOG_ERROR("VFS list failed");
         goto message_reply;
+    }
 
     /* 1 past the end so we return 0 */
     if (pos == nfiles) {
+        free(dir);
         result = 0;
         goto message_reply;
     }
 
     /* Invalid directory entry */
-    if (!ISINRANGE(0, pos, nfiles - 1))
-        goto message_reply;
-
-    /* Copy the name into the user process */
-    // AND HERE
-    size_t bytes_returned = MIN(nbytes, strlen(dir[pos])) + 1; /* + 1 for the null terminator */
-    memcpy((void *)uname, (void *)dir[pos], bytes_returned);
-    result = bytes_returned;
-
-    message_reply:
+    if (!ISINRANGE(0, pos, nfiles - 1)) {
         free(dir);
+        LOG_ERROR("Invalid directory entry");
+        goto message_reply;
+    }
+
+    /* Copy out the name to userland buffer */
+    size_t bytes_returned = MIN(nbytes, strlen(dir[pos])) + 1;
+    if (copy_out(curproc, uname, dir[pos], bytes_returned) != 0) {
+        LOG_ERROR("Error copying out");
+        goto message_reply;
+    }
+
+    result = bytes_returned;
+    free(dir);
+    message_reply:
         seL4_SetMR(0, result);
         return 1;
 }
