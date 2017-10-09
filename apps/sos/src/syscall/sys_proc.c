@@ -23,6 +23,7 @@ syscall_proc_create(proc *curproc)
     int result = -1;
 
     seL4_Word name = seL4_GetMR(1);
+
     char kname[NAME_MAX];
     if (copy_in(curproc, kname, name, NAME_MAX) != 0) {
         LOG_ERROR("Error copying in path name");
@@ -61,13 +62,11 @@ syscall_proc_id(proc *curproc)
 int
 syscall_proc_status(proc *curproc)
 {
-    // TODO: currently might write over page boundary
-
     LOG_INFO("syscall proc_status: PID %d", curproc->pid);
     seL4_Word sos_procs_addr = seL4_GetMR(1);
     seL4_Word procs_max = seL4_GetMR(2);
 
-    sos_process_t *sos_procs = (sos_process_t *)vaddr_to_sos_vaddr(curproc, sos_procs_addr, ACCESS_READ);
+    // sos_process_t *sos_procs = (sos_process_t *)vaddr_to_sos_vaddr(curproc, sos_procs_addr, ACCESS_READ);
     seL4_Word num_found = 0;
     pid_t c_id = 0;
     proc *c_proc;
@@ -79,19 +78,30 @@ syscall_proc_status(proc *curproc)
             goto proc_loop;
         }
         /* write proc info */
-        num_found++;
-        sos_procs->pid = c_proc->pid;
-        sos_procs->size = page_directory_count(c_proc);
-        sos_procs->stime = c_proc->stime;
-        strcpy(sos_procs->command, c_proc->proc_name);
+        sos_process_t kproc = {
+            .pid = c_proc->pid,
+            .size = page_directory_count(c_proc),
+            .stime = c_proc->stime,
+        };
+        strcpy(kproc.command, c_proc->proc_name);
+
+        /* Copy out stat to user process */
+        if (copy_out(curproc, sos_procs_addr, &kproc, sizeof(sos_process_t)) != 0) {
+            LOG_ERROR("Error copying out");
+            goto message_reply;
+        }
 
         /* get next sos procs struct over in buffer */
-        sos_procs++;
+        sos_procs_addr += sizeof(sos_process_t);
+        num_found++;
+
         proc_loop:
             c_id++;
     }
-    seL4_SetMR(0, (seL4_Word)num_found);
-    return 1;
+
+    message_reply:
+        seL4_SetMR(0, num_found);
+        return 1;
 }
 
 int
