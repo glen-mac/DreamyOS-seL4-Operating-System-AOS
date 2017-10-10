@@ -316,10 +316,10 @@ int main() {
     file_errors();
     printf("File error tests passed.\n");
 
-    // printf("Running memory error tests.\n");
-    // printf("Warning: Here be implementation specific dragons.\n");
-    // memory_errors();
-    // printf("Memory error tests passed.\n");
+    printf("Running memory error tests.\n");
+    printf("Warning: Here be implementation specific dragons.\n");
+    memory_errors();
+    printf("Memory error tests passed.\n");
 
     printf("Running process error tests.\n");
     process_errors();
