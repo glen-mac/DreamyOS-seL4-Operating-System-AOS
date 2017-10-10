@@ -7,6 +7,7 @@
 #include "vm.h"
 
 #include "event.h"
+#include "addrspace.h"
 #include "frametable.h"
 #include "mapping.h"
 #include <proc/proc.h>
@@ -523,6 +524,10 @@ vm_map(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
     region *vaddr_region;
     if (as_find_region(as, vaddr, &vaddr_region) != 0 &&
         as_region_collision_check(as, PAGE_ALIGN_4K(vaddr), as->region_stack->end) == 0) {
+        if ((seL4_Word)(as->region_stack->end - PAGE_ALIGN_4K(vaddr)) > RLIMIT_STACK_SZ) {
+            LOG_ERROR("Tried to extend size of stack beyond RLIMIT_STACK");
+            return 1;
+        }
         as->region_stack->start = PAGE_ALIGN_4K(vaddr);
         LOG_INFO("Extended the stack to %p -> %p", (void *)as->region_stack->start, (void *)as->region_stack->end);
     }

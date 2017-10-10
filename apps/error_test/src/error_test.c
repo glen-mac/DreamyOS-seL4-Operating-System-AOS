@@ -290,11 +290,11 @@ void process_errors() {
 }
 
 void crash_errors() {
-    //printf("%c\n", *((char *)NULL));
-    //*((char *)NULL) = 2;
-    //*"Read only string" = 13;
-    printf("%c\n", *((char *)sbrk(0)));
-    //*((char *)sbrk(0)) = 2;
+    //printf("%c\n", *((char *)NULL));      /* working \o/ */
+    //*((char *)NULL) = 2;                  /* working \o/ */
+    *"Read only string" = 13;
+    //printf("%c\n", *((char *)sbrk(0)));   /* working \o/ */
+    //*((char *)sbrk(0)) = 2;               /* working \o/ */
 }
 
 int main() {

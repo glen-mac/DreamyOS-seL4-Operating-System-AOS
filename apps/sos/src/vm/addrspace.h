@@ -8,6 +8,8 @@
 
 #include <sel4/sel4.h>
 
+#define RLIMIT_STACK_SZ 8192000
+
 typedef struct page_dir page_directory;
 
 /*
