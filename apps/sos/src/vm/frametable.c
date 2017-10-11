@@ -172,7 +172,7 @@ frame_free(seL4_Word frame_id)
     for (uint32_t id = LOW_WATERMARK; id < HIGH_WATERMARK; id++)
         _frame_free(free_frames[id]);
 
-    free_index = LOW_WATERMARK - 1;
+    free_index = LOW_WATERMARK;
 }
 
 seL4_ARM_Page 
@@ -382,6 +382,8 @@ _frame_free(seL4_Word frame_id)
     seL4_ARM_Page frame_cap = frame_table[frame_id].cap;
     frame_table[frame_id].cap = (seL4_ARM_Page)NULL; /* Error guarding */
     frame_table[frame_id].chance = FIRST_CHANCE; /* Reset the chance */
+    frame_table[frame_id].pid = 0; /* Reset the pid */
+    frame_table[frame_id].page_id = 0; /* Reset the page_id */
 
     if (!frame_cap) {
         LOG_ERROR("capability for %d does not exist", frame_id);
