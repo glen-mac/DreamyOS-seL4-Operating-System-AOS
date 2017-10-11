@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <signal.h>
+#include <fcntl.h>
 
 #define SIZE 4
 uint32_t score=0;
@@ -358,6 +359,8 @@ void signal_callback_handler(int signum) {
 }
 
 int main(int argc, char *argv[]) {
+	open("console", O_RDONLY);
+
 	uint8_t board[SIZE][SIZE];
 	char c;
 	bool success;
