@@ -32,19 +32,13 @@
 	This program tries to execute an address on the stack
 	It should vm fault out and the process should be killed
 */
-
-
 int main(void) {
-
     int stack_addr = 4;
 
     int (*functionPtr)(int,int);
     functionPtr =  &stack_addr;
     int sum = (*functionPtr)(1,1);
 
-    printf("\n[New process]\n");
-
-
-    printf("[Process exiting]\n");
-    return 32;
+    assert(!"Failed! Process should have been killed");
+    return 0;
 }
