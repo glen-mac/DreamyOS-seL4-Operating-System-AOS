@@ -12,15 +12,12 @@
 int
 syscall_brk(proc *curproc)
 {
-    intptr_t newbrk = seL4_GetMR(1);
-    LOG_INFO("syscall: thread made sos_brk(%d)", newbrk);
+    seL4_Word newbrk = seL4_GetMR(1);
+    LOG_INFO("syscall: thread made sos_brk(%p)", newbrk);
 
-    intptr_t *heap_s = &(curproc->p_addrspace->region_heap->start);
-    intptr_t *heap_e = &(curproc->p_addrspace->region_heap->end);
-    intptr_t stack_s = curproc->p_addrspace->region_stack->start;
-
-    /* Set return value as okay by default */
-    seL4_SetMR(0, 0);
+    seL4_Word *heap_s = &(curproc->p_addrspace->region_heap->start);
+    seL4_Word *heap_e = &(curproc->p_addrspace->region_heap->end);
+    seL4_Word stack_s = curproc->p_addrspace->region_stack->start;
 
     /* If we actually desire to change heap brk */
     if (newbrk) {
@@ -36,6 +33,6 @@ syscall_brk(proc *curproc)
         }
     }
 
-    seL4_SetMR(1, *heap_e);
-    return 2;
+    seL4_SetMR(0, *heap_e);
+    return 1;
 }
