@@ -289,7 +289,11 @@ void process_errors() {
 
     pid = sos_process_create("error_test");
     assert(pid != -1);
+
+    int64_t t1 = sos_sys_time_stamp();
     sos_sys_usleep(10000);
+    assert(sos_sys_time_stamp() >= t1 + 10000);
+
     assert(sos_process_create("error_test") != pid);
     assert(sos_process_wait(pid) == pid);
 }

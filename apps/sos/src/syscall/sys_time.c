@@ -16,7 +16,7 @@
 #include <stdlib.h>
 
 static void callback_sys_usleep(uint32_t id, void *data);
-static bool timer_fired;
+volatile static bool timer_fired;
 
 int
 syscall_usleep(proc *curproc)
@@ -29,7 +29,8 @@ syscall_usleep(proc *curproc)
         return 0;
 
     timer_fired = FALSE;
-    if (register_timer(MILLISECONDS(ms_delay), callback_sys_usleep, (void *)coro_getcur()) != 0)
+    /* Register timer returns 0 on failure */
+    if (register_timer(MILLISECONDS(ms_delay), callback_sys_usleep, (void *)coro_getcur()) == 0)
         /* Only happens if out of memory */
         return 0;
 
