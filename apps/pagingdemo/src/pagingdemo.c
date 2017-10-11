@@ -71,6 +71,7 @@ int main(void) {
     for (int block = 0; block < PAGING_DEMO_BLOCKS; block++) {
         free(blocks[block]);
     }
-    return 0;
 
+    printf("Pagingdemo tests passed\n");
+    return 0;
 }
