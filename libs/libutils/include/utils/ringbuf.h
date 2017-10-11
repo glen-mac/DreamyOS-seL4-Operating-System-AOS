@@ -94,6 +94,7 @@ int ring_buffer_dequeue(ring_buffer_t *buffer, char *data);
  * @return The number of bytes returned.
  */
 int ring_buffer_dequeue_arr(ring_buffer_t *buffer, char *data, ring_buffer_size_t len);
+
 /**
  * Peeks a ring buffer, i.e. returns an element without removing it.
  * @param buffer The buffer from which the data should be returned.
@@ -103,32 +104,25 @@ int ring_buffer_dequeue_arr(ring_buffer_t *buffer, char *data, ring_buffer_size_
  */
 int ring_buffer_peek(ring_buffer_t *buffer, char *data, ring_buffer_size_t index);
 
-
 /**
  * Returns whether a ring buffer is empty.
  * @param buffer The buffer for which it should be returned whether it is empty.
  * @return 1 if empty; 0 otherwise.
  */
-inline int ring_buffer_is_empty(ring_buffer_t *buffer) {
-  return (buffer->head_index == buffer->tail_index);
-}
+int ring_buffer_is_empty(ring_buffer_t *buffer);
 
 /**
  * Returns whether a ring buffer is full.
  * @param buffer The buffer for which it should be returned whether it is full.
  * @return 1 if full; 0 otherwise.
  */
-inline int ring_buffer_is_full(ring_buffer_t *buffer) {
-  return ((buffer->head_index - buffer->tail_index) & RING_BUFFER_MASK) == RING_BUFFER_MASK;
-}
+int ring_buffer_is_full(ring_buffer_t *buffer);
 
 /**
  * Returns the number of items in a ring buffer.
  * @param buffer The buffer for which the number of items should be returned.
  * @return The number of items in the ring buffer.
  */
-inline ring_buffer_size_t ring_buffer_num_items(ring_buffer_t *buffer) {
-  return ((buffer->head_index - buffer->tail_index) & RING_BUFFER_MASK);
-}
+ring_buffer_size_t ring_buffer_num_items(ring_buffer_t *buffer);
 
 #endif /* RINGBUFFER_H */

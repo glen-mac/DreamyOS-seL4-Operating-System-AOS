@@ -68,3 +68,15 @@ int ring_buffer_peek(ring_buffer_t *buffer, char *data, ring_buffer_size_t index
   *data = buffer->buffer[data_index];
   return 1;
 }
+
+int ring_buffer_is_empty(ring_buffer_t *buffer) {
+  return (buffer->head_index == buffer->tail_index);
+}
+
+int ring_buffer_is_full(ring_buffer_t *buffer) {
+  return ((buffer->head_index - buffer->tail_index) & RING_BUFFER_MASK) == RING_BUFFER_MASK;
+}
+
+ring_buffer_size_t ring_buffer_num_items(ring_buffer_t *buffer) {
+  return ((buffer->head_index - buffer->tail_index) & RING_BUFFER_MASK);
+}

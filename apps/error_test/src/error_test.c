@@ -8,6 +8,9 @@
  * @TAG(NICTA_BSD)
  */
 
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
+
 #include <assert.h>
 #include <limits.h>
 #include <fcntl.h>
@@ -290,9 +293,14 @@ void process_errors() {
 }
 
 void crash_errors() {
+    printf("This print helps ensure crash_errors is called and not thrown away by gcc\n");
+    fflush(stdout);
+
     //printf("%c\n", *((char *)NULL));      /* working \o/ */
     //*((char *)NULL) = 2;                  /* working \o/ */
+
     *"Read only string" = 13;
+
     //printf("%c\n", *((char *)sbrk(0)));   /* working \o/ */
     //*((char *)sbrk(0)) = 2;               /* working \o/ */
 }
@@ -325,8 +333,6 @@ int main() {
     process_errors();
     printf("Process error tests passed.\n");
 
-    // TODO(karl): Write share vm tests.
-
     printf("Running crash tests. You need to manually comment out individual lines.\n");
     crash_errors();
     assert(!"Crash tests failed you should never get here!\n");
@@ -334,3 +340,4 @@ int main() {
     return 0;
 }
 
+#pragma GCC pop_options
