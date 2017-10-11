@@ -128,6 +128,7 @@ syscall_proc_wait(proc *curproc)
             proc *child = get_proc(curr->data);
             if (child && child->p_state == ZOMBIE) {
                 ret_val = child->pid;
+                LOG_INFO("child pid is %d", ret_val);
                 goto destroy;
             }
         }
@@ -141,9 +142,12 @@ syscall_proc_wait(proc *curproc)
     }
 
     proc *child = get_proc(pid);
+    assert(child != NULL);
+
     if (child->p_state == ZOMBIE) {
         LOG_INFO("Child already exited");
         ret_val = pid;
+        LOG_INFO("pid is %d", ret_val);
         goto destroy;
     }
 
@@ -154,7 +158,10 @@ syscall_proc_wait(proc *curproc)
         curproc->waiting_coro = NULL;
         curproc->waiting_on = -1;
 
+    LOG_INFO("yieled and got this %d", ret_val);
+
     destroy:
+        LOG_INFO("ret_val is %d", ret_val);
         proc_destroy(get_proc(ret_val));
 
     message_reply:

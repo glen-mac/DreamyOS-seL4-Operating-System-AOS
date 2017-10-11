@@ -48,6 +48,7 @@ handle_syscall(seL4_Word pid)
     seL4_Word syscall_number = seL4_GetMR(0);
 
     proc *curproc = get_proc(pid);
+    assert(curproc != NULL);
 
     /* Save the caller */
     seL4_CPtr reply_cap = cspace_save_reply_cap(cur_cspace);

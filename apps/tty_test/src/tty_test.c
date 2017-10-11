@@ -49,13 +49,13 @@ main(void)
 {
     // thread_block();
     printf(">>> tty_test program started <<<\n");
-    // test_m3();
-    // test_m4();
-    // test_m7();
-    sleep(30);
+    test_m3();
+
+    printf("Not testing m4, requires terminal input, test this when you need to\n");
+    //test_m4();
 
     exit(0);
-    printf("Should not print");    
+    assert(!"Should not print");    
 }
 
 static void
@@ -75,7 +75,7 @@ do_pt_test(char *buf)
 static void
 test_m3(void)
 {
-    /* need a decent sized stack */
+    /* Nseed a decent sized stack */
     char buf1[NPAGES * PAGE_SIZE_4K];
 
     /* check the stack is above phys mem */
@@ -92,11 +92,12 @@ test_m3(void)
     do_pt_test(buf2);
     free(buf2);
 
-    printf("M3 Tests passed, Now generating a permissions fault\n");
+    printf("M3 Tests passed\n");
 
     /* This should generate a permissions fault, we cant write to the code section */
-    addr = (seL4_Word *)0x00008000;
-    *addr = 5;
+    /* This test is covered in another program */
+    // addr = (seL4_Word *)0x00008000;
+    // *addr = 5;
 }
 
 static void
@@ -114,7 +115,7 @@ test_m4(void)
     result = sos_sys_write(console_fd, test_str, strlen(test_str));
     assert(result == strlen(test_str));
 
-    /* Write from a non resident buffer, should get mapped int */
+    /* Write from a non resident buffer, should get mapped in */
     char non_resident_buffer[BUF_SZ];
     sos_sys_write(console_fd, non_resident_buffer, BUF_SZ);
 
@@ -162,6 +163,9 @@ test_m4(void)
        assert(next_seconds > prev_seconds);
        printf("Tick\n");
     }
+
+    /* Small sleep */
+    msleep(1);
 
     /* Checking permissions */
     printf("printing from a code section, dont be surprised if these look weird\n");

@@ -339,14 +339,34 @@ int main(void) {
     int i, r, done, found, new, argc;
     char *bp, *p;
 
-    in = open("console", O_RDONLY);
-    assert(in >= 0);
-
     bp = buf;
     done = 0;
     new = 1;
 
     printf("\n[SOSH Starting]\n");
+
+
+    printf("DEBUGGING FOR FINAL SUBMISSION: Running all tests\n");
+
+    pid_t pid;
+
+    /* This needs to be the first test run */
+    assert((pid = sos_process_create("error_test")) != -1);
+    assert(sos_process_wait(pid) == pid);
+
+    assert((pid = sos_process_create("execstack")) != -1);
+    assert(sos_process_wait(pid) == pid);
+
+    assert((pid = sos_process_create("tty_test")) != -1);
+    assert(sos_process_wait(pid) == pid);
+
+    assert((pid = sos_process_create("pagingdemo")) != -1);
+    assert(sos_process_wait(pid) == pid);
+
+    printf("All tests passed, you are awesome!\n");
+
+    in = open("console", O_RDONLY);
+    assert(in >= 0);
 
     while (!done) {
         if (new) {

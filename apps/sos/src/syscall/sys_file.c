@@ -126,6 +126,8 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
     seL4_Word nbytes_remaining = nbytes;
     seL4_Word kvaddr;
 
+    LOG_INFO("MIDDLE");
+
     while (nbytes_remaining > 0) {
         if (!(kvaddr = vaddr_to_sos_vaddr(curproc, buf, !access_mode))) {
             LOG_ERROR("Address translation failed");
@@ -176,6 +178,8 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
         buf += result;
         open_file->fp += result;
     }
+
+    LOG_INFO("AFTER");
 
     result = nbytes - nbytes_remaining;
     message_reply:

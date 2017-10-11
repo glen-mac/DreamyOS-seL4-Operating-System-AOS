@@ -165,8 +165,10 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
 
     next_operation:
         /* Run the next pagefile operation if any */
-        if (!list_is_empty(pagefile_operations))
+        if (!list_is_empty(pagefile_operations)) {
+            LOG_INFO("resuming from page_in");
             resume(pagefile_operations->head->data, NULL);
+        }
 
     return ret_val;
 }
@@ -224,8 +226,10 @@ page_out(seL4_Word *page_id)
 
     next_operation:
         /* Run the next pagefile operation if any */
-        if (!list_is_empty(pagefile_operations))
+        if (!list_is_empty(pagefile_operations)) {
+            LOG_INFO("resuming from page_out");
             resume(pagefile_operations->head->data, NULL);
+        }
 
     return frame_id;
 }
@@ -406,5 +410,6 @@ pagefile_op_append(void *a) {
 static int
 pagefile_op_release(void *a) {
     coro op_coro = (coro)a;
+    LOG_INFO("resuming from page_op_release");
     resume(op_coro, NULL);
 }

@@ -92,6 +92,8 @@ proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
         return -1;
     }
 
+    // printf("assigned pid %d for %s\n", new_pid, app_name);
+
     /* Create a process struct */
     proc *new_proc = proc_create();
     if (new_proc == NULL) {
@@ -341,7 +343,11 @@ void
 proc_destroy(proc *current)
 {
     /* Remove proc as child from parent */
+    LOG_INFO("Current %d, parent %d", current->pid, current->ppid);
+
     proc *parent = get_proc(current->ppid);
+    assert(parent != NULL);
+
     LOG_INFO("removing %d from %d", current->pid, parent->pid);
     list_remove(parent->children, current->pid, list_cmp_equality);
 
@@ -382,7 +388,7 @@ proc_create(void)
         LOG_ERROR("failed to create list of children");
         return NULL;
     }
-    assert(list_init(new_proc->children) == 0);
+    list_init(new_proc->children);
 
     /* Create a simple 1 level CSpace */
     if ((new_proc->croot = cspace_create(1)) == NULL) {
@@ -446,11 +452,7 @@ proc_reparent_children(proc *cur_parent, pid_t new_parent)
     if (new_parent_proc == NULL)
         return 1;
 
-    LOG_INFO("cur_parent is %p", cur_parent);
-    LOG_INFO("cur_parent children is %p", cur_parent->children);
     for (struct list_node *curr = cur_parent->children->head; curr != NULL; curr = curr->next) {
-        LOG_INFO("curr is %p", curr);
-        LOG_INFO("curr->data is %d", curr->data);
         proc *child = get_proc(curr->data);
         LOG_INFO("child is %p", child);
         child->ppid = new_parent_proc->pid;

@@ -186,7 +186,7 @@ sos_nfs_read(vnode *node, uiovec *iov)
     cb->routine = coro_getcur();
     cb->iv = iov;
 
-    int *ret;
+    int ret;
     seL4_Word total = iov->uiov_len;
 
     /* Loop to make sure entire page is written, as nfs could break it up into small packets */
@@ -197,15 +197,17 @@ sos_nfs_read(vnode *node, uiovec *iov)
         }
 
         ret = yield(NULL);
-        if (*ret == 0 || *ret == -1)
+        if (ret == 0 || ret == -1)
             break;
 
-        iov->uiov_len -= *ret;
-        iov->uiov_base += *ret;
-        iov->uiov_pos += *ret;
+        iov->uiov_len -= ret;
+        iov->uiov_base += ret;
+        iov->uiov_pos += ret;
     }
 
     free(cb);
+
+    // LOG_INFO("THIS FINISHED?");
     return total - iov->uiov_len;
 }
 
@@ -264,6 +266,7 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
     if((vn->vn_data = malloc(sizeof(fhandle_t))) == NULL) {
         LOG_ERROR("malloc failed when creating vn_data");
         free(vn);
+        vn = NULL;
         goto coro_resume;
     }
 
@@ -271,6 +274,7 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
     vn->vn_ops = &nfs_vnode_ops;
 
     coro_resume:
+        LOG_INFO("resuming from NFS lookup");
         resume((coro)token, vn);
 }
 
@@ -298,6 +302,7 @@ sos_nfs_readdir_callback(uintptr_t token, enum nfs_stat status, int num_files, c
 
     ret_val = 0;
     coro_resume:
+        LOG_INFO("resuming from readdir");
         resume((coro)token, &ret_val);
 }
 
@@ -318,6 +323,7 @@ sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, in
 
     ret_val = count;
     coro_resume:
+        LOG_INFO("resuming from write");
         resume((coro)token, &ret_val);
 }
 
@@ -344,7 +350,8 @@ sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int
     ret_val = count;
 
     coro_resume:
-        resume(call_data->routine, &ret_val);
+        LOG_INFO("resuming from read %d", ret_val);
+        resume(call_data->routine, (void *)ret_val);
 }
 
 
@@ -376,6 +383,7 @@ sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr)
     stat->st_atime = (long)(fattr->atime.seconds*1000 + fattr->atime.useconds / 1000);
 
     coro_resume:
+        LOG_INFO("resuming from stat");
         resume((coro)token, stat);
 }
 
