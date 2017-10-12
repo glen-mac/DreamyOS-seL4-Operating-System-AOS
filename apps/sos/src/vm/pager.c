@@ -116,10 +116,8 @@ page_gate_open(void)
 static int
 page_gate_close(void)
 {
-    if (lock_free_coro == coro_getcur()){
-        printf("Is this happening last?\n");
+    if (lock_free_coro == coro_getcur())
         return 0;
-    }
 
     /* Run the next pagefile operation if any */
     if (!list_is_empty(pagefile_operations)) {
@@ -128,7 +126,6 @@ page_gate_close(void)
         pagefile_operations->head = op->next;
 
 //        printf("resuming page_page_close\n");
-        printf("close resuming the next thing\n");
         resume(op->data, NULL);
 //        printf("After resume! page_gate_close\n");
 
@@ -178,7 +175,7 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
     lock_free_coro = coro_getcur();
     if (vm_map(curproc, page_id, access_type, &sos_vaddr) != 0) {
         LOG_INFO("failed to map in page");
-        printf("diretory lookup failed\n");
+        printf("vm map failed failed\n");
         global_page_lock = TRUE;
         lock_free_coro = NULL;
         goto page_in_epilogue;

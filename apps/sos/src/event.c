@@ -18,7 +18,6 @@
 
 static void start_first_proc(void);
 static void reap_dead_orphans(proc *init);
-static void init_wait_on_children(proc *init);
 
 void
 event_loop(const seL4_CPtr ep)
