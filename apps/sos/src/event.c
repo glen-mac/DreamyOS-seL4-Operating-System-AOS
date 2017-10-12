@@ -17,6 +17,7 @@
 #include "network.h"
 
 static void start_first_proc(void);
+static void reap_dead_orphans(proc *init);
 static void init_wait_on_children(proc *init);
 
 void
@@ -31,22 +32,25 @@ event_loop(const seL4_CPtr ep)
 
     LOG_INFO("returned from start_first_proc");
 
+    proc *init = get_proc(0);
+
     while (TRUE) {
         /* Wait on children if not already waiting */
-        proc *init = get_proc(0);
-        if (init->waiting_coro == NULL)
-            resume(coroutine(init_wait_on_children), init);
+        // proc *init = get_proc(0);
+        // if (init->waiting_coro == NULL)
+        //     resume(coroutine(init_wait_on_children), init);
+        reap_dead_orphans(init);
 
         message = seL4_Wait(ep, &badge);
         label = seL4_MessageInfo_get_label(message);
         if (badge & IRQ_EP_BADGE) {
             /* Interrupt */
             if (badge & IRQ_BADGE_NETWORK)
-                resume(coroutine(network_irq), NULL);
+                network_irq();
 
             /* Needs to be an if, interrupts can group together */
             if (badge & IRQ_BADGE_TIMER)
-                resume(coroutine(timer_interrupt), NULL);
+                timer_interrupt();
 
         } else if (label == seL4_VMFault) {
             resume(coroutine(vm_fault), GET_PROCID_BADGE(badge));
@@ -55,6 +59,16 @@ event_loop(const seL4_CPtr ep)
         } else {
             LOG_INFO("Rootserver got an unknown message");
         }
+    }
+}
+
+static void 
+reap_dead_orphans(proc *init)
+{
+    for (struct list_node *curr = init->children->head; curr != NULL; curr = curr->next) {
+        proc *child = get_proc(curr->data);
+        if (child->p_state == ZOMBIE)
+            proc_destroy(child);
     }
 }
 

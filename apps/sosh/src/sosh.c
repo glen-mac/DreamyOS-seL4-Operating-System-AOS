@@ -353,19 +353,19 @@ int main(void) {
     assert((pid = sos_process_create("error_test")) != -1);
     assert(sos_process_wait(pid) == pid);
 
-    assert((pid = sos_process_create("execstack")) != -1);
-    assert(sos_process_wait(pid) == pid);
+    // assert((pid = sos_process_create("execstack")) != -1);
+    // assert(sos_process_wait(pid) == pid);
 
-    assert((pid = sos_process_create("tty_test")) != -1);
-    assert(sos_process_wait(pid) == pid);
+    // assert((pid = sos_process_create("tty_test")) != -1);
+    // assert(sos_process_wait(pid) == pid);
 
-    assert((pid = sos_process_create("pagingdemo")) != -1);
-    assert(sos_process_wait(pid) == pid);
+    // assert((pid = sos_process_create("pagingdemo")) != -1);
+    // assert(sos_process_wait(pid) == pid);
 
-    do {
-        pid = sos_process_create("thrash");
-        printf("Starting thrash %d\n", pid);
-    } while (pid != -1);
+    // do {
+    //     pid = sos_process_create("thrash");
+    //     printf("Starting thrash %d\n", pid);
+    // } while (pid != -1);
 
     printf("All tests passed, you are awesome!\n");
 

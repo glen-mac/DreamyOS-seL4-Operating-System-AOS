@@ -138,6 +138,9 @@ syscall_proc_wait(proc *curproc)
 
     if (!proc_is_child(curproc, pid)) {
         LOG_ERROR("%d is not the calling procs child", pid);
+        proc *p = get_proc(pid);
+        if (p)
+            LOG_ERROR("procs parent is %d", p->ppid);
         goto message_reply;
     }
 

@@ -329,6 +329,10 @@ proc_delete(proc *victim)
         goto error;
     }
 
+    LOG_INFO("MY PARENT IS %d", parent->pid);
+    LOG_INFO("waitin on %d", parent->waiting_on);
+    LOG_INFO("waiting coro %d", parent->waiting_coro);
+
     if (proc_is_waiting(parent, victim)) {
         LOG_INFO("resuming coroutine");
         resume(parent->waiting_coro, victim->pid);
