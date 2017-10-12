@@ -73,6 +73,11 @@ static void *pass(coro me, void *arg) {
 }
 
 void *resume(coro c, void *arg) {
+    // void *buffer[10];
+    // size_t size = backtrace(buffer, 3);
+    // for (int i = 0; i < size; i++)
+    //     printf("meow %p\n", buffer[i]);
+
     assert(resumable(c));
     push(&running, c);
     return(pass(c->next, arg));

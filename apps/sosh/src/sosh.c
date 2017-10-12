@@ -345,7 +345,6 @@ int main(void) {
 
     printf("\n[SOSH Starting]\n");
 
-
     printf("DEBUGGING FOR FINAL SUBMISSION: Running all tests\n");
 
     pid_t pid;
@@ -362,6 +361,11 @@ int main(void) {
 
     assert((pid = sos_process_create("pagingdemo")) != -1);
     assert(sos_process_wait(pid) == pid);
+
+    do {
+        pid = sos_process_create("thrash");
+        printf("Starting thrash %d\n", pid);
+    } while (pid != -1);
 
     printf("All tests passed, you are awesome!\n");
 

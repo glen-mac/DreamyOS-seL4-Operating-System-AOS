@@ -42,11 +42,11 @@ event_loop(const seL4_CPtr ep)
         if (badge & IRQ_EP_BADGE) {
             /* Interrupt */
             if (badge & IRQ_BADGE_NETWORK)
-                network_irq();
+                resume(coroutine(network_irq), NULL);
 
             /* Needs to be an if, interrupts can group together */
             if (badge & IRQ_BADGE_TIMER)
-                timer_interrupt();
+                resume(coroutine(timer_interrupt), NULL);
 
         } else if (label == seL4_VMFault) {
             resume(coroutine(vm_fault), GET_PROCID_BADGE(badge));

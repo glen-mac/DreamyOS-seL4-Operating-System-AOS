@@ -107,6 +107,12 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
 
     LOG_INFO("syscall: %s(%d, %p, %d) received on SOS", access_mode == ACCESS_READ ? "read": "write", fd, (void *)buf, nbytes);
 
+    uiovec *iov = malloc(sizeof(uiovec));
+    if (iov == NULL) {
+        result = -1;
+        goto message_reply;
+    }
+
     file *open_file;
     if ((result = fdtable_get(curproc->file_table, fd, &open_file)) != 0) {
         LOG_ERROR("ftable_get error");
@@ -126,8 +132,6 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
     seL4_Word nbytes_remaining = nbytes;
     seL4_Word kvaddr;
 
-    LOG_INFO("MIDDLE");
-
     while (nbytes_remaining > 0) {
         if (!(kvaddr = vaddr_to_sos_vaddr(curproc, buf, !access_mode))) {
             LOG_ERROR("Address translation failed");
@@ -142,14 +146,18 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
         assert(frame_table_set_chance(frame_id, PINNED) == 0);
 
         bytes_this_round = MIN((PAGE_ALIGN_4K(buf) + PAGE_SIZE_4K) - buf, nbytes_remaining);
-        uiovec iov = {
-            .uiov_base = (char *)kvaddr,
-            .uiov_len = bytes_this_round,
-            .uiov_pos = open_file->fp
-        };
+
+        iov->uiov_base = (char *)kvaddr;
+        iov->uiov_len = bytes_this_round;
+        iov->uiov_pos = open_file->fp;
+        // uiovec iov = {
+        //     .uiov_base = (char *)kvaddr,
+        //     .uiov_len = bytes_this_round,
+        //     .uiov_pos = open_file->fp
+        // };
 
         if (access_mode == ACCESS_READ) {
-            if ((result = vn->vn_ops->vop_read(vn, &iov)) == -1) {
+            if ((result = vn->vn_ops->vop_read(vn, iov)) == -1) {
                 assert(frame_table_set_chance(frame_id, original_chance) == 0);
                 goto message_reply;
             }
@@ -167,7 +175,7 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
                 break;
             }
         } else {
-            if ((result = vn->vn_ops->vop_write(vn, &iov)) == -1) {
+            if ((result = vn->vn_ops->vop_write(vn, iov)) == -1) {
                 assert(frame_table_set_chance(frame_id, original_chance) == 0);
                 goto message_reply;
             }
@@ -179,10 +187,9 @@ syscall_do_read_write(seL4_Word access_mode, proc *curproc)
         open_file->fp += result;
     }
 
-    LOG_INFO("AFTER");
-
     result = nbytes - nbytes_remaining;
     message_reply:
+        free(iov);
         seL4_SetMR(0, result);
         return 1;
 }

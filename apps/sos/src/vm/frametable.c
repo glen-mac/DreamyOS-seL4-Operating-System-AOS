@@ -234,7 +234,7 @@ frame_table_get_limits(seL4_Word *lower, seL4_Word *upper)
     }
 
     *lower = 0;
-    *upper = ADDR_TO_INDEX(ut_top);
+    *upper = frame_table_max;
     return 0;
 }
 

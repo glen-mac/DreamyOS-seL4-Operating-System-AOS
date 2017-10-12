@@ -53,7 +53,7 @@ static volatile nfscookie_t global_cookie = 0;
 /* nfs operation struct to pass as the token (used only for read) */
 typedef struct {
     coro routine;
-    uiovec * iv;
+    uiovec *iv;
 } nfs_cb;
 
 int
@@ -155,7 +155,7 @@ sos_nfs_open(vnode *vnode, fmode_t mode)
 int
 sos_nfs_write(vnode *node, uiovec *iov)
 {
-    int *ret;
+    int ret;
     seL4_Word total = iov->uiov_len;
 
     /* Loop to make sure entire page is written, as nfs could break it up into small packets */
@@ -164,12 +164,13 @@ sos_nfs_write(vnode *node, uiovec *iov)
             return -1;
 
         ret = yield(NULL);
-        if (*ret == 0 || *ret == -1)
+        if (ret == 0 || ret == -1)
             break;
 
-        iov->uiov_len -= *ret;
-        iov->uiov_base += *ret;
-        iov->uiov_pos += *ret;
+        assert(iov != NULL);
+        iov->uiov_len -= ret;
+        iov->uiov_base += ret;
+        iov->uiov_pos += ret;
     }
 
     return total - iov->uiov_len;
@@ -178,28 +179,36 @@ sos_nfs_write(vnode *node, uiovec *iov)
 int
 sos_nfs_read(vnode *node, uiovec *iov)
 {
-    nfs_cb *cb = (nfs_cb *)malloc(sizeof(nfs_cb));
+    nfs_cb *cb = malloc(sizeof(nfs_cb));
     if (cb == NULL) {
         LOG_ERROR("Error creating callback struct");
         return -1;
     }
-    cb->routine = coro_getcur();
-    cb->iv = iov;
 
     int ret;
     seL4_Word total = iov->uiov_len;
 
     /* Loop to make sure entire page is written, as nfs could break it up into small packets */
     while (iov->uiov_len > 0) {
+//        printf("callback %p iov %p routine %p\n", cb, cb->iv, cb->routine);
+        cb->routine = coro_getcur();
+        cb->iv = iov;
+
         if (nfs_read(node->vn_data, iov->uiov_pos, iov->uiov_len, sos_nfs_read_callback, (uintptr_t)cb) != RPC_OK) {
             LOG_ERROR("Error in nfs_read");
+            printf("Error here\n");
+            free(cb);
             return -1;
         }
 
+//        printf("Before yield\n");
         ret = yield(NULL);
+//        printf("after yield, resumed too early? %d\n", ret);
+
         if (ret == 0 || ret == -1)
             break;
 
+        assert(iov != NULL);
         iov->uiov_len -= ret;
         iov->uiov_base += ret;
         iov->uiov_pos += ret;
@@ -274,7 +283,7 @@ sos_nfs_lookup_callback(uintptr_t token, enum nfs_stat status,
     vn->vn_ops = &nfs_vnode_ops;
 
     coro_resume:
-        LOG_INFO("resuming from NFS lookup");
+//        LOG_INFO("resuming from NFS lookup");
         resume((coro)token, vn);
 }
 
@@ -302,7 +311,7 @@ sos_nfs_readdir_callback(uintptr_t token, enum nfs_stat status, int num_files, c
 
     ret_val = 0;
     coro_resume:
-        LOG_INFO("resuming from readdir");
+//        LOG_INFO("resuming from readdir");
         resume((coro)token, &ret_val);
 }
 
@@ -317,14 +326,15 @@ sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, in
     int ret_val = -1;
     if (status != NFS_OK) {
         LOG_ERROR("write error status: %d", status);
+        printf("uh okay\n");
         panic("ruh roh");
         goto coro_resume;
     }
 
     ret_val = count;
     coro_resume:
-        LOG_INFO("resuming from write");
-        resume((coro)token, &ret_val);
+//        LOG_INFO("resuming from write");
+        resume((coro)token, ret_val);
 }
 
 /*
@@ -332,7 +342,7 @@ sos_nfs_write_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, in
  * Copy the memory into the buffer specified by the iov_base
  */
 static void
-sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void* data)
+sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int count, void *data)
 {
     int ret_val = -1;
 
@@ -342,15 +352,28 @@ sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int
 
     if (status != NFS_OK) {
         LOG_ERROR("read error status: %d", status);
+        printf("error? %d\n", status);
+        goto coro_resume;
+    }
+
+    struct iovec *iov = (struct iovec *)call_data->iv;
+    if (iov == NULL) {
+        printf("something went wrong call_data %p, iv %p, routine %p\n", call_data, iov, call_data->routine);
         goto coro_resume;
     }
     
-    struct iovec *iov = (struct iovec *)call_data->iv;
+    assert(iov != NULL);
+    assert(iov->iov_base != NULL);
+    assert(data != NULL);
+//    printf("before callback %p iov %p base %p routine %p\n", call_data, iov, iov->iov_base, call_data->routine);
     memcpy(iov->iov_base, data, count);
+//    printf("after\n");
     ret_val = count;
 
     coro_resume:
-        LOG_INFO("resuming from read %d", ret_val);
+//        LOG_INFO("resuming from read %d", ret_val);
+//        printf("resuming from read %d\n", ret_val);
+        assert(call_data->routine != NULL);
         resume(call_data->routine, (void *)ret_val);
 }
 
