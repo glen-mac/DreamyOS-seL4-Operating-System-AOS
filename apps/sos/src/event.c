@@ -33,12 +33,9 @@ event_loop(const seL4_CPtr ep)
     LOG_INFO("returned from start_first_proc");
 
     proc *init = get_proc(0);
+    assert(init != NULL);
 
     while (TRUE) {
-        /* Wait on children if not already waiting */
-        // proc *init = get_proc(0);
-        // if (init->waiting_coro == NULL)
-        //     resume(coroutine(init_wait_on_children), init);
         reap_dead_orphans(init);
 
         message = seL4_Wait(ep, &badge);
@@ -62,27 +59,33 @@ event_loop(const seL4_CPtr ep)
     }
 }
 
+/*
+ * Destroy a zombie child of init process
+ * @param init, the init process
+ */
 static void 
 reap_dead_orphans(proc *init)
 {
     for (struct list_node *curr = init->children->head; curr != NULL; curr = curr->next) {
         proc *child = get_proc(curr->data);
-        if (child->p_state == ZOMBIE)
+        assert(child != NULL);
+        if (child->p_state == ZOMBIE) {
             proc_destroy(child);
+            /* 
+             * We break because we dont want to keep iterating
+             * as proc_destroy modifies the list, so if we keep iterating
+             * we get invalid data.
+             * Breaking is fine, we will cleanup other children later
+             */
+            break;
+        }
     }
 }
 
-static void
-init_wait_on_children(proc *init)
-{
-    init->waiting_on = -1;
-    init->waiting_coro = coro_getcur();
-    int pid = yield(NULL);
-    init->waiting_coro = NULL;
-    LOG_INFO("SOS Cleaning up %d", pid);
-    proc_destroy(get_proc(pid));
-}
-
+/*
+ * Start the first process 
+ * Needs to be here because of NFS read
+ */
 static void
 start_first_proc(void)
 {

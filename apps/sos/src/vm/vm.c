@@ -134,7 +134,7 @@ vm_fault(seL4_Word pid)
 
     fault_error:
         // TODO: maybe we need the kill flag logic here?
-        printf("%d being killed", curproc->pid);
+        printf("%d being killed\n", curproc->pid);
         curproc->blocked_ref -= 1;
         cspace_free_slot(cur_cspace, reply_cap);
         LOG_INFO("%d being killed", curproc->pid);
