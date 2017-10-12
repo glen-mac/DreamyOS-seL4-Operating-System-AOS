@@ -289,12 +289,12 @@ next_victim(void)
             goto next;
 
         assert(frame_table_get_chance(current_page, &chance) == 0);
-        printf("page %d chance %d\n", current_page, chance);
+        // printf("page %d chance %d\n", current_page, chance);
         switch (chance) {
             /* Increment the chance of the current page and move on */
             case FIRST_CHANCE:
                 frame_table_set_chance(current_page, SECOND_CHANCE);
-                break;
+                goto next;
             
             /* can't touch this page so move on */
             case PINNED:
@@ -307,20 +307,14 @@ next_victim(void)
                 return current_old;
         }
 
-        if (current_page == starting_page) {
-            printf("current page %d, starting page %d\n", current_page, starting_page);
-            loops++;
-        }
-
-        /* We've looped around twice and have not chosen a page, all the pages are pinned */
-        if (loops == 1) {
-            printf("Loops is 1\n");
-            break;
-        }
-
         next:
             current_page = ((current_page + 1) % (upper - lower)) + lower;
-            printf("current_page incremented to %d\n", current_page);
+            // printf("current_page incremented to %d\n", current_page);
+            /* We've looped around twice and have not chosen a page, all the pages are pinned */
+            // if (current_page == starting_page) {
+            //     printf("current page %d, starting page %d\n", current_page, starting_page);
+            //     break;
+            // }
     }
 
     return -1;
