@@ -159,14 +159,19 @@ as_find_region(addrspace *as, seL4_Word vaddr, region **found_region)
 int
 as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end)
 {
+   if (start >= as->region_heap->end && start < as->region_stack->start)
+      return 0;
+   return 1;
+   /*
    region *curr = as->region_list;
    while (curr != NULL) {
-        if (WITHIN_REGION(as->region_list, start) || WITHIN_REGION(as->region_list, end)) {   
+        if (WITHIN_REGION(curr, start) || WITHIN_REGION(curr, end)) {   
             return 0;
         }
         curr = curr->next_region;
    }
    return 1;
+   */
 }
 
 int
