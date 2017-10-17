@@ -6,18 +6,13 @@
 
 #include "sos_nfs.h"
 
-#include "event.h"
 #include <string.h>
 #include <network.h>
 #include <fcntl.h>
 #include <coro/picoro.h>
-#include <syscall/syscall.h>
-#include <sys/panic.h>
 #include <clock/clock.h>
-#include <lwip/ip_addr.h>
 #include <nfs/nfs.h>
 #include <utils/util.h>
-#include <utils/time.h>
 
 /* Operations on the NFS namespace */
 static const vnode_ops nfs_dir_ops = {
@@ -233,12 +228,12 @@ sos_nfs_stat(vnode *node, sos_stat_t **stat)
 {
     if (nfs_getattr(node->vn_data, sos_nfs_getattr_callback, (uintptr_t)coro_getcur()) != RPC_OK) {
         LOG_ERROR("Error requesting attributes from file");
-        return -1;
+        return 1;
     }
 
     if ((*stat = yield(NULL)) == NULL) {
         LOG_ERROR("Invalid status struct returned from callback");
-        return -1;
+        return 1;
     }
 
     return 0;
@@ -372,9 +367,6 @@ sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int
         resume(call_data->routine, (void *)ret);
 }
 
-
-// UP TO HERE
-
 /*
  * Get Attributes callback
  * Copy the attributes of the fattr into the sos_stat_t
@@ -384,13 +376,12 @@ sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr)
 {
     sos_stat_t *stat = NULL;
     if (status != NFS_OK) {
-        LOG_ERROR("getattr error status: %d", status);
+        LOG_ERROR("Invalid nfs status %d", status);
         goto coro_resume;
     }
 
-    stat = malloc(sizeof(sos_stat_t));
-    if (!stat) {
-        LOG_ERROR("malloc returned NULL");
+    if ((stat = malloc(sizeof(sos_stat_t))) == NULL) {
+        LOG_ERROR("Failed to create status structure");
         goto coro_resume;
     }
 
@@ -399,13 +390,12 @@ sos_nfs_getattr_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr)
     stat->st_fmode = (fmode_t)fattr->mode;
     stat->st_size = (unsigned)fattr->size;
 
-    /* time conversion */
-    stat->st_ctime = (long)(fattr->ctime.seconds*1000 + fattr->ctime.useconds / 1000);
-    stat->st_atime = (long)(fattr->atime.seconds*1000 + fattr->atime.useconds / 1000);
+    /* Time conversion */
+    stat->st_ctime = (long)(SEC_TO_MS(fattr->ctime.seconds) + US_TO_MS(fattr->ctime.useconds));
+    stat->st_atime = (long)(SEC_TO_MS(fattr->atime.seconds) + US_TO_MS(fattr->atime.useconds));
 
     coro_resume:
-        LOG_INFO("resuming from stat");
-        resume((coro)token, stat);
+        resume((coro)token, (void *)stat);
 }
 
 /*
