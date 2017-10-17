@@ -108,4 +108,11 @@ int as_region_permission_check(region *reg, seL4_Word access_type);
  */
 int as_define_stack(addrspace *as);
 
+/*
+ * Define a heap region for an address space
+ * @param as, the address space to define the heap in
+ * @returns 0 on success, else 1
+ */
+int as_define_heap(addrspace *as, uintptr_t heap_loc);
+
 #endif /* _ADDRSPACE_H_ */

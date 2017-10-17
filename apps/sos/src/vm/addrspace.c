@@ -202,3 +202,30 @@ as_define_stack(addrspace *as)
     as->region_stack = stack;
     return as_add_region(as, stack);
 }
+
+int
+as_define_heap(addrspace *as, uintptr_t heap_loc)
+{
+    if (!as) {
+        LOG_ERROR("as not defined");
+        return 1;
+    }
+
+    if (as->region_heap) {
+        LOG_ERROR("region_heap already defined");
+        return 1;
+    }
+
+    region *heap = as_create_region(
+        heap_loc,
+        0,
+        seL4_CanRead | seL4_CanWrite
+    );
+    if (heap == NULL) {
+        LOG_ERROR("as_create_region failed");
+        return 1;
+    }
+
+    as->region_heap = heap;
+    return as_add_region(as, heap);
+}

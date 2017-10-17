@@ -231,9 +231,20 @@ proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
     /* Store new proc */
     sos_procs[new_pid] = new_proc;
 
+    /* Attempt to load the ELF */
     uint64_t elf_pc = 0;
-    if (elf_load(new_proc, app_name, &elf_pc) != 0) {
+    uint32_t last_section;
+    if (elf_load(new_proc, app_name, &elf_pc, &last_section) != 0) {
         LOG_ERROR("Error loading elf");
+        proc_delete(new_proc);
+        proc_destroy(new_proc);
+        return -1;
+    }
+
+    /* Create the heap */
+    seL4_Word heap_loc = PAGE_ALIGN_4K(last_section + PAGE_SIZE_4K);
+    if (as_define_heap(new_proc->p_addrspace, heap_loc) != 0) {
+        LOG_ERROR("Error defining heap");
         proc_delete(new_proc);
         proc_destroy(new_proc);
         return -1;

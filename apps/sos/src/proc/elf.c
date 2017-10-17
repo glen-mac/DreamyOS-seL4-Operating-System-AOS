@@ -144,7 +144,7 @@ load_segment_into_vspace(proc *curproc, vnode *file, uint64_t offset,
 }
 
 int
-elf_load(proc *curproc, char *app_name, uint64_t *elf_pc)
+elf_load(proc *curproc, char *app_name, uint64_t *elf_pc, uint32_t *last_section)
 {
     char *source_addr;
     unsigned long flags = 0;
@@ -216,14 +216,9 @@ elf_load(proc *curproc, char *app_name, uint64_t *elf_pc)
     /* Map in the heap region after all other regions were added */
     // TOOD: Might be able to move this into create_proc and just grab the info from the end of LL of region
 
-    addrspace *as = curproc->p_addrspace;
-
     assert(vaddr != 0);
-    seL4_Word heap_loc = PAGE_ALIGN_4K(vaddr + segment_size + PAGE_SIZE_4K);
-    region *heap = as_create_region(heap_loc, 0, seL4_CanRead | seL4_CanWrite);
-    as_add_region(as, heap);
-    as->region_heap = heap;
-
+    *last_section = vaddr + segment_size;
+    
     free(file->vn_data);
     free(file);
     return 0;

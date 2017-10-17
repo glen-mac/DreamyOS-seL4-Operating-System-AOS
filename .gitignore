@@ -8,3 +8,4 @@ cscope.out
 .config*
 tags
 *.diff
+.DS_Store

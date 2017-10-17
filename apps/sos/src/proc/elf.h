@@ -20,6 +20,6 @@
  * @param app_name, name of the binary
  * @returns 0 on success, else error
  */
-int elf_load(proc *curproc, char *app_name, uint64_t *elf_pc);
+int elf_load(proc *curproc, char *app_name, uint64_t *elf_pc, uint32_t *last_section);
 
 #endif /* _LIBOS_ELF_H_ */
