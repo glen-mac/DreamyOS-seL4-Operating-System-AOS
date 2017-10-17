@@ -11,8 +11,8 @@
 #include <sys/uio.h>
 
 /*
- * Intialise the console device for sos use
- * Creates a vnode for the device and registers that into the VFS
+ * Intialise the console device for use by SOS
+ * Creates a vnode for the device and registers with the VFS
  * @returns 0 on success else 1
  */
 int sos_serial_init(void);
@@ -30,7 +30,7 @@ int sos_serial_open(vnode *vnode, fmode_t mode);
  * Write to the serial device
  * @param node, the vnode of the device
  * @param iov, the io vector
- * @returns nbytes written on success else errno
+ * @returns nbytes written
  */
 int sos_serial_write(vnode *node, uiovec *iov);
 
@@ -38,7 +38,7 @@ int sos_serial_write(vnode *node, uiovec *iov);
  * Read from the serial device
  * @param node, the vnode of the device
  * @param iov, the io vector
- * @returns nbytes read on success else errno
+ * @returns nbytes read on success else -1
  */
 int sos_serial_read(vnode *node, uiovec *iov);
 

@@ -170,3 +170,20 @@ vfs_list(char ***master_list, size_t *num_files)
     *master_list = big_list;
     return 0;
 }
+
+vnode *
+vnode_create(void *data, void *ops, seL4_Word readcount, seL4_Word writecount)
+{
+    vnode *node = malloc(sizeof(vnode));
+    if (node == NULL) {
+        LOG_ERROR("Failed to malloc memory for a vnode");
+        return NULL;
+    }
+
+    node->vn_data = data;
+    node->vn_ops = ops;
+    node->readcount = readcount;
+    node->writecount = writecount;
+
+    return node;
+}

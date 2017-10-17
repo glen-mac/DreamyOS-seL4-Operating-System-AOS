@@ -94,4 +94,14 @@ int vfs_lookup(char *name, int create_file, vnode **ret);
  */
 int vfs_list(char ***dir, size_t *nfiles);
 
+/*
+ * Create a vnode
+ * @param data, the vn_data of the node
+ * @param ops, the operations pointers for the node
+ * @param readcount, the initial value for the number of current readers
+ * @param writecount, the initial value for the number of current writers
+ * @returns pointer to vnode
+ */
+vnode *vnode_create(void *data, void *ops, seL4_Word readcount, seL4_Word writecount);
+
 #endif /* _VFS_H_ */

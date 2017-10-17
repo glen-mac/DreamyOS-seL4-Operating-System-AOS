@@ -5,23 +5,27 @@
  */
 
 #include "sos_serial.h"
-#include <fcntl.h>
+
 #include <coro/picoro.h>
+#include <fcntl.h>
 #include <vfs/vfs.h>
 #include <vfs/device.h>
-
-#include <syscall/syscall.h>
-
-#include <stdlib.h>
 #include <serial/serial.h>
-
+#include <stdlib.h>
+#include <syscall/syscall.h>
 #include <utils/util.h>
 #include <utils/ringbuf.h>
 
+/* Pointer to waititng struct to be filled by read in data */
 static uiovec *volatile global_uio = NULL;
+
+/* Number of bytes read by the console */
 static volatile int nbytes_read = 0;
 
+/* Input buffer */
 static ring_buffer_t *volatile input_buffer = NULL;
+
+/* Status struct for the console */
 static sos_stat_t *stat = NULL;
 
 /*
@@ -35,6 +39,11 @@ static const vnode_ops serial_vnode_ops = {
     .vop_stat = sos_serial_stat,
 };
 
+/*
+ * Interrupt handler for a received character
+ * @param serial, the serial structure
+ * @param c, the receieved character
+ */
 static void
 handler(struct serial *serial, char c)
 {
@@ -44,6 +53,7 @@ handler(struct serial *serial, char c)
         buf[nbytes_read] = c;
         nbytes_read++;
 
+        /* New line or required bytes read restarts the blocked process */
         if (c == '\n' || nbytes_read >= global_uio->uiov_len)
             resume((coro)(serial->routine), NULL);
 
@@ -57,47 +67,42 @@ int
 sos_serial_init(void)
 {
     struct serial *port = serial_init();
-    if (!port) {
-        LOG_ERROR("serial_init failed");
+    if (port == NULL) {
+        LOG_ERROR("Failed to initialise the serial device");
         return 1;
     }
 
-    vnode *node = malloc(sizeof(vnode));
-    if (!node) {
-        LOG_ERROR("malloc returned null");
+    vnode *node = vnode_create(port, &serial_vnode_ops, 0, 0);
+    if (node == NULL) {
+        LOG_ERROR("Failed to create the vnode");
         return 1;
     }
-
-    node->vn_data = port;
-    node->vn_ops = &serial_vnode_ops;
-    node->readcount = 0;
-    node->writecount = 0;
 
     if (device_register("console", node) != 0) {
-        LOG_ERROR("device_register failed");
+        LOG_ERROR("Failed to register console as a device");
         free(node);
         return 1;
     }
 
     if ((input_buffer = malloc(sizeof(ring_buffer_t))) == NULL) {
-        LOG_ERROR("malloc returned null");
+        LOG_ERROR("Failed to create the input buffer");
         free(node);
         return 1;
     }
-
     ring_buffer_init(input_buffer);
-    assert(serial_register_handler(port, handler) == 0);
 
     if ((stat = malloc(sizeof(sos_stat_t))) == NULL) {
-        LOG_ERROR("malloc returned NULL");
+        LOG_ERROR("Failed to create the serial status structure");
         return 1;
     }
 
     stat->st_type = ST_SPECIAL;
     stat->st_fmode = FM_READ | FM_WRITE;
     stat->st_size = 0; /* Because theres not really a size */
-    stat->st_ctime = 3; /* TODO: Grab the system timestamp and convert to ms */
-    stat->st_atime = 4; /* TODO: update this on open() */
+    stat->st_ctime = 0; /* Created on init */
+    stat->st_atime = 0;
+
+    serial_register_handler(port, handler);
 
     return 0;
 }
@@ -105,6 +110,7 @@ sos_serial_init(void)
 int
 sos_serial_open(vnode *vnode, fmode_t mode)
 {
+    /* Update reader / write count based on mode */
     if (mode == O_RDONLY || mode == O_RDWR) {
         if (vnode->readcount > 0) {
             LOG_ERROR("Enforcing single reader policy on serial");
@@ -116,14 +122,17 @@ sos_serial_open(vnode *vnode, fmode_t mode)
     }
     /* O_RDWR or O_WRONLY */
     vnode->writecount += 1;
+
+    /* Update access timestamp */
+    stat->st_atime = U_TO_MS(time_stamp());
+
     return 0;
 }
 
 int
 sos_serial_write(vnode *node, uiovec *iov)
 {
-    struct serial *port = node->vn_data;
-    return serial_send(port, (char *)iov->uiov_base, (int)iov->uiov_len);
+    return serial_send(node->vn_data, (char *)iov->uiov_base, (int)iov->uiov_len);
 }
 
 int
@@ -145,6 +154,7 @@ sos_serial_read(vnode *node, uiovec *iov)
         }
     }
 
+    /* Read number of required bytes from the ring buffer */
     if (bytes_read == iov->uiov_len)
         goto read_return;
 
@@ -152,9 +162,11 @@ sos_serial_read(vnode *node, uiovec *iov)
     nbytes_read = bytes_read;
     global_uio = iov;
     
+    /* Save the current coroutine */
     ((struct serial *)(node->vn_data))->routine = (void *)coro_getcur();   
     yield(NULL); /* Yield back to event_loop, will be resumed when there is data */
 
+    /* Reset the global state */
     global_uio = NULL;
     bytes_read = nbytes_read;
     nbytes_read = 0;
@@ -177,6 +189,9 @@ sos_serial_close(vnode *node, fmode_t mode)
         node->writecount -= 1;
     } else if (mode == O_WRONLY) {
         node->writecount -= 1;
+    } else {
+        /* Invalid mode */
+        return 1;
     }
 
     return 0;

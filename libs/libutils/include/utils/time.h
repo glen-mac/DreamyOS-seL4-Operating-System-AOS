@@ -18,6 +18,9 @@
 #define SECONDS(t) (t * US_IN_S)
 #define MILLISECONDS(t) (t * US_IN_MS)
 
+/* Calculate number of milliseconds given microseconds */
+#define U_TO_MS(t) (t / US_IN_MS)
+
 /* milliseconds */
 #define MS_IN_S 1000llu
 
