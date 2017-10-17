@@ -122,6 +122,7 @@ vm_fault(seL4_Word pid)
         curproc->blocked_ref -= 1;
         LOG_INFO("%d vm_fault restart blocked_ref is %d", curproc->pid, curproc->blocked_ref);
         if (curproc->kill_flag && curproc->blocked_ref == 0) {
+            printf("%d being killed\n", curproc->pid);
             LOG_INFO("%d being killed", curproc->pid);
             proc_delete(curproc);
             return;

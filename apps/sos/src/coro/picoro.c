@@ -4,6 +4,7 @@
  * http://creativecommons.org/publicdomain/zero/1.0/
  */
 
+/* Specify this file to use optimisation level O0 - Prevents weird bugs */
 #pragma GCC push_options
 #pragma GCC optimize ("O0")
 
@@ -12,6 +13,10 @@
 #include <stdlib.h>
 
 #include "picoro.h"
+
+static void push(coro *list, coro c);
+static coro pop(coro *list);
+static void *pass(coro me, void *arg);
 
 /*
  * Each coroutine has a jmp_buf to hold its context when suspended.
@@ -37,53 +42,23 @@ static struct coro {
  * A coroutine can be passed to resume() if
  * it is not on the running or idle lists.
  */
-int resumable(coro c) {
+int
+resumable(coro c)
+{
     return(c != NULL && c->next == NULL);
 }
 
-/*
- * Add a coroutine to a list and return the previous head of the list.
- */
-static void push(coro *list, coro c) {
-    c->next = *list;
-    *list = c;
-}
-
-/*
- * Remove a coroutine from a list and return it.
- */
-static coro pop(coro *list) {
-    coro c = *list;
-    *list = c->next;
-    c->next = NULL;
-    return(c);
-}
-
-/*
- * Pass a value and control from one coroutine to another.
- * The current coroutine's state is saved in "me" and the
- * target coroutine is at the head of the "running" list.
- */
-static void *pass(coro me, void *arg) {
-    static void *saved;
-    saved = arg;
-    if(!setjmp(me->state))
-        longjmp(running->state, 1);
-    return(saved);
-}
-
-void *resume(coro c, void *arg) {
-    // void *buffer[10];
-    // size_t size = backtrace(buffer, 3);
-    // for (int i = 0; i < size; i++)
-    //     printf("meow %p\n", buffer[i]);
-
+void *
+resume(coro c, void *arg)
+{
     assert(resumable(c));
     push(&running, c);
     return(pass(c->next, arg));
 }
 
-void *yield(void *arg) {
+void *
+yield(void *arg)
+{
     return(pass(pop(&running), arg));
 }
 
@@ -98,7 +73,9 @@ void coroutine_start(void), coroutine_main(void*);
  * idle. When there are idle coroutines, we pass one the function
  * pointer and return the activated coroutine's address.
  */
-coro coroutine(void *fun(void *arg)) {
+coro
+coroutine(void *fun(void *arg))
+{
     if(idle == NULL && !setjmp(running->state))
         coroutine_start();
     return(resume(pop(&idle), fun));
@@ -138,7 +115,9 @@ coro coroutine(void *fun(void *arg)) {
  * The conversion between the function pointer and a void pointer is not
  * allowed by ANSI C but we do it anyway.
  */
-void coroutine_main(void *ret) {
+void
+coroutine_main(void *ret)
+{
     void *(*fun)(void *arg);
     struct coro me;
     push(&idle, &me);
@@ -156,16 +135,54 @@ void coroutine_main(void *ret) {
  * Allocate space for the current stack to grow before creating the
  * initial stack frame for the next coroutine.
  */
-void coroutine_start(void) {
+void
+coroutine_start(void)
+{
     char stack[16 * 1024];
     coroutine_main(stack);
 }
 
-/*
- * Return current running coroutine
- */
-coro coro_getcur() {
+coro
+coro_getcur(void)
+{
     return running;
+}
+
+/*
+ * Add a coroutine to a list and return the previous head of the list.
+ */
+static void
+push(coro *list, coro c)
+{
+    c->next = *list;
+    *list = c;
+}
+
+/*
+ * Remove a coroutine from a list and return it.
+ */
+static coro
+pop(coro *list)
+{
+    coro c = *list;
+    *list = c->next;
+    c->next = NULL;
+    return(c);
+}
+
+/*
+ * Pass a value and control from one coroutine to another.
+ * The current coroutine's state is saved in "me" and the
+ * target coroutine is at the head of the "running" list.
+ */
+static void *
+pass(coro me, void *arg)
+{
+    static void *saved;
+    saved = arg;
+    if(!setjmp(me->state))
+        longjmp(running->state, 1);
+    return(saved);
 }
 
 /* eof */

@@ -47,12 +47,18 @@ char *file_name = "test_file_name";
 int
 main(void)
 {
-    // thread_block();
     printf(">>> tty_test program started <<<\n");
+    printf("Testing M3\n");
     test_m3();
 
     printf("Not testing m4, requires terminal input, test this when you need to\n");
     //test_m4();
+
+    printf("Testing M7\n");
+    test_m7();
+
+    printf("Doing unknown syscall\n");
+    thread_block();
 
     exit(0);
     assert(!"Should not print");    
@@ -184,11 +190,10 @@ test_m7(void)
     printf("my id is %d\n", sos_my_id());
 
     pid_t pid = sos_process_create("sosh");
-    printf("pid is %d", pid);
-
-    printf("waiting for exit");
+    printf("new process created is %d\n", pid);
 
     /* Assert process that exited was one we were waiting for */
+    sos_process_delete(pid);
     assert(sos_process_wait(pid) == pid);
 }
 

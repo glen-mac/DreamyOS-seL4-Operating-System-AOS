@@ -357,6 +357,9 @@ int main(void) {
     assert(sos_process_wait(pid) == pid);
 
     assert((pid = sos_process_create("tty_test")) != -1);
+
+    /* We need to delete because this the process blocks with an unknown syscall */
+    sos_process_delete(pid);
     assert(sos_process_wait(pid) == pid);
 
     assert((pid = sos_process_create("pagingdemo")) != -1);
