@@ -7,6 +7,7 @@
 #define _ADDRSPACE_H_
 
 #include <sel4/sel4.h>
+#include <stdint.h>
 
 #define RLIMIT_STACK_SZ 8192000
 
@@ -113,6 +114,6 @@ int as_define_stack(addrspace *as);
  * @param as, the address space to define the heap in
  * @returns 0 on success, else 1
  */
-int as_define_heap(addrspace *as, uintptr_t heap_loc);
+int as_define_heap(addrspace *as, uint32_t heap_loc);
 
 #endif /* _ADDRSPACE_H_ */

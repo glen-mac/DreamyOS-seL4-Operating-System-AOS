@@ -161,7 +161,7 @@ as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end)
 {
    region *curr = as->region_list;
    while (curr != NULL) {
-        if (WITHIN_REGION(as, start) || WITHIN_REGION(as, end)) {   
+        if (WITHIN_REGION(as->region_list, start) || WITHIN_REGION(as->region_list, end)) {   
             return 0;
         }
         curr = curr->next_region;
@@ -209,7 +209,7 @@ as_define_stack(addrspace *as)
 }
 
 int
-as_define_heap(addrspace *as, uintptr_t heap_loc)
+as_define_heap(addrspace *as, uint32_t heap_loc)
 {
     if (!as) {
         LOG_ERROR("as not defined");
