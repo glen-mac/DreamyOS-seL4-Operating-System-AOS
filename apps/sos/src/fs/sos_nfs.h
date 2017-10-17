@@ -8,11 +8,11 @@
 #define _SOS_NFS_H_
 
 #include <vfs/vfs.h>
-#include <sys/uio.h>
+#include <sos.h>
 
 /*
  * Initialise the NFS file system
- * @returns 0 on success else 1
+ * @returns 0 on success, else 1
  */
 int sos_nfs_init(void);
 
@@ -20,7 +20,7 @@ int sos_nfs_init(void);
  * NFS lookup from the namespace
  * @param name, the name of the file
  * @param create_file, flag to specify if a file is to be created
- * @param[out] ret, the returned vnode
+ * @param[out] result, the returned vnode
  * @returns 0 on success, else 1
  */
 int sos_nfs_lookup(char *name, int create_file, vnode **result);
@@ -37,7 +37,7 @@ int sos_nfs_list(char ***list, size_t *nfiles);
  * Open an NFS file
  * @param vnode, vnode of the file
  * @param mode, mode of access
- * @returns 0 on success else 1
+ * @returns 0 on success, else 1
  */
 int sos_nfs_open(vnode *vnode, fmode_t mode);
 
