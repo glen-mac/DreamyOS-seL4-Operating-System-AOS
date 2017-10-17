@@ -102,6 +102,6 @@ int vfs_list(char ***dir, size_t *nfiles);
  * @param writecount, the initial value for the number of current writers
  * @returns pointer to vnode
  */
-vnode *vnode_create(void *data, void *ops, seL4_Word readcount, seL4_Word writecount);
+vnode *vnode_create(void *data, const void *ops, seL4_Word readcount, seL4_Word writecount);
 
 #endif /* _VFS_H_ */

@@ -5,21 +5,17 @@
  */
 
 #include "sos_nfs.h"
-#include "event.h"
 
+#include "event.h"
 #include <string.h>
 #include <network.h>
 #include <fcntl.h>
-
 #include <coro/picoro.h>
 #include <syscall/syscall.h>
-
 #include <sys/panic.h>
-
 #include <clock/clock.h>
 #include <lwip/ip_addr.h>
 #include <nfs/nfs.h>
-
 #include <utils/util.h>
 #include <utils/time.h>
 

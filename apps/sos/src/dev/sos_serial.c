@@ -6,13 +6,13 @@
 
 #include "sos_serial.h"
 
+#include <clock/clock.h>
 #include <coro/picoro.h>
 #include <fcntl.h>
 #include <vfs/vfs.h>
 #include <vfs/device.h>
 #include <serial/serial.h>
 #include <stdlib.h>
-#include <syscall/syscall.h>
 #include <utils/util.h>
 #include <utils/ringbuf.h>
 

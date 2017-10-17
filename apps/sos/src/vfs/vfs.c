@@ -172,7 +172,7 @@ vfs_list(char ***master_list, size_t *num_files)
 }
 
 vnode *
-vnode_create(void *data, void *ops, seL4_Word readcount, seL4_Word writecount)
+vnode_create(void *data, const void *ops, seL4_Word readcount, seL4_Word writecount)
 {
     vnode *node = malloc(sizeof(vnode));
     if (node == NULL) {

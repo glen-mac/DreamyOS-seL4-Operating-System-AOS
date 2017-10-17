@@ -8,7 +8,7 @@
 #define _SOS_SERIAL_H_
 
 #include <vfs/vfs.h>
-#include <sys/uio.h>
+#include <sos.h>
 
 /*
  * Intialise the console device for use by SOS
