@@ -69,9 +69,8 @@ sys_writev(va_list ap)
     }
 
     /* If all the iov_len members in the array are 0, return 0. */
-    if (!sum) {
+    if (!sum)
         return 0;
-    }
 
     /* Write the buffer to console if the fd is for stdout or stderr. */
     if (fildes == STDOUT_FD || fildes == STDERR_FD) {
@@ -109,11 +108,13 @@ sys_ioctl(va_list ap)
     int fd = va_arg(ap, int);
     int request = va_arg(ap, int);
     (void)request;
-    /* muslc does some ioctls to stdout, so just allow these to silently
-       go through */
-    if (fd == STDOUT_FD) {
+    /*
+     * muslc does some ioctls to stdout, so just allow these to silently
+     * go through
+     */
+    if (fd == STDOUT_FD)
         return 0;
-    }
+
     assert(!"not implemented");
     return 0;
 }
