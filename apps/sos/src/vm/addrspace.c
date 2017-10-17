@@ -16,6 +16,8 @@
 #include <ut_manager/ut.h>
 #include <utils/util.h>
 
+#define WITHIN_REGION(as, addr) (addr >= as->start && addr < as->end) 
+
 addrspace *
 as_create(void)
 {
@@ -157,11 +159,14 @@ as_find_region(addrspace *as, seL4_Word vaddr, region **found_region)
 int
 as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end)
 {
-    // TODO: Refactor this to check the addr doesnt collide with any other regions
-    if (start >= as->region_heap->end && start < as->region_stack->start)
-        return 0;
-
-    return 1;
+   region *curr = as->region_list;
+   while (curr != NULL) {
+        if (WITHIN_REGION(as, start) || WITHIN_REGION(as, end)) {   
+            return 0;
+        }
+        curr = curr->next_region;
+   }
+   return 1;
 }
 
 int
