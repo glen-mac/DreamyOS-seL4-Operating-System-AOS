@@ -1,44 +1,23 @@
 /*
  * Unit tests for milestones
+ * 
  * Cameron Lonsdale & Glenn McGuire
- *
  */
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-
-#include <cspace/cspace.h>
-
-#include <cpio/cpio.h>
-#include <nfs/nfs.h>
-#include <elf/elf.h>
-#include <serial/serial.h>
-#include <clock/clock.h>
-#include <utils/page.h>
-#include <utils/math.h>
-#include <utils/time.h>
-
-#include <vm/frametable.h>
-#include "network.h"
-#include <proc/elf.h>
-
-#include "ut_manager/ut.h"
-#include "mapping.h"
 
 #include "tests.h"
 
-#include <autoconf.h>
+#include <assert.h>
+#include <clock/clock.h>
+#include <utils/time.h>
+#include <vm/frametable.h>
 
 #define verbose 5
 #include <sys/debug.h>
-#include <sys/panic.h>
 
 void callback1(uint32_t id, void *data); 
 void callback2(uint32_t id, void *data);
 void callback3(uint32_t id, void *data);
 void callback4(uint32_t id, void *data);
-
 
 /* Timer tests */
 void
@@ -87,7 +66,7 @@ test_m2(void)
     /* Test 1: Allocate a frame and test read & write */
     seL4_Word frame_id;
     seL4_Word vaddr;
-    frame_alloc(&vaddr);
+    frame_id = frame_alloc(&vaddr);
     assert(vaddr);
 
     /* Test you can touch the page */
@@ -99,12 +78,13 @@ test_m2(void)
     /* Testing an id that does not map to a valid frame does not crash */
     frame_free(1);
 
+    frame_free(frame_id);
     dprintf(0, "Test 1 Passed\n");
 
     /* Test 2: Allocate 10 pages and make sure you can touch them all */
     for (int i = 0; i < 10; i++) {
         /* Allocate a page */
-        frame_alloc(&vaddr);
+        frame_id = frame_alloc(&vaddr);
         assert(vaddr);
 
         /* Test you can touch the page  */
@@ -112,6 +92,7 @@ test_m2(void)
         assert(*(seL4_Word *)vaddr == 0x37);
 
         printf("Page #%d allocated at %p\n",  i, (void *)vaddr);
+        frame_free(frame_id);
     }
 
     dprintf(0, "Test 2 Passed\n");
@@ -165,11 +146,13 @@ test_m2(void)
     /* Test 5: Test that you eventually run out of memory gracefully, and doesn't crash */
     while (1) {
         /* Allocate a page */
-        frame_alloc(&vaddr);
-        if (!vaddr) {
+        seL4_Word frame_id = frame_alloc(&vaddr);
+        if (vaddr == (seL4_Word)NULL) {
             printf("Out of memory!\n");
             break;
         }
+        /* Pin it to prevent it being pages out */
+        frame_table_set_chance(frame_id, PINNED);
 
         /* Test you can touch the page */
         *(seL4_Word *)vaddr = 0x37;
