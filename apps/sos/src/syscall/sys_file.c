@@ -9,26 +9,12 @@
 #include <fcntl.h>
 #include <proc/proc.h>
 #include <string.h>
-#include "syscall.h"
-#include <sys/uio.h>
 #include <vfs/file.h>
 #include <vm/frametable.h>
 #include <vm/vm.h>
 #include <utils/util.h>
 
 static int syscall_do_read_write(seL4_Word access_mode, proc *curproc);
-
-int
-syscall_write(proc *curproc)
-{
-    return syscall_do_read_write(ACCESS_WRITE, curproc);
-}
-
-int
-syscall_read(proc *curproc)
-{
-    return syscall_do_read_write(ACCESS_READ, curproc);
-}
 
 int
 syscall_open(proc *curproc)
@@ -73,6 +59,18 @@ syscall_open(proc *curproc)
     message_reply:
         seL4_SetMR(0, result);
         return 1; /* nwords in message */
+}
+
+int
+syscall_write(proc *curproc)
+{
+    return syscall_do_read_write(ACCESS_WRITE, curproc);
+}
+
+int
+syscall_read(proc *curproc)
+{
+    return syscall_do_read_write(ACCESS_READ, curproc);
 }
 
 int
