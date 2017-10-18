@@ -13,7 +13,6 @@
 
 #include <sel4/sel4.h>
 
-
 /* 
  * To abstract the details of untyped objects, we must restrict the
  * minimum size_bits of untyped objects such that any object can be
@@ -40,8 +39,6 @@
  *                      low  |_____|
  */
 
-
-
 /**
  * initialises the untyped->linear  mapping system
  * @param bi seL4 boot information
@@ -54,7 +51,7 @@ int ut_table_init(const seL4_BootInfo *bi);
  * @param low on return, contains the lowest valid address
  * @param high on return, contains the highest valid address +1
  */
-void ut_find_memory(seL4_Word* low, seL4_Word* high);
+void ut_find_memory(seL4_Word *low, seL4_Word *high);
 
 /**
  * Steals memory from the untyped abstraction layer
@@ -64,7 +61,6 @@ void ut_find_memory(seL4_Word* low, seL4_Word* high);
  */
 seL4_Word ut_steal_mem(int sizebits);
 
-
 /**
  * Translates an address in to a untyped object capability pointer and offset
  * @param addr the address to translate
@@ -72,7 +68,7 @@ seL4_Word ut_steal_mem(int sizebits);
  * @param ret_offset the returned offset within the untyped offset
  * @return 0 on success
  */
-int ut_translate(seL4_Word addr, seL4_Untyped* ret_cptr, seL4_Word* ret_offset);
+int ut_translate(seL4_Word addr, seL4_Untyped *ret_cptr, seL4_Word *ret_offset);
 
 /**
  * Initialise the allocator to manage memory from "low" to "high"
@@ -96,4 +92,3 @@ seL4_Word ut_alloc(int sizebits);
 void ut_free(seL4_Word addr, int sizebits);
 
 #endif /* _UT_H_ */
-

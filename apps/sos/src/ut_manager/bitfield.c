@@ -22,7 +22,7 @@
 #define FLOOR(x)      ((x) & ~(BITS_PER_BYTE - 1))
 #define CEILING(x)    (FLOOR((x) + (BITS_PER_BYTE-1)))
 
-void debug_print(bitfield_t* bf){
+void debug_print(bitfield_t *bf){
 #if 0
     int i, j;
     for(i = 0, j=1; i < CEILING(bf->size)/BITS_PER_BYTE; i++, j++){
@@ -40,19 +40,18 @@ void debug_print(bitfield_t* bf){
 #endif
 }
 
-bitfield_t* new_bitfield(int size, enum bf_init_state state){
-    bitfield_t* bf;
+bitfield_t *
+new_bitfield(int size, enum bf_init_state state)
+{
+    bitfield_t *bf;
     int bytes;
 
     /* Allocate memory */
-    bf = (bitfield_t*)malloc(sizeof(bitfield_t));
-    if(bf == NULL){
+    if ((bf = (bitfield_t*)malloc(sizeof(bitfield_t))) == NULL)
         return NULL;
-    }
 
     bytes = CEILING(size)/BITS_PER_BYTE;
-    bf->b = (char*)malloc(bytes);
-    if(bf->b == NULL){
+    if ((bf->b = (char*)malloc(bytes)) == NULL) {
         free(bf);
         return NULL;
     }
@@ -60,17 +59,15 @@ bitfield_t* new_bitfield(int size, enum bf_init_state state){
     /* initialise the bitfield */
     bf->size = size;
     bf->next_free = 0;
-    if(state == BITFIELD_INIT_FILLED){
+    if (state == BITFIELD_INIT_FILLED) {
         bf->available = 0;
         memset(bf->b, 0xff, bytes);
-    }else{
-        int i;
-
+    } else {
         bf->available = size;
         memset(bf->b, 0x00, bytes);
 
         /* mark overflow as used if the size is not a a multiple of 8 */
-        for(i = size; i < bytes * BITS_PER_BYTE; i++){
+        for (int i = size; i < bytes * BITS_PER_BYTE; i++) {
             bf_set(bf, i);
         }
     }
@@ -78,30 +75,32 @@ bitfield_t* new_bitfield(int size, enum bf_init_state state){
     return bf;
 }
 
-void destroy_bitfield(bitfield_t* bf){
+void
+destroy_bitfield(bitfield_t *bf)
+{
     free(bf->b);
     free(bf);
 }
 
 
 /* Find a byte that is not completely marked */
-static inline int _bf_find_next_free_byte(char* field, int next, int size){
+static inline int
+_bf_find_next_free_byte(char *field, int next, int size)
+{
     int current;
     next = FLOOR(next)/BITS_PER_BYTE;
     size = CEILING(size)/BITS_PER_BYTE;
 
     /* Search from next to limit */
-    for(current = next; current < size; current++){
-        if(field[current] != 0xff){
+    for (current = next; current < size; current++) {
+        if (field[current] != 0xff)
             return current;
-        }
     }
 
     /* Search from limit to next */
-    for(current = 0; current < next; current++){
-        if(field[current] != 0xff){
+    for (current = 0; current < next; current++) {
+        if (field[current] != 0xff)
             return current;
-        }
     }
 
     return -1;
@@ -111,24 +110,27 @@ static inline int _bf_find_next_free_byte(char* field, int next, int size){
  * find a bit that is clear 
  * @pre the byte must have a free bit
  */
-static inline int _bf_find_next_free_bit(char field){
-    int i;
+static inline int
+_bf_find_next_free_bit(char field)
+{
     assert(field != 0xff);
-    for(i = 0; i < BITS_PER_BYTE; i++){
-        if((field & (1 << i)) == 0){
+    for (int i = 0; i < BITS_PER_BYTE; i++){
+        if ((field & (1 << i)) == 0)
             return i;
-        }
     }
+
     return -1;
 }
 
-int bf_set_next_free(bitfield_t* bf){
-    if(bf->available != 0){
+int
+bf_set_next_free(bitfield_t *bf)
+{
+    if (bf->available != 0) {
         int byte;
 
         /* Bytewise search for != 0xff */
         byte = _bf_find_next_free_byte(bf->b, bf->next_free, bf->size);
-        if(byte != -1){
+        if (byte != -1) {
             int bit;
             int offset;
 
@@ -139,9 +141,8 @@ int bf_set_next_free(bitfield_t* bf){
             /* mark and return */
             bf_set(bf, offset); 
             bf->next_free = offset + 1;
-            if(bf->next_free > bf->size){
+            if (bf->next_free > bf->size)
                 bf->next_free = 0;
-            }
 
             return offset;
         }
@@ -151,19 +152,22 @@ int bf_set_next_free(bitfield_t* bf){
 }
 
 
-static inline void _bf_decode(int offset, int* byte, int* bitmask){
+static inline void
+_bf_decode(int offset, int *byte, int *bitmask)
+{
     int bit;
     *byte = offset >> 3;
     bit = offset & 0x7;
 
     *bitmask = 1;
-    while(bit-- > 0){
+    while (bit-- > 0)
         *bitmask <<= 1;
-    }
 }
 
 
-void bf_set(bitfield_t* bf, int offset){
+void
+bf_set(bitfield_t *bf, int offset)
+{
     int byte, bitmask;
 
     assert(!bf_get(bf, offset));
@@ -175,7 +179,9 @@ void bf_set(bitfield_t* bf, int offset){
     bf->available--;
 }
 
-void bf_clr(bitfield_t* bf, int offset){
+void
+bf_clr(bitfield_t *bf, int offset)
+{
     int byte, bitmask;
 
     assert(bf_get(bf, offset));
@@ -189,12 +195,12 @@ void bf_clr(bitfield_t* bf, int offset){
     debug_print(bf);
 }
 
-int bf_get(const bitfield_t* bf, int offset){
+int 
+bf_get(const bitfield_t *bf, int offset)
+{
     int byte, bitmask;
     _bf_decode(offset, &byte, &bitmask);
 
     assert(byte < CEILING(bf->size)/BITS_PER_BYTE);
     return (bf->b[byte] & bitmask) != 0;
 }
-
-
