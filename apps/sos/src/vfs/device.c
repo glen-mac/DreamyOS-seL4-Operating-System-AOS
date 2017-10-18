@@ -6,16 +6,14 @@
 
 #include "device.h"
 
-#include "vfs.h"
-
-#include <utils/util.h>
 #include <string.h>
-
 #include <stdlib.h>
+#include <utils/util.h>
+#include "vfs.h"
 
 /*
  * Device representation
- * Has a name and a vnode attached
+ * Linked list element, has a name and a vnode attached
  */
 typedef struct dev {
     char *name;
@@ -23,7 +21,7 @@ typedef struct dev {
     struct dev *next;
 } device;
 
-
+/* Operations on the device namespace */
 const vnode_ops device_vnode_ops = {
     .vop_lookup = device_lookup,
     .vop_list = device_list
@@ -39,14 +37,16 @@ int
 device_register(char *name, vnode *vn)
 {
     device *new_dev = malloc(sizeof(device));
-    if (!new_dev) {
-        LOG_ERROR("malloc error when creating device");
+    if (new_dev == NULL) {
+        LOG_ERROR("Failed to create new device");
         return 1;
     }
 
+    /* Set name and vnode */
     new_dev->name = name;
     new_dev->vn = vn;
 
+    /* Add to the head of the devices linked list */
     device *head = devices;
     new_dev->next = head;
     devices = new_dev;
@@ -72,17 +72,20 @@ device_lookup(char *name, int create_file, vnode **ret)
 int
 device_list(char ***list, size_t *nfiles)
 {
+    /* Count the number of devices */
     for (device *curr = devices; curr != NULL; curr = curr->next)
         (*nfiles)++;
 
     char **dir = malloc(sizeof(char *) * (*nfiles));
-    if (!dir)
+    if (!dir) {
+        LOG_ERROR("Failed to allocate memory for a device list");
         return 1;
-
-    int i = 0;
-    for (device *curr = devices; curr != NULL; curr = curr->next) {
-        dir[i++] = devices->name;
     }
+
+    /* Copy names into the directory */
+    int i = 0;
+    for (device *curr = devices; curr != NULL; curr = curr->next)
+        dir[i++] = devices->name;
 
     *list = dir;
     return 0;

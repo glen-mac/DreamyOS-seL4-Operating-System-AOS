@@ -9,7 +9,6 @@
 
 #include <sel4/sel4.h>
 #include <sys/uio.h>
-
 #include <sos.h>
 
 typedef struct {
