@@ -24,7 +24,7 @@
 #define GPT_OCR2 0x14 /* Output Compare Register 2 */
 #define GPT_CNT 0x24 /* Counter Register */
 
-#define GPT_PERIPHERAL_CLOCK_FREQUENCY 66; /* Mhz */
+#define GPT_PERIPHERAL_CLOCK_FREQUENCY 1; /* Mhz */
 
 /* Register reset values */
 #define ZERO_RESET_VALUE 0x00000000
@@ -194,6 +194,7 @@ timer_interrupt(void)
         /* Run all callback events that should have already happened */
         /* Because multiple interrupts can bascially happen at the same time, so we need to account for that */
         do {
+            /* Check rollover every time */
             event *cur_event = pq_pop(pq);
             if (!cur_event) {
                 LOG_ERROR("pq_pop returned null");
@@ -208,7 +209,8 @@ timer_interrupt(void)
                 add_event_to_pq(cur_event->delay, cur_event->callback, cur_event->data, REPEAT_EVENT, cur_event->uid);
 
             free(cur_event);
-        } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + MILLISECONDS(1));
+            check_for_rollover();
+        } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + (uint64_t)MILLISECONDS(1));
 
         if (pq_is_empty(pq)) {
             /* We disable compare interrupts because theres no more events */
@@ -306,7 +308,7 @@ stop_timer(void)
 static inline uint64_t
 join32to64(uint32_t upper, uint32_t lower)
 {
-    return (uint64_t)lower | ((uint64_t)upper << sizeof(uint32_t));
+    return (uint64_t) upper << 32 | lower;
 }
 
 /* 
@@ -329,7 +331,7 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
     }
 
     /* If the event will happen within 1ms, just execute the event, as we might miss it */
-    if (delay < MILLISECONDS(1)) {
+    if (delay < (uint64_t)MILLISECONDS(1)) {
         if ((id = pq_get_next_id(pq)) == 0) {
             LOG_ERROR("pq_get_next_id returned invalid id");
             return EVENT_FAIL;
@@ -364,7 +366,7 @@ check_for_rollover(void)
 {
     if (*status_register_ptr & ROLL_OVER_MASK) {
         /* Overflow wont happen for ~584 years, we plan to finish AOS by then */
-        *upper_timestamp_register_ptr += 1;
+        *upper_timestamp_register_ptr = *upper_timestamp_register_ptr + 1;
         *status_register_ptr |= ROLL_OVER_MASK; /* Acknowledge a roll over event occured */ 
         LOG_INFO("32-bit timer rollover");
     }

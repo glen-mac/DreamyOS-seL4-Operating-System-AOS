@@ -134,7 +134,7 @@ static int ps(int argc, char **argv) {
 
     printf("PID   SIZE %*s  COMMAND\n", ++max_stime, "STIME");
     for (i = 0; i < processes; i++) {
-        printf("%3d %6d %*d  %s\n", process[i].pid, process[i].size,
+        printf("%3d %6u %*u  %s\n", process[i].pid, process[i].size,
                 max_stime, process[i].stime, process[i].command);
     }
 

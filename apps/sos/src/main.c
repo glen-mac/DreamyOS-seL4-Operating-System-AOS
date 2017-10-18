@@ -234,7 +234,7 @@ main(void)
     
     /* Unit tests; Not for submission */
     /* test_m2(); */
-    /* test_m1(); *//* After so as to have time to enter event loop */
+    test_m1();/* After so as to have time to enter event loop */
 
     /* Wait on synchronous endpoint for IPC */
     LOG_INFO("SOS entering event loop");
