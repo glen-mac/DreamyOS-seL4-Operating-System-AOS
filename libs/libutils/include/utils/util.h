@@ -31,14 +31,15 @@
 #define TRUE 1
 #define FALSE 0
 
-#define NDEBUG
 
 #ifdef NDEBUG
 #define LOG_ERROR(format, ...)
 #define LOG_INFO(format, ...)
+#define LOG_SYSCALL(format, ...)
 #else
 #define LOG_ERROR(format, ...) printf("ERROR:%s:%d: "format"\n", __func__, __LINE__, ##__VA_ARGS__)
-#define LOG_INFO(format, ...)  printf("INFO :%s:%d: "format"\n", __func__, __LINE__, ##__VA_ARGS__)
+#define LOG_INFO(format, ...)  printf("INFO:%s:%d: "format"\n", __func__, __LINE__, ##__VA_ARGS__)
+#define LOG_SYSCALL(pid, format, ...)  printf("SYSCALL: pid %d called "format"\n", pid, ##__VA_ARGS__)
 #endif /* NDEBUG */
 
 #endif /* __UTILS_H */
