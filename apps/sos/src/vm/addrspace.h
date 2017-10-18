@@ -77,6 +77,16 @@ int as_destroy_region(region *reg);
 int as_add_region(addrspace *as, region *new_region);
 
 /*
+ * Create and add a region to an address space
+ * @param as, the address space to add the region into
+ * @param start, the starting virtual address of the region
+ * @param size, the size of the region
+ * @param permissions, encoded permissions of the region
+ * @returns 1 on failure and 0 on success
+ */
+int as_define_region(addrspace *as, seL4_Word start, seL4_Word size, seL4_Word permissions);
+
+/*
  * Find the region that contains vaddr
  * @param as, the addresspace to search
  * @param vaddr, the address in the region

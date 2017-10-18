@@ -143,6 +143,12 @@ as_add_region(addrspace *as, region *new_region)
 }
 
 int
+as_define_region(addrspace *as, seL4_Word start, seL4_Word size, seL4_Word permissions)
+{
+    return as_add_region(as, as_create_region(start, size, permissions));
+}
+
+int
 as_find_region(addrspace *as, seL4_Word vaddr, region **found_region)
 {
     region *curr = as->region_list;

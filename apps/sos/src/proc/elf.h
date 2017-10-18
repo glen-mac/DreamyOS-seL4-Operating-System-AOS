@@ -11,13 +11,14 @@
 #ifndef _LIBOS_ELF_H_
 #define _LIBOS_ELF_H_
 
-#include <sel4/sel4.h>
 #include <proc/proc.h>
 
 /*
  * Load an elf binary into an address space
- * @param proc, the destination process
+ * @param curproc, the destination process
  * @param app_name, name of the binary
+ * @param[out] elf_pc, the program counter of the elf binary
+ * @param[out] last_section, the last section in the binary
  * @returns 0 on success, else error
  */
 int elf_load(proc *curproc, char *app_name, uint64_t *elf_pc, uint32_t *last_section);
