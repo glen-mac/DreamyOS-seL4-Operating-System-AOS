@@ -264,6 +264,8 @@ proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
 int
 proc_delete(proc *victim)
 {
+    LOG_INFO("%d being killed", victim->pid);
+
     int ret_val = 1;
     if (victim->protected) {
         LOG_ERROR("Cannot kill a protected process");

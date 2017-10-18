@@ -5,31 +5,23 @@
  */
 
 #include "syscall.h"
+
 #include <cspace/cspace.h>
-#include <unistd.h>
 #include <utils/util.h>
 
 /* include all sys_* wrappers */
-#include "sys_time.h"
 #include "sys_file.h"
-#include "sys_vm.h"
 #include "sys_proc.h"
-#include "event.h"
+#include "sys_time.h"
+#include "sys_vm.h"
 
-/* Currently dependent on syscall numbers ordering, might change this */
+/* Syscall Jump Table, Ordering is dependent on syscall numbers in sos.h */
 static int (*syscall_table[])(proc *) = {
-    NULL,
     syscall_write,
-    NULL,
     syscall_read,
-    NULL,
     syscall_open,
     syscall_close,
     syscall_brk,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
     syscall_usleep,
     syscall_time_stamp,
     syscall_stat,
@@ -57,15 +49,19 @@ handle_syscall(seL4_Word pid)
     /* If syscall number is valid and function pointer is not NULL */
     if (ISINRANGE(0, syscall_number, ARRAY_SIZE(syscall_table) - 1) &&
         syscall_table[syscall_number]) {
+        /* Mark the process as blocked, prevent it from being killed during the middle of a syscall */
         proc_mark(curproc, BLOCKED);
-
         curproc->blocked_ref += 1;
+
+        /* Handle the syscall */
         int nwords = syscall_table[syscall_number](curproc);
+
+        /* Unblock the process */
         proc_mark(curproc, RUNNING);
         curproc->blocked_ref -= 1;
 
+        /* If the process is meant to be killed, and it is not blocked */
         if (curproc->kill_flag && curproc->blocked_ref == 0) {
-            LOG_INFO("%d being killed", curproc->pid);
             proc_delete(curproc);
             nwords = -1;
         }

@@ -18,27 +18,31 @@
 #include <sel4/sel4.h>
 
 /* System calls for SOS */
-// TODO: probably number these how they appear below in order
-#define SOS_SYS_WRITE 1
-#define SOS_SYS_READ 3
-#define SOS_SYS_OPEN 5
-#define SOS_SYS_CLOSE 6
 
-#define SOS_SYS_BRK 7
+/* File Syscalls */
+#define SOS_SYS_WRITE 0
+#define SOS_SYS_READ 1
+#define SOS_SYS_OPEN 2
+#define SOS_SYS_CLOSE 3
 
-#define SOS_SYS_USLEEP 12
-#define SOS_SYS_TIME_STAMP 13
+/* Memory Syscalls */
+#define SOS_SYS_BRK 4
 
-#define SOS_SYS_STAT 14
-#define SOS_SYS_GETDIRENT 15
+/* Time Syscalls */
+#define SOS_SYS_USLEEP 5
+#define SOS_SYS_TIME_STAMP 6
 
-#define SOS_SYS_PROC_CREATE 16
-#define SOS_SYS_PROC_DELETE 17
-#define SOS_SYS_PROC_ID 18
-#define SOS_SYS_PROC_STATUS 19
-#define SOS_SYS_PROC_WAIT 20
+/* File System Syscalls */
+#define SOS_SYS_STAT 7
+#define SOS_SYS_GETDIRENT 8
 
-#define SOS_SYS_EXIT 21
+/* Process syscalls */
+#define SOS_SYS_PROC_CREATE 9
+#define SOS_SYS_PROC_DELETE 10
+#define SOS_SYS_PROC_ID 11
+#define SOS_SYS_PROC_STATUS 12
+#define SOS_SYS_PROC_WAIT 13
+#define SOS_SYS_EXIT 14
 
 /* Endpoint for talking to SOS */
 #define SOS_IPC_EP_CAP     (0x1)

@@ -7,14 +7,13 @@
 #ifndef _SYS_VM_H_
 #define _SYS_VM_H_
 
-#include <sel4/sel4.h>
 #include <proc/proc.h>
 
 /* 
- * Syscall for extend the heap
+ * Syscall for setting the end of the heap
  * msg(1) newbrk
  * @returns nwords in return message
  */
-int syscall_brk(proc * curproc);
+int syscall_brk(proc *curproc);
 
 #endif /* _SYS_VM_H_ */

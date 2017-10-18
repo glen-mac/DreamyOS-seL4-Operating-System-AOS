@@ -24,12 +24,12 @@ syscall_open(proc *curproc)
 
     /* File name to open */
     seL4_Word name = seL4_GetMR(1);
-    /* Mde to open the file in */
+    /* Mode to open the file in */
     fmode_t mode = seL4_GetMR(2);
 
     LOG_SYSCALL(curproc->pid, "open(%p, %d)", (void *)name, mode);
 
-    /* Copy the file into a local buffer, as the name may span multiple frames */
+    /* Copy the filename into a local buffer, as the name may span multiple frames */
     char kname[NAME_MAX];
     if (copy_in(curproc, kname, name, NAME_MAX) != 0) {
         LOG_ERROR("Error copying in filename");

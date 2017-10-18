@@ -13,7 +13,8 @@ int
 syscall_brk(proc *curproc)
 {
     seL4_Word newbrk = seL4_GetMR(1);
-    LOG_INFO("syscall: thread made sos_brk(%p)", newbrk);
+
+    LOG_SYSCALL(curproc->pid, "brk(%p)", newbrk);
 
     seL4_Word *heap_s = &(curproc->p_addrspace->region_heap->start);
     seL4_Word *heap_e = &(curproc->p_addrspace->region_heap->end);
@@ -24,7 +25,7 @@ syscall_brk(proc *curproc)
         if (newbrk < *heap_s) {
             /* If the newbrk is silly, then we change return value */
             seL4_SetMR(0, 1);
-        } else if (newbrk >= stack_s){
+        } else if (newbrk >= stack_s) {
             /* If the newbrk is actually WITHIN the DEFINED stack region */
             seL4_SetMR(0, 1);
         } else {

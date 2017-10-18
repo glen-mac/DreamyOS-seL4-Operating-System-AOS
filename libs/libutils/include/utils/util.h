@@ -36,7 +36,7 @@
 #ifdef NDEBUG
 #define LOG_ERROR(format, ...)
 #define LOG_INFO(format, ...)
-#define LOG_SYSCALL(format, ...)
+#define LOG_SYSCALL(pid, format, ...)
 #else
 #define LOG_ERROR(format, ...) printf("ERROR:%s:%d: "format"\n", __func__, __LINE__, ##__VA_ARGS__)
 #define LOG_INFO(format, ...)  printf("INFO:%s:%d: "format"\n", __func__, __LINE__, ##__VA_ARGS__)
