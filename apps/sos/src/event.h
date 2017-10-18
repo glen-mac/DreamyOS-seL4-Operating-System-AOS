@@ -20,9 +20,6 @@
 /* return the proc ID from the badge upper bits */
 #define GET_PROCID_BADGE(x) (x >> 21)
 
-/* return the badge with the proc set in upper bits */
-#define SET_PROCID_BADGE(b, pid) ((b & 0x7FFFFFF) | (pid << 21))
-
 /* 
  * All badged IRQs set high bet, then we use uniq bits to
  * distinguish interrupt sources
