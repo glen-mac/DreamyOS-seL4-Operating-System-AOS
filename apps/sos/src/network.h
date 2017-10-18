@@ -20,7 +20,7 @@ extern fhandle_t mnt_point;
  * Initialises the network stack
  * @param interrupt_ep, The asynchronous endpoint that the driver should use for registering IRQs
  */
-extern void network_init(seL4_CPtr interrupt_ep);
+void network_init(seL4_CPtr interrupt_ep);
 
 /*
  * Initialises DMA memory for the network driver
@@ -28,11 +28,11 @@ extern void network_init(seL4_CPtr interrupt_ep);
  * @param sizebits, The size (1 << sizebits bytes) of the memory provided.
  * @returns 0 on success
  */
-extern int dma_init(seL4_Word paddr, int sizebits);
+int dma_init(seL4_Word paddr, int sizebits);
 
 /*
  * Allows the network driver to handle any pending events
  */
-extern void network_irq(void);
+void network_irq(void);
 
 #endif /* _NETWORK_H_ */
