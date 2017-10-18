@@ -106,7 +106,7 @@ void
 network_irq(void)
 {
     /* skip if the network was not initialised */
-    if(_irq_ep == seL4_CapNull)
+    if (_irq_ep == seL4_CapNull)
         return;
 
     ethif_lwip_handle_irq(lwip_iface, _net_irqs[0].irq);

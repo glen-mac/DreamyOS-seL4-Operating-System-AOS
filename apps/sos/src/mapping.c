@@ -10,18 +10,12 @@
 
 #include "mapping.h"
 
-#define verbose 1
-#include <sys/panic.h>
-#include <sys/debug.h>
 #include <cspace/cspace.h>
-#include <utils/page.h>
+#include <sys/panic.h>
 #include <utils/util.h>
 #include <ut_manager/ut.h>
-
-#include <proc/proc.h>
 #include <vm/layout.h>
 #include <vm/frametable.h>
-#include <vm/vm.h>
 
 extern const seL4_BootInfo *_boot_info;
 
@@ -38,12 +32,13 @@ _map_page_table(seL4_ARM_PageDirectory pd, seL4_Word vaddr, seL4_CPtr *pt_cap)
 
     /* Allocate a PT object */
     if ((pt_addr = ut_alloc(seL4_PageTableBits)) == (seL4_Word)NULL) {
-        LOG_ERROR("Error allocating PT object");
+        LOG_ERROR("Failed to allocate PT object");
         return 1;
     }
+
     /* Create the frame cap */
     if ((err = cspace_ut_retype_addr(pt_addr, seL4_ARM_PageTableObject, seL4_PageTableBits, cur_cspace, pt_cap))) {
-        LOG_ERROR("Error retyping the PT object");
+        LOG_ERROR("Failed to retype PT object");
         ut_free(pt_addr, seL4_PageTableBits);
         return err;
     }
@@ -62,7 +57,7 @@ map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr,
     /* Attempt the mapping */
     if ((err = seL4_ARM_Page_Map(frame_cap, pd, vaddr, rights, attr)) == seL4_FailedLookup) {
         /* Assume the error was because we have no page table */
-        if((err = _map_page_table(pd, vaddr, pt_cap)) == 0)
+        if ((err = _map_page_table(pd, vaddr, pt_cap)) == 0)
             /* Try the mapping again */
             err = seL4_ARM_Page_Map(frame_cap, pd, vaddr, rights, attr);
     }
@@ -83,11 +78,10 @@ map_device(void *paddr, int size)
         seL4_ARM_Page frame_cap;
         seL4_CPtr pt_cap;
 
-        // TODO: This a common code block across multiple files, it could be refactored
         /* Retype the untype to a frame */
         err = cspace_ut_retype_addr(phys, seL4_ARM_SmallPageObject, seL4_PageBits, cur_cspace, &frame_cap);
         conditional_panic(err, "Unable to retype device memory");
-        
+
         /* Map in the page */
         err = map_page(frame_cap, seL4_CapInitThreadPD, virt, seL4_AllRights, 0, &pt_cap);
         conditional_panic(err, "Unable to map device");
@@ -96,6 +90,7 @@ map_device(void *paddr, int size)
         phys += BIT(seL4_PageBits);
         virt += BIT(seL4_PageBits);
     }
+
     return (void *)vstart;
 }
 
@@ -107,7 +102,7 @@ sos_map_page(proc *curproc, seL4_Word page_id, unsigned long permissions, seL4_W
 
     seL4_Word frame_id = frame_alloc(kvaddr);
     if (frame_id == -1) {
-        LOG_ERROR("Frame allocation failed");
+        LOG_ERROR("Failed to allocate a frame");
         return 1;
     }
 
@@ -119,17 +114,18 @@ sos_map_page(proc *curproc, seL4_Word page_id, unsigned long permissions, seL4_W
      * Because we have already used the cap to map the frame into SOS's address space.
      */
     seL4_CPtr new_frame_cap = cspace_copy_cap(cur_cspace, cur_cspace, frame_cap, seL4_AllRights);
-    if (!new_frame_cap) {
-        LOG_ERROR("Error copying the capability");
+    if (new_frame_cap == (seL4_CPtr)NULL) {
+        LOG_ERROR("Failed to copy the capability");
         frame_free(frame_id);
         return 1;
     }
 
     addrspace *as = curproc->p_addrspace;
 
+    /* Map the page into the process addrspace */
     seL4_CPtr pt_cap;
     if (map_page(new_frame_cap, as->vspace, page_id, permissions, seL4_ARM_Default_VMAttributes, &pt_cap) != 0) {
-        LOG_ERROR("Error mapping page");
+        LOG_ERROR("Failed to map page");
         cspace_delete_cap(cur_cspace, new_frame_cap);
         frame_free(frame_id);
         return 1;
@@ -137,7 +133,7 @@ sos_map_page(proc *curproc, seL4_Word page_id, unsigned long permissions, seL4_W
 
     /* Insert the capability into the processes 2-level page table */
     if (page_directory_insert(as->directory, page_id, new_frame_cap, pt_cap) != 0) {
-        LOG_ERROR("Error inserting into page directory");
+        LOG_ERROR("Failed to insert cap into the page table");
         seL4_ARM_Page_Unmap(new_frame_cap);
         cspace_delete_cap(cur_cspace, new_frame_cap);
         frame_free(frame_id);
