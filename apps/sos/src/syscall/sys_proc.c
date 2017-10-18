@@ -99,7 +99,7 @@ syscall_proc_status(proc *curproc)
         strcpy(kproc.command, c_proc->proc_name);
 
         /* Copy out stat to user process */
-        if (copy_out(curproc, sos_procs_addr, &kproc, sizeof(sos_process_t)) != 0) {
+        if (copy_out(curproc, sos_procs_addr, (char *)&kproc, sizeof(sos_process_t)) != 0) {
             LOG_ERROR("Error copying out");
             goto message_reply;
         }
@@ -129,7 +129,7 @@ syscall_proc_wait(proc *curproc)
     /* Check all children if called with -1 */
     if (pid == -1) {
         for (struct list_node *curr = curproc->children->head; curr != NULL; curr = curr->next) {
-            proc *child = get_proc(curr->data);
+            proc *child = get_proc((pid_t)curr->data);
             /* Destroy the child if it has exited */
             if (child && child->p_state == ZOMBIE) {
                 result = child->pid;
@@ -159,7 +159,7 @@ syscall_proc_wait(proc *curproc)
     wait:
         curproc->waiting_coro = coro_getcur();
         curproc->waiting_on = pid;
-        result = yield(NULL);
+        result = (int)yield(NULL);
         curproc->waiting_coro = NULL;
         curproc->waiting_on = -1;
 
