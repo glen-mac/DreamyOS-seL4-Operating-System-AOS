@@ -359,8 +359,8 @@ sos_nfs_read_callback(uintptr_t token, enum nfs_stat status, fattr_t *fattr, int
     }
 
     /* Hardcopy the data into the specified memory region */
-    struct iovec *iov = (struct iovec *)call_data->iv;
-    memcpy(iov->iov_base, data, count);
+    uiovec *iov = (uiovec *)call_data->iv;
+    memcpy(iov->uiov_base, data, count);
 
     ret = count;
     coro_resume:

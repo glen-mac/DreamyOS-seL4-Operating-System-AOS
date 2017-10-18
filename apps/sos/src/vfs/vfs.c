@@ -7,14 +7,11 @@
 #include "vfs.h"
 
 #include "device.h"
-
+#include <fcntl.h>
 #include <stdlib.h>
-#include <assert.h>
-#include <errno.h>
-
 #include <utils/util.h>
 
-#include <fcntl.h>
+static int vfs_lookup(char *name, int create_file, vnode **ret);
 
 /*
  * Linked list of mount points on the VFS
@@ -35,36 +32,42 @@ vfs_init(void)
      */
     vnode *device_mount = malloc(sizeof(vnode));
     if (!device_mount) {
-        LOG_ERROR("Malloc failed when creating device namespace");
+        LOG_ERROR("Failed to create device mount");
         return 1;
     }
 
     device_mount->vn_data = NULL;
     device_mount->vn_ops = &device_vnode_ops;
     if (vfs_mount(device_mount) != 0) {
-        LOG_ERROR("Error mounting device namespace");
+        LOG_ERROR("Failed to mount device namespace");
         return 1;
     }
-   
+
     return 0;
 }
 
 int
 vfs_mount(vnode *vn)
 {
+    /*
+     * Reach the end of the linked list
+     * We want to do this in order to preserve the lookup order,
+     * It's first come first serve for namespaces.
+     */
     mount *curr;
     for (curr = mount_points; curr != NULL && curr->next != NULL; curr = curr->next);
 
     mount *new_mount = malloc(sizeof(mount));
-    if (!new_mount) {
-        LOG_ERROR("malloc error creating mount point");
+    if (new_mount == NULL) {
+        LOG_ERROR("Failed to create mount point entry");
         return 1;
     }
 
     new_mount->node = vn;
     new_mount->next = NULL;
 
-    if (!curr) {
+    /* Either at the front of the linked list or not */
+    if (curr == NULL) {
         mount_points = new_mount;
     } else {
         curr->next = new_mount;
@@ -76,30 +79,29 @@ vfs_mount(vnode *vn)
 int
 vfs_open(char *name, fmode_t mode, vnode **ret)
 {
-    int result;
     vnode *vn = NULL;
 
     if (mode != O_RDONLY && mode != O_WRONLY && mode != O_RDWR) {
-        LOG_ERROR("incorrect mode %d", mode);
-        return EINVAL;
+        LOG_ERROR("Invalid mode %d", mode);
+        return 1;
     }
 
     /*
-     * Might create a file, NFS creates a failed lookup file inside its vop_lookup function
-     * Only create the file if it is opened in write only mode aswell
+     * Might create a file, NFS creates a failed lookup file inside its vop_lookup function.
+     * Only create the file if it is opened in writeable mode.
      */
     int create_file = 0;
     if (mode == O_WRONLY || mode == O_RDWR)
         create_file = 1;
 
-    if ((result = vfs_lookup(name, create_file, &vn))) {
-        LOG_ERROR("vfs_lookup failed");
-        return result;
+    if (vfs_lookup(name, create_file, &vn) != 0) {
+        LOG_ERROR("Failed to find the file");
+        return 1;
     }
 
     /* Open the vnode */
     if (vn->vn_ops->vop_open(vn, mode) != 0) {
-        LOG_ERROR("Failed to open file");
+        LOG_ERROR("Failed to open the file");
         return 1;
     }
 
@@ -117,23 +119,36 @@ vfs_close(vnode *vn, fmode_t mode)
 int
 vfs_stat(char *name, sos_stat_t **buf)
 {
-    int result;
     vnode *vn = NULL;
 
-    if ((result = vfs_lookup(name, 0, &vn))) {
-        LOG_ERROR("vfs_lookup failed");
-        return result;
+    if (vfs_lookup(name, 0, &vn) != 0) {
+        LOG_ERROR("Failed to find the file");
+        return 1;
     }
 
-    if (vn->vn_ops->vop_stat(vn, buf) != 0)
+    if (vn->vn_ops->vop_stat(vn, buf) != 0) {
+        LOG_ERROR("Failed to stat the file");
         return 1;
+    }
 
     return 0;
 }
 
-int
+/*
+ * Lookup a name inside the VFS
+ * @param name, the name to search
+ * @param create_file, flag to specify if a file should be created on lookup fail
+ * This is delegated to the FS to first see this file and support file creation
+ * @param[out] ret, the returned vnode
+ * @returns 0 on success else 1
+ */
+static int
 vfs_lookup(char *name, int create_file, vnode **ret)
 {
+    /*
+     * Lookup name in each mount point, ordered by earliest to latest mount
+     * The first namespace to recognise the file will be chosen
+     */
     for (mount *curr = mount_points; curr != NULL; curr = curr->next) {
         if (curr->node->vn_ops->vop_lookup(name, create_file, ret) == 0)
             return 0;
@@ -143,31 +158,37 @@ vfs_lookup(char *name, int create_file, vnode **ret)
 }
 
 int
-vfs_list(char ***master_list, size_t *num_files)
+vfs_list(char ***dir, size_t *nfiles)
 {
-    *num_files = 0;
-    char **big_list = malloc(sizeof(char *));
-    if (!big_list)
+    /* Create a master list which stores all entries */
+    *nfiles = 0;
+    char **master_list = malloc(sizeof(char *));
+    if (master_list == NULL) {
+        LOG_ERROR("Failed to create master list");
         return 1;
-
-    char **dir;
-    size_t nfiles = 0;
-
-    for (mount *curr = mount_points; curr != NULL; curr = curr->next) {
-        if (curr->node->vn_ops->vop_list(&dir, &nfiles) != 0)
-            return 1;
-
-        /* Resize list to fit new entries */
-        size_t new_size = (*num_files) + nfiles;
-        big_list = realloc(big_list, sizeof(char *) * new_size);
-        for (int i = 0; i < nfiles; i++)
-            big_list[*num_files + i] = dir[i];
-
-        *num_files = new_size;
-        free(dir);
     }
 
-    *master_list = big_list;
+    /* The namespace list stores netries from that namespace */
+    char **namespace_list;
+    size_t num_files = 0;
+
+    for (mount *curr = mount_points; curr != NULL; curr = curr->next) {
+        if (curr->node->vn_ops->vop_list(&namespace_list, &num_files) != 0) {
+            LOG_ERROR("Failed to list files in namespace");
+            return 1;
+        }
+
+        /* Add entries from namespace_list to the master list */
+        size_t new_size = (*nfiles) + num_files;
+        master_list = realloc(master_list, sizeof(char *) * new_size);
+        for (int i = 0; i < num_files; i++)
+            master_list[*nfiles + i] = namespace_list[i];
+
+        *nfiles = new_size;
+        free(namespace_list);
+    }
+
+    *dir = master_list;
     return 0;
 }
 
