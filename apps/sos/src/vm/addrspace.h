@@ -105,11 +105,12 @@ int as_find_region(addrspace *as, seL4_Word vaddr, region **found_region);
 /*
  * Check if the given start and end collide with existing regions in an addrspace
  * @param as, the addresspace to search
+ * @param exempt, the region you're trying to expand, so dont check this
  * @param start, the starting address of the region
  * @param end, the ending address of the region
  * @returns 0 on success, else 1
  */
-int as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end);
+int as_region_collision_check(addrspace *as, region *exempt, seL4_Word start, seL4_Word end);
 
 /*
  * Check if the region has correct permissions for a certain type of access

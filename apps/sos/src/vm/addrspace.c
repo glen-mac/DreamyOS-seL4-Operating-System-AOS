@@ -161,26 +161,35 @@ as_find_region(addrspace *as, seL4_Word vaddr, region **found_region)
 }
 
 int
-as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end)
+as_region_collision_check(addrspace *as, region *exempt, seL4_Word start, seL4_Word end)
 {
-   if (start >= as->region_heap->end && start < as->region_stack->start)
-      return 0;
+    /* Cant have the end before the start */
+    if (end < start) {
+        LOG_ERROR("Region cannot have end before the start");
+        return 1;
+    }
 
-   return 1;
+    /* Region can however decrease back down so the start == end (heap does this) */
 
-   /*
-   TODO; Probably need to take in the region these values correspond to, cause 
-   we want to ignore that region we are checking
+    for (region *curr = as->region_list; curr != NULL; curr = curr->next_region) {
+        if (curr == exempt)
+            continue;
 
-   region *curr = as->region_list;
-   while (curr != NULL) {
-        if (WITHIN_REGION(curr, start) || WITHIN_REGION(curr, end)) {   
-            return 0;
+        /* Start is inside another region */
+        if (ISINRANGE(curr->start, start, curr->end)) {
+            LOG_ERROR("Region start is inside another region");
+            return 1;
         }
-        curr = curr->next_region;
-   }
-   return 1;
-   */
+
+        /* Other region's start is inside the proposed region */
+        if (ISINRANGE(start, curr->start, end)) {
+            LOG_ERROR("Another regions start is inside the proposed region");
+            return 1;
+        }
+    }
+
+    /* No collision */
+    return 0;
 }
 
 bool

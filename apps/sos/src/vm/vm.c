@@ -448,29 +448,41 @@ vm_map(proc *curproc, seL4_Word vaddr, seL4_Word access_type, seL4_Word *kvaddr)
 
     /* Try to expand the stack */
     region *vaddr_region;
-    if (as_find_region(as, vaddr, &vaddr_region) != 0 &&
-        as_region_collision_check(as, PAGE_ALIGN_4K(vaddr), as->region_stack->end) == 0) {
-        if ((seL4_Word)(as->region_stack->end - PAGE_ALIGN_4K(vaddr)) > RLIMIT_STACK_SZ) {
-            LOG_ERROR("Tried to extend size of stack beyond RLIMIT_STACK");
+    if (as_find_region(as, vaddr, &vaddr_region) != 0) {
+        if (as_region_collision_check(as, as->region_stack, PAGE_ALIGN_4K(vaddr), as->region_stack->end) == 0) {
+            /* Will not collide with another region, but did we try to set the stack backwards? */
+            if (PAGE_ALIGN_4K(vaddr) >= as->region_stack->end) {
+                LOG_ERROR("Cannot decrease the stack region");
+                goto stack_extension_epilogue;
+            }
+
+            /* Check the stack extension does not exceed the limit */
+            if ((seL4_Word)(as->region_stack->end - PAGE_ALIGN_4K(vaddr)) > RLIMIT_STACK_SZ) {
+                LOG_ERROR("Tried to extend size of stack beyond RLIMIT_STACK_SZ");
+                return 1;
+            }
+
+            as->region_stack->start = PAGE_ALIGN_4K(vaddr);
+            LOG_INFO("Extended the stack to %p -> %p", (void *)as->region_stack->start, (void *)as->region_stack->end);
+        } else {
+            LOG_ERROR("Failed to extend the stack");
+        }
+    }
+
+    stack_extension_epilogue:
+        /* Check if address belongs to a region and that region has permissions for the access type */
+        if (!as_find_region(as, vaddr, &vaddr_region) == 0 ||
+            !as_region_permission_check(vaddr_region, access_type)) {
+            LOG_ERROR("Incorrect Permissions");
             return 1;
         }
-        as->region_stack->start = PAGE_ALIGN_4K(vaddr);
-        LOG_INFO("Extended the stack to %p -> %p", (void *)as->region_stack->start, (void *)as->region_stack->end);
-    }
-    
-    /* Check if address belongs to a region and that region has permissions for the access type */
-    if (!as_find_region(as, vaddr, &vaddr_region) == 0 ||
-        !as_region_permission_check(vaddr_region, access_type)) {
-        LOG_ERROR("Incorrect Permissions");
-        return 1;
-    }
 
-    if (sos_map_page(curproc, PAGE_ALIGN_4K(vaddr), vaddr_region->permissions, kvaddr) != 0) {
-        LOG_ERROR("Failed to map page into sos");
-        return 1;
-    }
+        if (sos_map_page(curproc, PAGE_ALIGN_4K(vaddr), vaddr_region->permissions, kvaddr) != 0) {
+            LOG_ERROR("Failed to map page into sos");
+            return 1;
+        }
 
-    return 0;
+        return 0;
 }
 
 /* The status of the fault is indicated by bits 12, 10 and 3:0 all strung together */

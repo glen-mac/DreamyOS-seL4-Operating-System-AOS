@@ -151,13 +151,6 @@ proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
     seL4_DebugNameThread(new_proc->tcb_cap, app_name);
 #endif
 
-    if (as_define_stack(new_proc->p_addrspace) != 0) {
-        LOG_ERROR("Failed to define the stack");
-        _proc_delete(new_proc);
-        proc_destroy(new_proc);
-        return -1;
-    }
-
     /* Map in the IPC buffer for the thread */
     seL4_CPtr pt_cap;
     if (map_page(new_proc->ipc_buffer_cap, new_proc->p_addrspace->vspace,
@@ -217,6 +210,13 @@ proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid)
     uint32_t last_section;
     if (elf_load(new_proc, app_name, &elf_pc, &last_section) != 0) {
         LOG_ERROR("Failed to load elf file");
+        _proc_delete(new_proc);
+        proc_destroy(new_proc);
+        return -1;
+    }
+
+    if (as_define_stack(new_proc->p_addrspace) != 0) {
+        LOG_ERROR("Failed to define the stack");
         _proc_delete(new_proc);
         proc_destroy(new_proc);
         return -1;
