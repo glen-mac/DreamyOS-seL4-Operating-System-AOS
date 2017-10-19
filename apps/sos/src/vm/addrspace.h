@@ -11,8 +11,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Maximum size limit of the stack region */
-#define RLIMIT_STACK_SZ 8192000
+/* Maximum size limit of the stack region (16mb) */
+#define RLIMIT_STACK_SZ 16780000
 
 /* Forward declaration of a page directory */
 typedef struct page_dir page_directory;
