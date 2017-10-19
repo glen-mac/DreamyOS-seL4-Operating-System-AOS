@@ -11,8 +11,6 @@
 #include <stdlib.h>
 #include <utils/util.h>
 
-static int vfs_lookup(char *name, int create_file, vnode **ret);
-
 /*
  * Linked list of mount points on the VFS
  * Each mount point is a VFS with vop_lookup defined.
@@ -22,7 +20,9 @@ typedef struct mnt {
     struct mnt *next;
 } mount;
 
-mount *mount_points = NULL;
+static mount *mount_points = NULL;
+
+static int vfs_lookup(char *name, int create_file, vnode **ret);
 
 int
 vfs_init(void)

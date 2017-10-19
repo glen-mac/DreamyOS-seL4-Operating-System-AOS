@@ -32,7 +32,7 @@ typedef void (*timer_callback_t)(uint32_t id, void *data);
 
 /*
  * Initialise the timer.
- * @param mapped_vaddr, the address of the memory mapped registers for GPT
+ * @param vaddr, the address of the memory mapped registers for GPT
  */
 void init_timer(void *vaddr);
 
@@ -46,44 +46,44 @@ int start_timer(seL4_CPtr interrupt_ep);
 
 /*
  * Register a callback to be called after a given delay
- * @param uint64_t delay, microsecond delay before event
- * @param timer_callback_t callback, function to be run after delay
- * @param void *data, data to be passed to the callback function
+ * @param delay, microsecond delay before event
+ * @param callback, function to be run after delay
+ * @param data, data to be passed to the callback function
  * @return id of the timer event
  */
 uint32_t register_timer(uint64_t delay, timer_callback_t callback, void *data);
 
 /*
  * Register a repeating callback to be run every delay microseconds
- * @param uint64_t delay, microsecond delay before event
- * @param timer_callback_t callback, function to be run after delay
- * @param void *data, data to be passed to the callback function
+ * @param delay, microsecond delay before event
+ * @param callback, function to be run after delay
+ * @param data, data to be passed to the callback function
  * @return id of the timer event
  */
 uint32_t register_repeating_timer(uint64_t delay, timer_callback_t callback, void *data);
 
 /*
  * Remove a previously registered callback by its ID
- * @param uint32_t id of the registered timer
+ * @param id, id of the registered timer
  * @return CLOCK_R_OK iff successful.
  */
 int remove_timer(uint32_t id);
 
 /*
  * Handle an interrupt message sent to 'interrupt_ep' from start_timer
- * @returns CLOCK_R_OK iff successful
+ * @returns CLOCK_R_OK iff successful.
  */
 int timer_interrupt(void);
 
 /*
  * Get the present time in microseconds since booting.
- * @returns 64 bit timestamp on success, else negative value
+ * @returns 64 bit timestamp on success, else CLOCK_R_UINT
  */
 timestamp_t time_stamp(void);
 
 /*
  * Stop clock driver operation.
- * @returns CLOCK_R_OK iff successful.
+ * @returns CLOCK_R_OK iff successful, else CLOCK_R_FAIL
  */
 int stop_timer(void);
 

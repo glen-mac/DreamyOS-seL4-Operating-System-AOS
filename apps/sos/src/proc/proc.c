@@ -27,7 +27,7 @@
 #define MAX_PROCS 32
 
 /* Global process array */
-proc *sos_procs[MAX_PROCS];
+static proc *sos_procs[MAX_PROCS];
 
 /* The last found pid */
 static seL4_Word curr_pid = 0;
