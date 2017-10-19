@@ -73,6 +73,10 @@ handle_syscall(seL4_Word pid)
         }
     } else {
         LOG_INFO("Unknown syscall %d", syscall_number);
+        /* return to the user, with -1 */
+        seL4_SetMR(0, -1);
+        seL4_MessageInfo_t reply = seL4_MessageInfo_new(0, 0, 0, 1);
+        seL4_Send(reply_cap, reply);
     }
 
     /* Free the saved reply cap */

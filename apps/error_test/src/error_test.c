@@ -311,6 +311,23 @@ void crash_errors() {
     //*((char *)sbrk(0)) = 2;               /* working \o/ */
 }
 
+void syscall_errors() {
+    seL4_MessageInfo_t tag;
+    
+    /* check to see if a negative syscall fails */
+    tag = seL4_MessageInfo_new(0, 0, 0, 1);
+    seL4_SetTag(tag);
+    seL4_SetMR(0, -1);
+    seL4_Call(SOS_IPC_EP_CAP, tag);
+
+    /* check to see if a syscall number out of the table fails */
+    tag = seL4_MessageInfo_new(0, 0, 0, 1);
+    seL4_SetTag(tag);
+    seL4_SetMR(0, 15);
+    seL4_Call(SOS_IPC_EP_CAP, tag);
+}
+
+
 int main() {
     /* Implementation defined. Set this to your initial id. */
     if (sos_my_id() != initial_pid) {
@@ -338,6 +355,10 @@ int main() {
     printf("Running process error tests.\n");
     process_errors();
     printf("Process error tests passed.\n");
+
+    printf("Running syscall error tests.\n");
+    syscall_errors();
+    printf("Syscall error tests passed.\n");
 
     printf("Running crash tests. You need to manually comment out individual lines.\n");
     crash_errors();
