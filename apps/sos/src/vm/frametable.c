@@ -20,8 +20,8 @@
 #define FT_PORTION 0.8
 
 /* Maximum number of frames to allocate */
-//#define ARTIFICIAL_FRAME_LIMIT (BYTES_TO_4K_PAGES(ut_top - ut_base) * FT_PORTION)
-#define ARTIFICIAL_FRAME_LIMIT 2000
+// #define ARTIFICIAL_FRAME_LIMIT (BYTES_TO_4K_PAGES(ut_top - ut_base) * FT_PORTION)
+#define ARTIFICIAL_FRAME_LIMIT (8 * BYTES_TO_4K_PAGES(BIT(20))) /* 8 MB frametable size */
 
 /* High and low watermark for number of free frames */
 #define HIGH_WATERMARK 64

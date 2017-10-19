@@ -272,8 +272,10 @@ page_directory_insert(page_directory *dir, seL4_Word page_id, seL4_CPtr cap, seL
     page_table_entry *second_level = (page_table_entry *)directory[directory_index];
 
     /* Must be less than, as we use the highest bit to represent evicted or not */
-    assert(cap < MAX_CAP_ID);
-    assert((cap >> 31) == 0);
+    if (IS_EVICTED(cap)) {
+        LOG_ERROR("MSB is required to be 0");
+        return 1;
+    }
 
     /* Store the cap in the pagetable */
     second_level[table_index].page = cap;
@@ -345,10 +347,13 @@ page_directory_evict(page_directory *dir, seL4_Word page_id, seL4_Word free_id)
     }
 
     seL4_CPtr cap = second_level[table_index].page;
+    assert(!IS_EVICTED(cap));
 
     /* Must be less than, as we use the highest bit to represent evicted or not */
-    assert(free_id < MAX_CAP_ID);
-    assert((free_id >> 31) == 0);
+    if (IS_EVICTED(free_id)) {
+        LOG_ERROR("MSB is required to be 0");
+        return 1;
+    }
 
     second_level[table_index].page = free_id;
     second_level[table_index].page |= EVICTED_BIT; /* Mark as evicted */

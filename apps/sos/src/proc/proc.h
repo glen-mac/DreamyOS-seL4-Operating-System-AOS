@@ -15,8 +15,8 @@
 #include <vm/addrspace.h>
 #include <vm/vm.h>
 
-/* Maximum number of processes to support */
-#define MAX_PROCS 32
+/* Maximum number of processes to support; Customisable */
+#define MAX_PROCS 16
 
 /* process states enum */
 typedef enum {

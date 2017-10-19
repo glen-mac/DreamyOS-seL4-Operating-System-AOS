@@ -353,6 +353,9 @@ int main(void) {
     assert((pid = sos_process_create("error_test")) != -1);
     assert(sos_process_wait(pid) == pid);
 
+    // assert((pid = sos_process_create("pagingdemo")) != -1);
+    // assert(sos_process_wait(pid) == pid);
+
     assert((pid = sos_process_create("execstack")) != -1);
     assert(sos_process_wait(pid) == pid);
 
@@ -362,10 +365,8 @@ int main(void) {
     sos_process_delete(pid);
     assert(sos_process_wait(pid) == pid);
 
-    assert((pid = sos_process_create("pagingdemo")) != -1);
-    assert(sos_process_wait(pid) == pid);
-
     do {
+        printf("Before calling sos_process_create\n");
         pid = sos_process_create("thrash");
         printf("Starting thrash %d\n", pid);
     } while (pid != -1);

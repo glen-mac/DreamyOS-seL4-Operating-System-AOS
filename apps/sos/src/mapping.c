@@ -142,5 +142,7 @@ sos_map_page(proc *curproc, seL4_Word page_id, unsigned long permissions, seL4_W
 
     /* For demand paging, we need to know what process vaddr is mapped to this frame in the frame table entry */
     assert(frame_table_set_page_id(frame_id, curproc->pid, page_id) == 0);
+    assert(frame_table_set_chance(frame_id, FIRST_CHANCE) == 0);
+
     return 0;
 }

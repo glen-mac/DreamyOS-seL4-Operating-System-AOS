@@ -10,13 +10,12 @@
 #include "event.h"
 #include "frametable.h"
 #include <fs/sos_nfs.h>
+#include "mapping.h"
 #include "network.h"
 #include <string.h>
 #include <strings.h>
 #include <utils/util.h>
-
-/* Maximum number of pages in the pagefile */
-#define PAGEFILE_MAX_PAGES 5000 // BYTES_TO_4K_PAGES(BIT(31)) // 2 GB pagefile size
+#include <vm/layout.h>
 
 /* Variable to represent where we are up to in our search for a victim page */
 static volatile seL4_Word current_page = 0;
@@ -27,11 +26,11 @@ static volatile seL4_Word pager_initialised = FALSE;
 /* Handle of the pagefile for NFS operations */
 static fhandle_t pagefile_handle;
 
-/* List of free pages in the pagefile */
-static list_t *pagefile_free_pages = NULL;
-
 /* Queue of paging operations */
 static list_t *pagefile_operations = NULL;
+
+/* Bit array representing the pagefile */
+static int *pagefile_metatable = NULL;
 
 /* Private functions */
 static int next_victim(void);
@@ -47,7 +46,7 @@ static volatile bool global_page_lock = FALSE;
 static volatile coro lock_free_coro = NULL;
 
 int
-init_pager(void)
+init_pager(seL4_Word paddr, seL4_Word size_in_bits)
 {
     const sattr_t file_attr = {
         .mode = 0664, /* Read write for owner and group, read for everyone */
@@ -70,28 +69,33 @@ init_pager(void)
 
     LOG_INFO("Resuming sos initialisation");
 
-    /* Page file metadata */
-    if ((pagefile_free_pages = malloc(sizeof(list_t))) == NULL) {
-        LOG_ERROR("Failed to allocate memory for free page list");
-        return 1;
-    }
-
     /* Page file operations */
     if ((pagefile_operations = malloc(sizeof(list_t))) == NULL) {
         LOG_ERROR("Failed to allocate memory for paging operations queue");
         return 1;
     }
 
-    list_init(pagefile_free_pages);
     list_init(pagefile_operations);
 
-    /* Mark every page on the file as empty */
-    LOG_INFO("Max pages in the pagefile is %d", PAGEFILE_MAX_PAGES);
-    for (size_t id = 0; id < PAGEFILE_MAX_PAGES; ++id) {
-        if (list_prepend(pagefile_free_pages, (void *)id) == -1) {
-            LOG_ERROR("Failed to mark page as free %d", id);
+    /* Initilizer the pagefile metatable */
+    seL4_Word vaddr = PHYSICAL_VSTART + paddr;
+    pagefile_metatable = (int *)vaddr;
+    seL4_ARM_Page frame_cap;
+
+    for (int i = 0; i < BYTES_TO_4K_PAGES(BIT(size_in_bits)); i++) {
+        if (cspace_ut_retype_addr(paddr, seL4_ARM_SmallPageObject, seL4_PageBits, cur_cspace, &frame_cap) != 0) {
+            LOG_ERROR("Failed to retype frame");
             return 1;
         }
+
+        seL4_CPtr pt_cap;
+        if (map_page(frame_cap, seL4_CapInitThreadPD, vaddr, seL4_AllRights, seL4_ARM_Default_VMAttributes, &pt_cap) != 0) {
+            LOG_ERROR("Failed to map frame");
+            return 1;
+        }
+
+        vaddr += PAGE_SIZE_4K;
+        paddr += PAGE_SIZE_4K;
     }
 
     return 0;
@@ -108,7 +112,7 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
         return 1;
     }
 
-    LOG_INFO("Paging in %lu", page_id);
+    LOG_INFO("Paging in %p", (void *)page_id);
 
     seL4_CPtr pagefile_id;
     if (page_directory_lookup(curproc->p_addrspace->directory, PAGE_ALIGN_4K(page_id), &pagefile_id) != 0) {
@@ -116,6 +120,7 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
         goto page_in_epilogue;
     }
 
+    assert((pagefile_id & EVICTED_BIT) != 0);
     pagefile_id &= (~EVICTED_BIT);
     LOG_INFO("Page is stored at entry %lu in the pagefile", pagefile_id);
 
@@ -156,6 +161,7 @@ page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type)
 
     /* Mark the page as free in the pagefile */
     pagefile_free_add(pagefile_id);
+
     /* Flush the cache in case this page was instruction data */
     seL4_ARM_Page_Unify_Instruction(frame_table_get_capability(frame_table_sos_vaddr_to_index(sos_vaddr)), 0, PAGE_SIZE_4K);
 
@@ -176,11 +182,6 @@ page_out(seL4_Word *page_id)
         return -1;
     }
 
-    if (list_is_empty(pagefile_free_pages)) {
-        LOG_ERROR("No more space in the pagefile");
-        goto page_out_epilogue;
-    }
-
     if ((frame_id = next_victim()) == -1) {
         LOG_ERROR("Failed to select a victim frame");
         goto page_out_epilogue; /* We're unable to choose a vicitm, all pages are pinned */
@@ -199,8 +200,8 @@ page_out(seL4_Word *page_id)
     *page_id = frame_table_index_to_sos_vaddr(frame_id);
     bzero((void *)(*page_id), PAGE_SIZE_4K);
 
-    /* Reset the chance on the frame */
-    assert(frame_table_set_chance(frame_id, FIRST_CHANCE) == 0);
+    /* Pin the frame until it is claimed */
+    assert(frame_table_set_chance(frame_id, PINNED) == 0);
 
     page_out_epilogue:
         page_gate_close();
@@ -210,7 +211,7 @@ page_out(seL4_Word *page_id)
 void
 pagefile_free_add(seL4_CPtr pagefile_id)
 {
-    assert(list_prepend(pagefile_free_pages, (void *)pagefile_id) == 0);
+    pagefile_metatable[pagefile_id / 32] &= ~(1 << (pagefile_id % 32));
 }
 
 /*
@@ -298,15 +299,29 @@ evict_frame(seL4_Word frame_id)
         return -1;
     }
 
-    /* Pop the next free page off the list */
-    void *free_node = pagefile_free_pages->head;
-    seL4_Word pagefile_id = (seL4_Word)pagefile_free_pages->head->data;
-    pagefile_free_pages->head = pagefile_free_pages->head->next;
-    free(free_node);
+    /* Find free spot in metatable */
+    seL4_Word pagefile_id = 0;
+    for (seL4_Word page = 0; page < PAGEFILE_MAX_PAGES; page++) {
+        if ((pagefile_metatable[page / 32] & (1 << (page % 32))) == 0) {
+            pagefile_metatable[page / 32] |= 1 << (page % 32);
+            pagefile_id = page;
+            goto pagefile_space_found;
+        }
+    }
+
+    /* No space found */
+    LOG_ERROR("Failed to find space in the file");
+    return -1;
+
+    pagefile_space_found:
 
     LOG_INFO("Free page in file at %d", pagefile_id);
 
-    assert(page_directory_evict(curproc->p_addrspace->directory, page_id, pagefile_id) == 0);
+    if (page_directory_evict(curproc->p_addrspace->directory, page_id, pagefile_id) != 0) {
+        LOG_ERROR("Failed to evict directory entry");
+        pagefile_free_add(pagefile_id);
+        return -1;
+    }
 
     /* Write the page to disk */
     seL4_Word sos_vaddr = frame_table_index_to_sos_vaddr(frame_id);
@@ -320,6 +335,7 @@ evict_frame(seL4_Word frame_id)
     /* sos_nfs_write gauruntees all data is written succesfully */
     if (sos_nfs_write(&handle, &iov) == -1) {
         LOG_ERROR("Failed to write to the pagefile");
+        pagefile_free_add(pagefile_id);
         return -1;
     }
 
