@@ -296,6 +296,9 @@ void process_errors() {
 
     assert(sos_process_create("error_test") != pid);
     assert(sos_process_wait(pid) == pid);
+
+    /* ensure deleting proc 0 fails */
+    assert(sos_process_delete(0) == -1);
 }
 
 void crash_errors() {
