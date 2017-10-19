@@ -23,9 +23,6 @@
 #define NEW_EP_BADGE_PRIORITY (0)
 #define NEW_EP_BADGE (101)
 
-/* Maximum number of processes to support; Customisable */
-#define MAX_PROCS 32
-
 /* Global process array */
 static proc *sos_procs[MAX_PROCS];
 
