@@ -91,9 +91,9 @@ vm_fault(seL4_Word pid)
     seL4_Word access_type = ACCESS_TYPE(fault_cause);
     seL4_Word fault_status = get_fault_status(fault_cause);
 
-    LOG_INFO("PID %d, Access Type %s, Fault status %d, Fault address %p, PC %p, Type %s", 
-        access_type? "Write": "Read", fault_status, (void *)fault_addr, (void *)fault_pc,
-        fault_type ? "Instruction Fault" : "Data fault"
+    LOG_INFO("PID %d, Access Type %s, Fault status %d, Fault address %p, PC %p, Type %s",
+        pid, access_type? "Write": "Read", fault_status, (void *)fault_addr,
+        (void *)fault_pc, fault_type ? "Instruction Fault" : "Data fault"
     );
 
     if (fault_status == PERMISSION_FAULT_PAGE) {

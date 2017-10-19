@@ -226,12 +226,20 @@ next_victim(void)
     assert(frame_table_get_limits(&lower, &upper) == 0);
 
     enum chance_type chance;
-    //seL4_Word starting_page = current_page;
-    //seL4_Word loops = 0;
+
+    bool starting_page_found = FALSE;
+    seL4_Word starting_page = 0;
+    seL4_Word looped = FALSE;
 
     while (TRUE) {
         if (!frame_table_get_capability(current_page))
             goto next;
+
+        /* Set the starting page to be the next valid page */
+        if (!starting_page_found) {
+            looped = FALSE;
+            starting_page = current_page;
+        }
 
         assert(frame_table_get_chance(current_page, &chance) == 0);
         switch (chance) {
@@ -252,14 +260,17 @@ next_victim(void)
         }
 
         next:
+            if (starting_page_found && (current_page == starting_page)) {
+                /* We need this logic in order to ignore the first time this while loop goes around */
+                if (looped) {
+                    LOG_ERROR("Looped around and didnt select a page, all pages pinned");
+                    break;
+                } else {
+                    looped = TRUE;
+                }
+            }
+
             current_page = ((current_page + 1) % (upper - lower)) + lower;
-            // TODO I SWEAR YOU CAN FIX THIS
-            // printf("current_page incremented to %d\n", current_page);
-            /* We've looped around twice and have not chosen a page, all the pages are pinned */
-            // if (current_page == starting_page) {
-            //     printf("current page %d, starting page %d\n", current_page, starting_page);
-            //     break;
-            // }
     }
 
     return -1;
