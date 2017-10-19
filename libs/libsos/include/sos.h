@@ -154,6 +154,10 @@ void sos_sys_usleep(int msec);
 /* Sleeps for the specified number of milliseconds.
  */
 
+void sos_sys_exit(void);
+/* Process exit
+ */
+
 /*
  * sys_brk call
  * @param newbrk: the desired new brk address - if this value is 0, the user
