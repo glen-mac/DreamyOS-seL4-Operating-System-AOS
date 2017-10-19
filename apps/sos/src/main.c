@@ -143,6 +143,11 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     dma_addr = ut_steal_mem(DMA_SIZE_BITS);
     conditional_panic(dma_addr == (seL4_Word)NULL, "Failed to reserve DMA memory\n");
 
+    /* Pagefile table represents the pagefile in memory, its a bit array with PAGEFILE_MAX_PAGES entries */
+    seL4_Word pagefile_table_size_in_bits = LOG_BASE_2(nearest_power_of_two(PAGEFILE_MAX_PAGES / 8));
+    seL4_Word pagefile_metadata_table = ut_steal_mem(pagefile_table_size_in_bits);
+    conditional_panic(pagefile_metadata_table == (seL4_Word)NULL, "Failed to reserve Pagefile memory\n");
+
     /* find available memory */
     ut_find_memory(&low, &high);
 
@@ -193,7 +198,7 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     conditional_panic(err, "Failed to mount NFS\n");
 
     /* Must happen after NFS is initialised because it creates pagefile */
-    err = init_pager();
+    err = init_pager(pagefile_metadata_table, pagefile_table_size_in_bits);
     conditional_panic(err, "Failed to initialise demand pager\n");
 }
 

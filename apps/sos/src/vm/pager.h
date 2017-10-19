@@ -9,6 +9,9 @@
 
 #include <proc/proc.h>
 
+/* Maximum number of pages in the pagefile */
+#define PAGEFILE_MAX_PAGES (80 * BYTES_TO_4K_PAGES(BIT(20))) /* 80 MB pagefile size */
+
 /* Second chance replacement marker */
 enum chance_type {
 	FIRST_CHANCE, /* One more chance */
@@ -20,7 +23,7 @@ enum chance_type {
  * Initialise the pager
  * @returns 0 on success, else 1
  */
-int init_pager(void);
+int init_pager(seL4_Word paddr, seL4_Word size_in_bits);
 
 /*
  * Page the frame belonging to this vaddr
