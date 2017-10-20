@@ -24,4 +24,3 @@ inline void __conditional_panic(int condition, const char *message,
         abort();
     }
 }
-

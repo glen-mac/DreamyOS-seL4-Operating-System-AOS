@@ -134,7 +134,7 @@ static int ps(int argc, char **argv) {
 
     printf("PID   SIZE %*s  COMMAND\n", ++max_stime, "STIME");
     for (i = 0; i < processes; i++) {
-        printf("%3d %6d %*d  %s\n", process[i].pid, process[i].size,
+        printf("%3d %6u %*u  %s\n", process[i].pid, process[i].size,
                 max_stime, process[i].stime, process[i].command);
     }
 
@@ -339,14 +339,42 @@ int main(void) {
     int i, r, done, found, new, argc;
     char *bp, *p;
 
-    in = open("console", O_RDONLY);
-    assert(in >= 0);
-
     bp = buf;
     done = 0;
     new = 1;
 
     printf("\n[SOSH Starting]\n");
+
+    printf("DEBUGGING FOR FINAL SUBMISSION: Running all tests\n");
+
+    pid_t pid;
+
+    /* This needs to be the first test run */
+    assert((pid = sos_process_create("error_test")) != -1);
+    assert(sos_process_wait(pid) == pid);
+
+    // assert((pid = sos_process_create("pagingdemo")) != -1);
+    // assert(sos_process_wait(pid) == pid);
+
+    assert((pid = sos_process_create("execstack")) != -1);
+    assert(sos_process_wait(pid) == pid);
+
+    assert((pid = sos_process_create("tty_test")) != -1);
+
+    // We need to delete because this the process blocks with an unknown syscall 
+    sos_process_delete(pid);
+    assert(sos_process_wait(pid) == pid);
+
+    do {
+        printf("Before calling sos_process_create\n");
+        pid = sos_process_create("thrash");
+        printf("Starting thrash %d\n", pid);
+    } while (pid != -1);
+
+    printf("All tests passed, you are awesome!\n");
+
+    in = open("console", O_RDONLY);
+    assert(in >= 0);
 
     while (!done) {
         if (new) {

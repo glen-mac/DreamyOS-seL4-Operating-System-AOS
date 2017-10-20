@@ -16,6 +16,11 @@ sos-components=$(addprefix $(STAGE_BASE)/bin/, $(sos-components-y))
 sos-components-$(CONFIG_APP_GAME) += game
 sos-components-$(CONFIG_APP_THRASH) += thrash
 
+# Test programs
+sos-components-$(CONFIG_APP_ERROR_TEST) += error_test
+sos-components-$(CONFIG_APP_EXEC_STACK) += execstack
+sos-components-$(CONFIG_APP_PAGINGDEMO) += pagingdemo
+
 sos: export COMPONENTS=${sos-components}
 sos: ${sos-components-y} \
      libsel4 libelf $(libc) libcpio \

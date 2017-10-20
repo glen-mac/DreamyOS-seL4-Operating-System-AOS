@@ -3,8 +3,8 @@
  *
  * Cameron Lonsdale & Glenn McGuire
  */
-
 #include "file.h"
+
 #include <assert.h>
 #include <strings.h>
 #include <stdlib.h>
@@ -16,20 +16,16 @@ static ssize_t fdtable_next_unused_index(file **table);
 int
 file_open(char *filename, fmode_t mode, file **open_file)
 {
-    int result;
-
-    /* Since we dont have an open file table, we can just keep creating more files */
-    *open_file = malloc(sizeof(file));
-    if (!open_file) {
-        LOG_ERROR("malloc error when creating a file");
+    vnode *node;
+    if (vfs_open(filename, mode, &node) != 0) {
+        LOG_ERROR("Failed to open the vnode");
         return 1;
     }
 
-    vnode *node;
-    if ((result = vfs_open(filename, mode, &node)) != 0) {
-        free(*open_file);
-        LOG_ERROR("vfs open failed");
-        return result;
+    /* Since we dont have an open file table, we can just keep creating more files */
+    if ((*open_file = malloc(sizeof(file))) == NULL) {
+        LOG_ERROR("Failed to create a file");
+        return 1;
     }
 
     /* Set up the file entry. */
@@ -43,7 +39,7 @@ file_open(char *filename, fmode_t mode, file **open_file)
 void
 file_close(file *f)
 {
-    vfs_close(f->vn);
+    vfs_close(f->vn, f->mode);
     f->vn = NULL;
     free(f);
 }
@@ -53,7 +49,7 @@ fdtable_create(void)
 {
     fdtable *fdt;
     if ((fdt = malloc(sizeof(fdtable))) == NULL) {
-        LOG_ERROR("fdt table malloc failed");
+        LOG_ERROR("Failed to create the fdtable");
         return NULL;
     }
 
@@ -66,32 +62,30 @@ fdtable_destroy(fdtable *table)
 {
     file *open_file = NULL;
     for (size_t fd = 0; fd < PROCESS_MAX_FILES; ++fd) {
-        if (fdtable_close_fd(table, fd, &open_file) == 0) {
+        /* If the fd is valid, close the file attached */
+        if (fdtable_close_fd(table, fd, &open_file) == 0)
             file_close(open_file);
-        }
     }
 
     free(table);
     return 0;
 }
 
-
 int
 fdtable_get(fdtable *fdt, int fd, file **f)
 {
-    if (fd < 0 || (size_t)fd >= PROCESS_MAX_FILES) {
-        LOG_ERROR("invalid fd %d", fd);
-        return EBADF;
+    if (!ISINRANGE(0, fd, PROCESS_MAX_FILES)) {
+        LOG_ERROR("Invalid fd %d", fd);
+        return 1;
     }
 
     if ((*f = fdt->table[fd]) == NULL) {
         LOG_ERROR("%d didnt correspond to an open file", fd);
-        return EBADF;
+        return 1;
     }
 
     return 0;
 }
-
 
 void
 fdtable_insert(fdtable *fdt, int fd, file *open_file)
@@ -106,24 +100,24 @@ int
 fdtable_get_unused_fd(fdtable *fdt, int *fd)
 {
     if ((*fd = fdtable_next_unused_index(fdt->table)) == -1) {
-        LOG_ERROR("Proc out of space for an open file");
-        return EMFILE; /* Process out of space for new file */
+        LOG_ERROR("Failed to find a free index in the fdtable");
+        return 1; /* Process out of space for new file */
     }
 
     return 0;
 }
 
 int
-fdtable_close_fd(fdtable *fdt, int fd, file **oft_file)
+fdtable_close_fd(fdtable *fdt, int fd, file **open_file)
 {
-    if (fd < 0 || (unsigned)fd >= PROCESS_MAX_FILES) {
+    if (!ISINRANGE(0, fd, PROCESS_MAX_FILES)) {
         LOG_ERROR("Invalid fd %d", fd);
-        return EBADF;
+        return 1;
     }
 
-    if ((*oft_file = fdt->table[fd]) == NULL) {
+    if ((*open_file = fdt->table[fd]) == NULL) {
         LOG_ERROR("Invalid file for fd %d", fd);
-        return EBADF;
+        return 1;
     }
 
     fdt->table[fd] = NULL;
@@ -133,8 +127,7 @@ fdtable_close_fd(fdtable *fdt, int fd, file **oft_file)
 /*
  * Finds the next unused (i.e., NULL) index in an array, and returns
  * it.  Unfortunately, this is a linear scan.
- *
- * @param table the array to search in
+ * @param table,  the array to search in
  * @returns the next unused index, or -1 if none was found.
  */
 static ssize_t

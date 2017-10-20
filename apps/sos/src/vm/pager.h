@@ -7,60 +7,42 @@
 #ifndef _PAGER_H_
 #define _PAGER_H_
 
-#include <sel4/sel4.h>
-#include "addrspace.h"
 #include <proc/proc.h>
 
+/* Maximum number of pages in the pagefile */
+#define PAGEFILE_MAX_PAGES (80 * BYTES_TO_4K_PAGES(BIT(20))) /* 80 MB pagefile size */
+
+/* Second chance replacement marker */
 enum chance_type {
 	FIRST_CHANCE, /* One more chance */
 	SECOND_CHANCE, /* Can be paged to disk */
 	PINNED, /* Cannot be paged */
 };
 
-/* a pagefile operation node */
-typedef struct {
-	seL4_CPtr pagefile_id;	/* the id of the pagefile frame being operated on */
-	list_t *waiting_coros;	/* a list of the coros waiting to be resumed */
-} pagefile_op_node;
-
-extern list_t *pagefile_operations;
-
 /*
  * Initialise the pager
- * @returns 0 on success else 1
+ * @returns 0 on success, else 1
  */
-int init_pager(void);
+int init_pager(seL4_Word paddr, seL4_Word size_in_bits);
 
 /*
  * Page the frame belonging to this vaddr
- * @param page_id, the process vaddr of the page
+ * @param curproc, the process requesting the page in
+ * @param page_id, the vaddr of the page in the process
  * @param access_type, the type of access for this page (for permissions mapping)
- * @returns 1 on failure, else 0
+ * @returns 0 on success, else 1
  */
 int page_in(proc *curproc, seL4_Word page_id, seL4_Word access_type);
 
 /*
  * Try paging a frame out to disk to make room for a new frame
  * @param[out] vaddr, the sos vaddr of the frame
- * @returns -1 on failure, else the id of the frame
+ * @returns id of the frame on success, else -1
  */
 int page_out(seL4_Word *vaddr);
 
-/*
- * Find the next page to be evicted
- * @returns -1 on failure, else frame id of the frame
- */
-int next_victim(void);
-
-/*
- * Evict a frame from the frame table
- * @param frame_id, the id of the frame
- * @returns 0 on success else -1
- */
-int evict_frame(seL4_Word frame_id);
-
 /* 
- * Add a pagefile id to the pagefile freelist
+ * Add a pagefile id to the pagefile free list
  * @param pagefile_id, the id of the page in the pagefile
  */
 void pagefile_free_add(seL4_CPtr pagefile_id);

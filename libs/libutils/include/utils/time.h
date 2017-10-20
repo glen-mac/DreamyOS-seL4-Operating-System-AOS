@@ -12,11 +12,15 @@
 
 /* seconds */
 #define SEC_IN_MINUTE 60llu
-#define NS_IN_MINUTE (SEC_IN_MINUTE*NS_IN_S)
+#define NS_IN_MINUTE (SEC_IN_MINUTE*NS_IN_S
+#define SEC_TO_MS(t) (t * MS_IN_S)
 
 /* Calculate number of microseconds for a given time of seconds and milliseconds */
 #define SECONDS(t) (t * US_IN_S)
 #define MILLISECONDS(t) (t * US_IN_MS)
+
+/* Calculate number of milliseconds given microseconds */
+#define U_TO_MS(t) (t / US_IN_MS)
 
 /* milliseconds */
 #define MS_IN_S 1000llu
@@ -24,6 +28,7 @@
 /* microseconds */
 #define US_IN_MS 1000llu
 #define US_IN_S  1000000llu
+#define US_TO_MS(t) (t / US_IN_MS)
 
 /* nanoseconds */
 #define NS_IN_US 1000llu

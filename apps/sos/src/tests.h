@@ -1,7 +1,7 @@
 /*
  * Unit tests for milestones
- * Cameron Lonsdale & Glenn McGuire
  *
+ * Cameron Lonsdale & Glenn McGuire
  */
 
 #ifndef _TESTS_H_

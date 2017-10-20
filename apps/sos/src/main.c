@@ -4,43 +4,25 @@
  * Cameron Lonsdale & Glenn McGuire
  */
 
-#define verbose 5
-
-#include <autoconf.h>
 #include <clock/clock.h>
-#include <cspace/cspace.h>
-#include <cpio/cpio.h>
+#include <coro/picoro.h>
 #include <dev/sos_serial.h>
-#include <elf/elf.h>
-#include <fs/sos_nfs.h>
-#include <nfs/nfs.h>
-#include <sys/debug.h>
-#include <sys/panic.h>
-#include <syscall/syscall.h>
-#include <utils/page.h>
-#include <utils/util.h>
-#include <vfs/vfs.h>
-#include <vm/vm.h>
-#include <vm/frametable.h>
-#include <vm/pager.h>
-
 #include "event.h"
+#include <fs/sos_nfs.h>
 #include "mapping.h"
 #include "network.h"
-#include <coro/picoro.h>
-#include <proc/elf.h>
-#include <proc/proc.h>
+
+#define verbose 5
+#include <sys/debug.h>
+#include <sys/panic.h>
+
+#include <utils/util.h>
 #include <ut_manager/ut.h>
+#include <vm/frametable.h>
 #include <vm/layout.h>
 
-/* For unit tests: REMOVE BEFORE FINAL SUBMISSION */
+/* For unit tests */
 #include "tests.h"
-
-/* 
- * This is the index where a clients syscall enpoint will
- * be stored in the clients cspace.
- */
-#define USER_EP_CAP (1)
 
 const seL4_BootInfo *_boot_info;
 
@@ -84,8 +66,7 @@ print_startup(void)
 }
 
 /*
- * Initialise the IPC endpoints for SOS to talk to other 
- * services running ontop of seL4
+ * Initialise the IPC endpoints for SOS to talk to other services running ontop of seL4
  * @param ipc_ep, IPC endpoint
  * @param async_ep, asynchronos endpoint
  */
@@ -106,8 +87,6 @@ sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     err = seL4_TCB_BindAEP(seL4_CapInitThreadTCB, *async_ep);
     conditional_panic(err, "Failed to bind ASync EP to TCB");
 
-    // TODO: Will each process need its own endpoint?
-
     /* Create an endpoint for user application IPC */
     ep_addr = ut_alloc(seL4_EndpointBits);
     conditional_panic(!ep_addr, "No memory for endpoint");
@@ -122,8 +101,6 @@ sos_ipc_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
 static void
 sos_driver_init(void)
 {
-    int err;
-
     /* Initialise the network hardware */
     network_init(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_NETWORK));
 
@@ -131,7 +108,7 @@ sos_driver_init(void)
     init_timer(map_device((void *)CLOCK_GPT, CLOCK_GPT_SIZE));
 
     /* Initialise timer with badged capability */
-    err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
+    int err = start_timer(badge_irq_ep(_sos_interrupt_ep_cap, IRQ_BADGE_TIMER));
     conditional_panic(err, "Failed to start the timer\n");
 }
 
@@ -148,13 +125,15 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     seL4_Word high;
     int err;
 
-    print_startup();
+    /* Not for submission */
+    /* print_startup(); */
 
     /* Retrieve boot info from seL4 */
     _boot_info = seL4_GetBootInfo();
     conditional_panic(!_boot_info, "Failed to retrieve boot info\n");
     
-    print_bootinfo(_cpio_archive, _boot_info);
+    /* Not for submission */
+    /* print_bootinfo(_cpio_archive, _boot_info); */
 
     /* Initialise the untyped sub system and reserve memory for DMA */
     err = ut_table_init(_boot_info);
@@ -163,6 +142,11 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     /* DMA uses a large amount of memory that will never be freed */
     dma_addr = ut_steal_mem(DMA_SIZE_BITS);
     conditional_panic(dma_addr == (seL4_Word)NULL, "Failed to reserve DMA memory\n");
+
+    /* Pagefile table represents the pagefile in memory, its a bit array with PAGEFILE_MAX_PAGES entries */
+    seL4_Word pagefile_table_size_in_bits = LOG_BASE_2(nearest_power_of_two(PAGEFILE_MAX_PAGES / 8));
+    seL4_Word pagefile_metadata_table = ut_steal_mem(pagefile_table_size_in_bits);
+    conditional_panic(pagefile_metadata_table == (seL4_Word)NULL, "Failed to reserve Pagefile memory\n");
 
     /* find available memory */
     ut_find_memory(&low, &high);
@@ -202,6 +186,7 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     err = vfs_init();
     conditional_panic(err, "Failed to initialise virtual file system\n");
 
+    /* Initialise drivers */
     sos_driver_init();
 
     /* Intialise the serial device and register it with the VFS */
@@ -213,7 +198,7 @@ sos_init(seL4_CPtr *ipc_ep, seL4_CPtr *async_ep)
     conditional_panic(err, "Failed to mount NFS\n");
 
     /* Must happen after NFS is initialised because it creates pagefile */
-    err = init_pager();
+    err = init_pager(pagefile_metadata_table, pagefile_table_size_in_bits);
     conditional_panic(err, "Failed to initialise demand pager\n");
 }
 
@@ -230,8 +215,8 @@ seL4_CPtr badge_irq_ep(const seL4_CPtr ep, const seL4_Word badge)
         cur_cspace, cur_cspace, ep, 
         seL4_AllRights, seL4_CapData_Badge_new(badge | IRQ_EP_BADGE)
     );
-    conditional_panic(!badged_cap, "Failed to allocate badged cap");
 
+    conditional_panic(!badged_cap, "Failed to allocate badged cap");
     return badged_cap;
 }
 
@@ -252,15 +237,14 @@ main(void)
     pid_t init = proc_bootstrap();
     assert(init == 0);
     
-    /* Unit tests */
-    // test_m2();
-    // test_m1(); /* After so as to have time to enter event loop */
-    // test_m6();
+    /* Unit tests; Not for submission */
+    /* test_m2(); */
+    /* test_m1(); *//* After so as to have time to enter event loop */
 
     /* Wait on synchronous endpoint for IPC */
     LOG_INFO("SOS entering event loop");
     event_loop(_sos_ipc_ep_cap);
 
-    panic("should not be reached");
+    panic("Should not be reached");
     return 0;
 }

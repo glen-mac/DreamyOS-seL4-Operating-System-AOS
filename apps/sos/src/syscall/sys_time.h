@@ -7,7 +7,6 @@
 #ifndef _SYS_TIME_H_
 #define _SYS_TIME_H_
 
-#include <sel4/sel4.h>
 #include <proc/proc.h>
 
 /* 

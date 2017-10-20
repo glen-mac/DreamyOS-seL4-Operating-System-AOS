@@ -11,16 +11,12 @@
 #ifndef _MAPPING_H_
 #define _MAPPING_H_
 
-#include <sel4/sel4.h>
 #include <cspace/cspace.h>
-
 #include <proc/proc.h>
-#include <vm/addrspace.h>
 
 /*
  * Maps a page into a page table. 
  * A 2nd level table will be created if required
- *
  * @param frame_cap a capbility to the page to be mapped
  * @param pd A capability to the page directory to map to
  * @param vaddr The virtual address for the mapping
@@ -35,7 +31,6 @@ int map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr,
 /*
  * Maps a device to virtual memory
  * A 2nd level table will be created if required
- *
  * @param paddr the physical address of the device
  * @param size the number of bytes that this device occupies
  * @return The new virtual address of the device
@@ -43,11 +38,12 @@ int map_page(seL4_CPtr frame_cap, seL4_ARM_PageDirectory pd, seL4_Word vaddr,
 void *map_device(void *paddr, int size);
 
 /*
- * Map a user level page into a process address space
- * @param vaddr, the address of the page 
- * @param as, the process address space
+ * Create a page in a process address space
+ * @param curproc, the process to map into
+ * @param page_id, the virtual address of the page
  * @param permissions, the permissions of the page
  * @param[out] kvaddr, the sos virtual address to access the physical memory
+ * @returns 0 on success, else 1
  */
 int sos_map_page(proc *curproc, seL4_Word page_id, unsigned long permissions, seL4_Word *kvaddr);
 

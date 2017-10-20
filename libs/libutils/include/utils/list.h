@@ -94,7 +94,7 @@ int list_remove_all_nodes(list_t *l);
 static inline
 int list_cmp_equality(void *a, void *b)
 {
-    return (!a == b);
+    return !(a == b);
 }
 
 #endif

@@ -8,20 +8,17 @@
 
 #include "vm.h"
 #include "layout.h"
-
-#include <cspace/cspace.h>
-#include <sel4/sel4.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ut_manager/ut.h>
 #include <utils/util.h>
+
+#define WITHIN_REGION(as, addr) (addr >= as->start && addr < as->end) 
 
 addrspace *
 as_create(void)
 {
     addrspace *as;
     if ((as = malloc(sizeof(addrspace))) == NULL) {
-        LOG_ERROR("Error mallocing addrspace");
+        LOG_ERROR("Failed to allocate memory for addrspace");
         return NULL;
     }
 
@@ -31,24 +28,21 @@ as_create(void)
 
     /* Create a VSpace */
     if ((as->vspace_addr = ut_alloc(seL4_PageDirBits)) == (seL4_Word)NULL) {
-        LOG_ERROR("Error ut_alloc vspace_addr");
+        LOG_ERROR("Failed to create a VSpace");
         free(as);
         return NULL;
     }
 
-    if (cspace_ut_retype_addr(as->vspace_addr,
-                                seL4_ARM_PageDirectoryObject,
-                                seL4_PageDirBits,
-                                cur_cspace,
-                                &(as->vspace))) {
-        LOG_ERROR("Error retyping memory");
+    if (cspace_ut_retype_addr(as->vspace_addr, seL4_ARM_PageDirectoryObject, seL4_PageDirBits, cur_cspace, &(as->vspace))) {
+        LOG_ERROR("Failed to retype VSpace");
         ut_free(as->vspace_addr, seL4_PageDirBits);
         free(as);
         return NULL;
     }
 
+    /* Create the top level of the page table */
     if ((as->directory = page_directory_create()) == NULL) {
-        LOG_ERROR("page_directory_create returned null");
+        LOG_ERROR("Failed to create a page directory");
         cspace_delete_cap(cur_cspace, as->vspace);
         ut_free(as->vspace_addr, seL4_PageBits);
         free(as);
@@ -62,7 +56,7 @@ int
 as_destroy(addrspace *as)
 {
     if (page_directory_destroy(as->directory) != 0) {
-        LOG_ERROR("Failed to destroy page_directory");
+        LOG_ERROR("Failed to destroy page directory");
         return 1;
     }
     as->directory = NULL;
@@ -72,12 +66,11 @@ as_destroy(addrspace *as)
         LOG_ERROR("Failed to delete vspace cap");
         return 1;
     }
-    as->vspace = NULL;
+    as->vspace = (seL4_Word)NULL;
 
     ut_free(as->vspace_addr, seL4_PageDirBits);
-    as->vspace_addr = NULL;
+    as->vspace_addr = (seL4_Word)NULL;
 
-    region *curr = as->region_list;
     for (region *curr = as->region_list; curr != NULL; curr = curr->next_region) {
         if (as_destroy_region(curr) != 0) {
             LOG_ERROR("Failed to destroy region");
@@ -96,21 +89,24 @@ as_create_region(seL4_Word start, seL4_Word size, seL4_Word permissions)
     assert(size >= 0);
     region *new_region;
     if ((new_region = (region *)malloc(sizeof(region))) == NULL) {
-        LOG_ERROR("Unable to create region");
+        LOG_ERROR("Failed to allocate space for a region");
         return NULL;
     }
 
     new_region->start = start;
     new_region->end = start + size;
     new_region->permissions = permissions;
+
     return new_region;
 }
 
 int
 as_destroy_region(region *reg)
 {
-    if (!reg)
+    if (reg == NULL) {
+        LOG_ERROR("Failed to destroy region");
         return 1;
+    }
 
     free(reg);
     return 0;
@@ -120,6 +116,8 @@ int
 as_add_region(addrspace *as, region *new_region)
 {
     LOG_INFO("Adding region %p -> %p", (void *)new_region->start, (void *)new_region->end);
+
+    /* If there are no previous regions */
     if (as->region_list == NULL) {
         as->region_list = new_region;
         goto end_add;
@@ -141,8 +139,15 @@ as_add_region(addrspace *as, region *new_region)
 }
 
 int
+as_define_region(addrspace *as, seL4_Word start, seL4_Word size, seL4_Word permissions)
+{
+    return as_add_region(as, as_create_region(start, size, permissions));
+}
+
+int
 as_find_region(addrspace *as, seL4_Word vaddr, region **found_region)
 {
+    /* Search through the linked list until found */
     region *curr = as->region_list;
     while (curr != NULL) {
         if (vaddr >= curr->start && vaddr < curr->end) {
@@ -151,41 +156,64 @@ as_find_region(addrspace *as, seL4_Word vaddr, region **found_region)
         }
         curr = curr->next_region;
     }
+
     return 1;
 }
 
 int
-as_region_collision_check(addrspace *as, seL4_Word start, seL4_Word end)
+as_region_collision_check(addrspace *as, region *exempt, seL4_Word start, seL4_Word end)
 {
-    // TODO: Refactor this to check the addr doesnt collide with any other regions
-    if (start >= as->region_heap->end && start < as->region_stack->start)
-        return 0;
+    /* Cant have the end before the start */
+    if (end < start) {
+        LOG_ERROR("Region cannot have end before the start");
+        return 1;
+    }
 
-    return 1;
+    /* Region can however decrease back down so the start == end (heap does this) */
+
+    for (region *curr = as->region_list; curr != NULL; curr = curr->next_region) {
+        if (curr == exempt)
+            continue;
+
+        /* Start is inside another region */
+        if (ISINRANGE(curr->start, start, curr->end)) {
+            LOG_ERROR("Region start is inside another region");
+            return 1;
+        }
+
+        /* Other region's start is inside the proposed region */
+        if (ISINRANGE(start, curr->start, end)) {
+            LOG_ERROR("Another regions start is inside the proposed region");
+            return 1;
+        }
+    }
+
+    /* No collision */
+    return 0;
 }
 
-int
+bool
 as_region_permission_check(region *reg, seL4_Word access_type)
 {
     if (access_type == ACCESS_READ && (reg->permissions & seL4_CanRead))
-        return 1;
+        return TRUE; /* Correct Permission */
 
     if (access_type == ACCESS_WRITE && (reg->permissions & seL4_CanWrite))
-        return 1;
+        return TRUE; /* Correct Permission */
 
-    return 0;
+    return FALSE; /* Incorrect Permission */
 }
 
 int
 as_define_stack(addrspace *as)
 {
-    if (!as) {
-        LOG_ERROR("as not defined");
+    if (as == NULL) {
+        LOG_ERROR("Addrspace cannot be null");
         return 1;
     }
 
     if (as->region_stack) {
-        LOG_ERROR("region_stack already defined");
+        LOG_ERROR("Stack region already defined");
         return 1;
     }
 
@@ -195,10 +223,37 @@ as_define_stack(addrspace *as)
         seL4_CanRead | seL4_CanWrite
     );
     if (stack == NULL) {
-        LOG_ERROR("as_create_region failed");
+        LOG_ERROR("Failed to create stack region");
         return 1;
     }
 
     as->region_stack = stack;
     return as_add_region(as, stack);
+}
+
+int
+as_define_heap(addrspace *as, uint32_t heap_loc)
+{
+    if (as == NULL) {
+        LOG_ERROR("Addrspace cannot be null");
+        return 1;
+    }
+
+    if (as->region_heap) {
+        LOG_ERROR("Heap region already defined");
+        return 1;
+    }
+
+    region *heap = as_create_region(
+        heap_loc,
+        0,
+        seL4_CanRead | seL4_CanWrite
+    );
+    if (heap == NULL) {
+        LOG_ERROR("Failed to create heap region");
+        return 1;
+    }
+
+    as->region_heap = heap;
+    return as_add_region(as, heap);
 }

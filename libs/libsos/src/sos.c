@@ -110,7 +110,7 @@ sos_stat(const char *name, sos_stat_t *buf)
 pid_t
 sos_process_create(const char *path)
 {
-    MAKE_SYSCALL(SOS_SYS_PROC_CREATE, path, strlen(path));
+    MAKE_SYSCALL(SOS_SYS_PROC_CREATE, path);
     return (pid_t)seL4_GetMR(0); /* -1 on error, 0 on success */
 }
 
@@ -164,7 +164,7 @@ seL4_Word
 sos_sys_brk(seL4_Word newbrk)
 {
     MAKE_SYSCALL(SOS_SYS_BRK, newbrk);
-    return seL4_GetMR(1); /* could contain newbrk, or the original brk */
+    return seL4_GetMR(0); /* could contain newbrk, or the original brk */
 }
 
 void

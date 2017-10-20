@@ -58,45 +58,18 @@ static seL4_Word *upper_timestamp_register_ptr;
 static seL4_Word *counter_register_ptr;
 
 static seL4_CPtr irq_handler; /* Global IRQ handler */
-static priority_queue *pq; /* Timer event pq handler */
+static priority_queue *pq = NULL; /* Timer event pq handler */
 static uint32_t timer_started = 0; /* Boolean to state if the timer has started or not */
 
+static int enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr);
 static uint64_t join32to64(uint32_t upper, uint32_t lower);
 static uint32_t add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t repeat, uint32_t uid);
 static void check_for_rollover(void);
 
-/* 
- * Enable Interrupts for a sepcific IRQ and endpoint
- * This is copied from network.c (and modified)
- * TODO: Abstract this out so network.c and clock.c uses the same code?
- *
- * @param irq, interrupt request id
- * @param aep, asynchronous endpoint the interrupt message will be delivered to
- * @param[out] irq_handler_ptr, Capability pointer to describe the interrupt handler
- * @returns 0 on success, else -1
- */
-static int
-enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr)
-{
-    /* Create an IRQ handler */
-    if (!(*irq_handler_ptr = cspace_irq_control_get_cap(cur_cspace, seL4_CapIRQControl, irq)))
-        return -1;
-
-    /* Assign to an endpoint */
-    if (seL4_IRQHandler_SetEndpoint(*irq_handler_ptr, aep) != 0)
-        return -1;
-
-    /* Ack the handler before continuing */
-    if (seL4_IRQHandler_Ack(*irq_handler_ptr) != 0)
-        return -1;
-
-    return 0;
-}
-
 void
-init_timer(void *mapped_vaddr)
+init_timer(void *vaddr)
 {
-    gpt_virtual = mapped_vaddr;
+    gpt_virtual = vaddr;
     pq = init_pq();
 
     /* Setup pointers to registers of the GPT Timer */
@@ -118,7 +91,7 @@ start_timer(seL4_CPtr interrupt_ep)
 
     /* Set timer interupts to be sent to interrupt_ep, and creates an interrupt capability */
     if (enable_irq(GPT_IRQ, interrupt_ep, &irq_handler) != 0) {
-        LOG_INFO("enable_irq failed");
+        LOG_INFO("Failed to enable irq");
         return CLOCK_R_FAIL; /* Operation failed for other reason (IRQ failed setup) */
     }
 
@@ -191,8 +164,10 @@ timer_interrupt(void)
     check_for_rollover();
 
     if (*status_register_ptr & OUTPUT_COMPARE_MASK) {
-        /* Run all callback events that should have already happened */
-        /* Because multiple interrupts can bascially happen at the same time, so we need to account for that */
+        /* 
+         * Run all callback events that should have already happened
+         * Because multiple interrupts can bascially happen at the same time, so we need to account for that
+         */
         do {
             event *cur_event = pq_pop(pq);
             if (!cur_event) {
@@ -208,7 +183,9 @@ timer_interrupt(void)
                 add_event_to_pq(cur_event->delay, cur_event->callback, cur_event->data, REPEAT_EVENT, cur_event->uid);
 
             free(cur_event);
-        } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + MILLISECONDS(1));
+            /* Check rollover every time */
+            check_for_rollover();
+        } while (!pq_is_empty(pq) && pq_time_peek(pq) <= time_stamp() + (uint64_t)MILLISECONDS(1));
 
         if (pq_is_empty(pq)) {
             /* We disable compare interrupts because theres no more events */
@@ -223,7 +200,7 @@ timer_interrupt(void)
 
     /* Acknowledge the interrupt so more can happen */
     if (seL4_IRQHandler_Ack(irq_handler) != 0) {
-        LOG_ERROR("Interrupt Acknowledge failed");
+        LOG_ERROR("Failed to acknowledge interrupt");
         return CLOCK_R_FAIL; /* Operation failed for other reason (Failed to ack interrupt) */
     }
 
@@ -297,8 +274,40 @@ stop_timer(void)
     return CLOCK_R_OK;
 }
 
+/* 
+ * Enable Interrupts for a sepcific IRQ and endpoint
+ * This is copied from network.c (and modified)
+ * @param irq, interrupt request id
+ * @param aep, asynchronous endpoint the interrupt message will be delivered to
+ * @param[out] irq_handler_ptr, Capability pointer to describe the interrupt handler
+ * @returns 0 on success, else 1
+ */
+static int
+enable_irq(int irq, seL4_CPtr aep, seL4_CPtr *irq_handler_ptr)
+{
+    /* Create an IRQ handler */
+    if (!(*irq_handler_ptr = cspace_irq_control_get_cap(cur_cspace, seL4_CapIRQControl, irq))) {
+        LOG_ERROR("Failed to create an IRQ handler");
+        return 1;
+    }
+
+    /* Assign to an endpoint */
+    if (seL4_IRQHandler_SetEndpoint(*irq_handler_ptr, aep) != 0) {
+        LOG_ERROR("Failed to assign handler to endpoint");
+        return 1;
+    }
+
+    /* Ack the handler before continuing */
+    if (seL4_IRQHandler_Ack(*irq_handler_ptr) != 0) {
+        LOG_ERROR("Failed to acknowledge handler");
+        return 1;
+    }
+
+    return 0;
+}
+
 /*
- * Joins two 32 bit numbers into a 64 bit number
+ * Joins two 32 bit numbers into a 64 bit number.
  * @param upper, the upper 32 bits
  * @param lower, the lower 32 bits
  * @returns 64 bit number upper:lower
@@ -306,17 +315,17 @@ stop_timer(void)
 static inline uint64_t
 join32to64(uint32_t upper, uint32_t lower)
 {
-    return (uint64_t)lower | ((uint64_t)upper << sizeof(uint32_t));
+    return (uint64_t) upper << 32 | lower;
 }
 
 /* 
- * Add an event to the PQ
+ * Add an event to the PQ.
  * @param delay, the microsecond delay until the event
  * @param callback, the callback to run at the event
  * @param data, the data to provide to the callback
  * @param repeat, flag to specify if the event is repeating
  * @param uid, unique id of the event
- * @returns CLOCK_R_OK on failure, else positive id
+ * @returns 0 on failure, else positive id
  */
 static uint32_t
 add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t repeat, uint32_t uid)
@@ -329,14 +338,15 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
     }
 
     /* If the event will happen within 1ms, just execute the event, as we might miss it */
-    if (delay < MILLISECONDS(1)) {
+    if (delay < (uint64_t)MILLISECONDS(1)) {
         if ((id = pq_get_next_id(pq)) == 0) {
-            LOG_ERROR("pq_get_next_id returned invalid id");
+            LOG_ERROR("Failed to acquire next priority queue id");
             return EVENT_FAIL;
         }
 
         if (callback) 
             callback(id, data);
+
         return id;
     }
 
@@ -346,7 +356,7 @@ add_event_to_pq(uint64_t delay, timer_callback_t callback, void *data, uint8_t r
 
     /* If there was an issue pushing event, terminate early */
     if ((id = pq_push(pq, time_stamp() + delay, delay, callback, data, repeat, uid)) == 0) {
-        LOG_ERROR("Error pushing event to the queue");
+        LOG_ERROR("Failed to add event to the queue");
         return EVENT_FAIL;
     }
 
@@ -364,7 +374,7 @@ check_for_rollover(void)
 {
     if (*status_register_ptr & ROLL_OVER_MASK) {
         /* Overflow wont happen for ~584 years, we plan to finish AOS by then */
-        *upper_timestamp_register_ptr += 1;
+        *upper_timestamp_register_ptr = *upper_timestamp_register_ptr + 1;
         *status_register_ptr |= ROLL_OVER_MASK; /* Acknowledge a roll over event occured */ 
         LOG_INFO("32-bit timer rollover");
     }

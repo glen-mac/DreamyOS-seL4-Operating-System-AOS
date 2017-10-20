@@ -29,10 +29,10 @@ char morecore_area[MORECORE_AREA_BYTE_SIZE];
 static uintptr_t morecore_base = (uintptr_t) &morecore_area;
 static uintptr_t morecore_top = (uintptr_t) &morecore_area[MORECORE_AREA_BYTE_SIZE];
 
-/* Actual morecore implementation
-   returns 0 if failure, returns newbrk if success.
-*/
-
+/*
+ * Actual morecore implementation
+ * returns 0 if failure, returns newbrk if success.
+ */
 long
 sys_brk(va_list ap)
 {
@@ -52,8 +52,10 @@ sys_brk(va_list ap)
     return ret;
 }
 
-/* Large mallocs will result in muslc calling mmap, so we do a minimal implementation
-   here to support that. We make a bunch of assumptions in the process */
+/*
+ * Large mallocs will result in muslc calling mmap, so we do a minimal implementation
+ * here to support that. We make a bunch of assumptions in the process
+ */
 long
 sys_mmap2(va_list ap)
 {
@@ -67,6 +69,7 @@ sys_mmap2(va_list ap)
     (void)prot;
     (void)fd;
     (void)offset;
+
     if (flags & MAP_ANONYMOUS) {
         /* Steal from the top */
         uintptr_t base = morecore_top - length;
@@ -76,6 +79,7 @@ sys_mmap2(va_list ap)
         morecore_top = base;
         return base;
     }
+
     assert(!"not implemented");
     return -ENOMEM;
 }

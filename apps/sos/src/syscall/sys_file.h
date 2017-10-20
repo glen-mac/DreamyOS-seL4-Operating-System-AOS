@@ -7,7 +7,6 @@
 #ifndef _SYS_FILE_H_
 #define _SYS_FILE_H_
 
-#include <sel4/sel4.h>
 #include <proc/proc.h>
 
 /*
@@ -42,14 +41,6 @@ int syscall_read(proc *curproc);
  * @returns nwords in return message
  */
 int syscall_close(proc *curproc);
-
-/*
- * Syscall to stat to a file
- * msg(1) name
- * msg(2) buf_vaddr
- * @returns nwords in return message
- */
-int syscall_stat(proc *curproc);
 
 /*
  * Syscall to stat to a file

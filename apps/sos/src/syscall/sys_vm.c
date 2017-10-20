@@ -13,25 +13,24 @@ int
 syscall_brk(proc *curproc)
 {
     seL4_Word newbrk = seL4_GetMR(1);
-    LOG_INFO("syscall: thread made sos_brk(%d)", newbrk);
 
-    seL4_Word *heap_b = &(curproc->p_addrspace->region_heap->start);
-    seL4_Word *heap_t = &(curproc->p_addrspace->region_heap->end);
+    LOG_SYSCALL(curproc->pid, "brk(%p)", newbrk);
 
-    /* Set return value as okay by default */
-    seL4_SetMR(0, 0);
+    seL4_Word heap_s = curproc->p_addrspace->region_heap->start;
+    seL4_Word *heap_e = &(curproc->p_addrspace->region_heap->end);
 
     /* If we actually desire to change heap brk */
     if (newbrk) {
-        if (*heap_b > newbrk) {
-            /* If the newbrk is silly, then we change return value */
-            seL4_SetMR(0, 1);
-        } else {
-            /* otherwise we change the brk */
-            *heap_t = newbrk;
+        if (as_region_collision_check(curproc->p_addrspace, curproc->p_addrspace->region_heap, heap_s, newbrk) != 0) {
+            LOG_ERROR("Heap extension failed collision check");
+            goto brk_epilogue;
         }
+
+        *heap_e = newbrk;
     }
 
-    seL4_SetMR(1, *heap_t);
-    return 2;
+    brk_epilogue:
+        LOG_INFO("returning %p", *heap_e);
+        seL4_SetMR(0, *heap_e);
+        return 1;
 }

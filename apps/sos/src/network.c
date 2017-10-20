@@ -55,7 +55,7 @@
 
 #define ETHERNET_IRQ 150
 
-extern const seL4_BootInfo* _boot_info;
+extern const seL4_BootInfo *_boot_info;
 
 static struct net_irq {
     int irq;
@@ -84,12 +84,11 @@ sos_unmap_device(void *cookie, void *addr, size_t size)
     return;
 }
 
-// TODO: Can we use the timer here instead
 void 
 sos_usleep(int usecs)
 {
     /* We need to spin because we do not as yet have a timer interrupt */
-    while (usecs-- > 0){
+    while (usecs-- > 0) {
         /* Assume 1 GHz clock */
         volatile int i = 1000;
         while (i-- > 0);
@@ -107,12 +106,11 @@ void
 network_irq(void)
 {
     /* skip if the network was not initialised */
-    if(_irq_ep == seL4_CapNull)
+    if (_irq_ep == seL4_CapNull)
         return;
 
     ethif_lwip_handle_irq(lwip_iface, _net_irqs[0].irq);
-    int err = seL4_IRQHandler_Ack(_net_irqs[0].cap);
-    assert(!err);
+    seL4_IRQHandler_Ack(_net_irqs[0].cap);
 }
 
 static seL4_CPtr
@@ -145,7 +143,7 @@ network_prime_arp(struct ip_addr *gw)
     int timeout = ARP_PRIME_TIMEOUT_MS;
     struct eth_addr *eth;
     struct ip_addr *ip;
-    while (timeout > 0){
+    while (timeout > 0) {
         /* Send an ARP request */
         etharp_request(lwip_iface->netif, gw);
 
@@ -233,7 +231,7 @@ network_init(seL4_CPtr interrupt_ep)
         if (!(err = nfs_init(&gw))) {
             /* Print out the exports on this server */
             nfs_print_exports();
-            if ((err = nfs_mount(SOS_NFS_DIR, &mnt_point))){
+            if ((err = nfs_mount(SOS_NFS_DIR, &mnt_point))) {
                 printf("Error mounting path '%s'!\n", SOS_NFS_DIR);
             } else {
                 printf("\nSuccessfully mounted '%s'\n", SOS_NFS_DIR);

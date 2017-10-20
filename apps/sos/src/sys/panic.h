@@ -12,7 +12,8 @@
 #define PANIC_H
 
 #include <stdio.h>
-/**
+
+/*
  * Panic if condition is true
  */
 #define conditional_panic(a, b) __conditional_panic(a, b, __FILE__, __func__, __LINE__)

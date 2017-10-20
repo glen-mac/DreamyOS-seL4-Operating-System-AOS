@@ -11,8 +11,12 @@
 
 typedef struct coro *coro;
 
-/* return current running routine */
-coro coro_getcur();
+/*
+ * Cameron & Glenns function:
+ * Return the current running coroutine
+ * @returns current coroutine
+ */
+coro coro_getcur(void);
 
 /*
  * Create a coroutine that will run fun(). The coroutine starts off suspended.

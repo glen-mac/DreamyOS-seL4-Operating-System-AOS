@@ -7,48 +7,44 @@
 #ifndef _PROC_H_
 #define _PROC_H_
 
-#include <sel4/sel4.h>
+#include <coro/picoro.h>
 #include <cspace/cspace.h>
-
+#include <sel4/sel4.h>
+#include <utils/list.h>
+#include <vfs/file.h>
 #include <vm/addrspace.h>
 #include <vm/vm.h>
-#include <vfs/file.h>
-#include <utils/list.h>
-#include <coro/picoro.h>
 
-/* maximum saved proc name */
-#define N_NAME 32
-
-/* Maximum number of processes to support */
-#define MAX_PROCS 32
+/* Maximum number of processes to support; Customisable */
+#define MAX_PROCS 16
 
 /* process states enum */
 typedef enum {
-    ZOMBIE,
-    RUNNING,
-    BLOCKED /* Blocked on SOS */
+    CREATED, /* Created but not started */
+    ZOMBIE,  /* Exited but not reclaimed by parent */
+    RUNNING, /* Running uninterrupted */
+    BLOCKED  /* Blocked on SOS */
 } proc_states;
 
 /* Process Struct */
 typedef struct _proc {
-    seL4_Word tcb_addr;
-    seL4_TCB tcb_cap;               /* thread control block cap */
-    seL4_CPtr ipc_buffer_cap;       /* ipc buffer cap */
+    seL4_Word tcb_addr;             /* Physical address of the TCB */
+    seL4_TCB tcb_cap;               /* TCB Capability */
+    seL4_CPtr ipc_buffer_cap;       /* IPC buffer cap */
+    cspace_t *croot;                /* cspace root pointer */
 
-    cspace_t *croot;                /* the cspace root */
-
-    addrspace *p_addrspace;         /* the address space */
-    fdtable *file_table;            /* file table ptr */
+    addrspace *p_addrspace;         /* Process address space */
+    fdtable *file_table;            /* File table */
     list_t *children;               /* Linked list of children */
 
-    pid_t waiting_on;               /* pid of the child proc is waiting on */
+    pid_t waiting_on;               /* Pid of the child proc is waiting on */
     coro waiting_coro;              /* Coroutine to resume when the wait is satisfied */
 
-    pid_t ppid;                     /* parent pid */
-    pid_t pid;                      /* pid of process */
-    char *proc_name;                /* process name */
-    int64_t stime;                  /* process start time */
-    proc_states p_state;            /* enum of the process state */
+    pid_t ppid;                     /* Parent pid */
+    pid_t pid;                      /* Pid of process */
+    char *proc_name;                /* Process name */
+    int64_t stime;                  /* Process start time */
+    proc_states p_state;            /* Enum of the process state */
 
     size_t blocked_ref;             /* Number of blocks on this process */
     bool kill_flag;                 /* Flag to specify if this process has received a kill signal */
@@ -57,23 +53,23 @@ typedef struct _proc {
 
 /*
  * Bootstrap the init process
- * @returns pid of the init process
+ * @returns pid of the init process (should be 0)
  */
 pid_t proc_bootstrap(void);
 
 /*
  * Start a process
- * @param _cpio_archive, the archive of binaries
  * @param app_name, executible name
  * @param fault_ep, endpoint for IPC
+ * @param parent_pid, the pid of the parent process for this new child
  * @return -1 on error, pid on success
  */
 pid_t proc_start(char *app_name, seL4_CPtr fault_ep, pid_t parent_pid);
 
 /*
  * Delete a process
- * Remove all metadata except the proc struct itself
- * @param victim, the proc to delete
+ * Remove all data required for the process to run
+ * @param victim, the process to delete
  * @returns 0 on success, else 1
  */
 int proc_delete(proc *victim);
@@ -88,22 +84,14 @@ void proc_destroy(proc *current);
  * Check if pid is a child of curproc
  * @param curproc, parent process
  * @param pid, the pid of the process to test
- * @return boolean if pid is a child of curproc
+ * @return TRUE if pid is a child of curproc, else FALSE
  */
 bool proc_is_child(proc *curproc, pid_t pid);
-
-/*
- * Check if parent is waiting on child
- * @param parent, parent process
- * @param child, child process
- * @returns true or false
- */
-bool proc_is_waiting(proc *parent, proc *child);
 
 /* 
  * Get proc structure given pid
  * @param pid, the pid of the process
- * @returns process struct pointer
+ * @returns process struct pointer on success, else NULL
  */
 proc *get_proc(pid_t pid);
 
@@ -115,7 +103,7 @@ proc *get_proc(pid_t pid);
 void proc_mark(proc *curproc, proc_states state);
 
 /*
- * Reparent childre from curproc to pid
+ * Reparent children from curproc to pid
  * @param cur_parent, the current parent
  * @param new_parent, pid of the new parent
  * @returns 0 on success, else 1

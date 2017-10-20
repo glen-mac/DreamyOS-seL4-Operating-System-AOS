@@ -53,7 +53,7 @@ static seL4_Word _dma_pnext = 0;
 static inline void
 _dma_fill(seL4_Word pstart, seL4_Word pend, int cached)
 {
-    seL4_CPtr* caps = &_dma_caps[(pstart - _dma_pstart) >> seL4_PageBits];
+    seL4_CPtr *caps = &_dma_caps[(pstart - _dma_pstart) >> seL4_PageBits];
     seL4_ARM_VMAttributes vm_attr = 0;
     int err;
 
@@ -99,7 +99,7 @@ dma_init(seL4_Word dma_paddr_start, int sizebits)
 
 
 void *
-sos_dma_malloc(void* cookie, size_t size, int align, int cached, ps_mem_flags_t flags)
+sos_dma_malloc(void *cookie, size_t size, int align, int cached, ps_mem_flags_t flags)
 {
     static int alloc_cached = 0;
     void *dma_addr;
@@ -123,6 +123,7 @@ sos_dma_malloc(void* cookie, size_t size, int align, int cached, ps_mem_flags_t 
     } else {
         dma_addr = NULL;
     }
+
     dprintf(5, "DMA: 0x%x\n", (uint32_t)dma_addr);
     /* Clean invalidate the range to prevent seL4 cache bombs */
     sos_dma_cache_op(NULL, dma_addr, size, DMA_CACHE_OP_CLEAN_INVALIDATE);

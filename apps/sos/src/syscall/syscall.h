@@ -7,7 +7,6 @@
 #ifndef _SYSCALL_H_
 #define _SYSCALL_H_
 
-#include <coro/picoro.h>
 #include <sel4/sel4.h>
 
 /*

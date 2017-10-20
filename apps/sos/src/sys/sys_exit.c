@@ -12,23 +12,22 @@
 #include <stdlib.h>
 #include <sel4/sel4.h>
 
-#include "execinfo.h" /*for backtrace()*/
+#include "execinfo.h" /* for backtrace() */
 
 static void sel4_abort(void) {
     printf("seL4 root server aborted\n");
 
-    /* Printout backtrace*/
+    /* Printout backtrace */
     void *array[10] = {NULL};
     int size = 0;
 
     size = backtrace(array, 10);
     if (size) {
-
         printf("Backtracing stack PCs:  ");
 
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size; i++)
             printf("0x%x  ", (unsigned int)array[i]);
-        }
+
         printf("\n");
     }
 
@@ -74,4 +73,3 @@ sys_tgkill(va_list ap)
     sel4_abort();
     return 0;
 }
-
