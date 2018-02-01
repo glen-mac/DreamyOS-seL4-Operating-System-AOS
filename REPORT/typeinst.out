@@ -1,0 +1,54 @@
+\BOOKMARK [0][-]{chapter.1}{DreamyOS}{}% 1
+\BOOKMARK [1][-]{section.1.1}{Executive Summary}{chapter.1}% 2
+\BOOKMARK [1][-]{section.1.2}{Third Party Content}{chapter.1}% 3
+\BOOKMARK [2][-]{subsection.1.2.1}{Picoro}{section.1.2}% 4
+\BOOKMARK [2][-]{subsection.1.2.2}{Ringbuf}{section.1.2}% 5
+\BOOKMARK [1][-]{section.1.3}{Multitasking Model}{chapter.1}% 6
+\BOOKMARK [1][-]{section.1.4}{Testing}{chapter.1}% 7
+\BOOKMARK [2][-]{subsection.1.4.1}{Pagefile Limit}{section.1.4}% 8
+\BOOKMARK [2][-]{subsection.1.4.2}{Frametable Limit}{section.1.4}% 9
+\BOOKMARK [2][-]{subsection.1.4.3}{Maximum number of Processes}{section.1.4}% 10
+\BOOKMARK [1][-]{section.1.5}{Subsystems}{chapter.1}% 11
+\BOOKMARK [2][-]{subsection.1.5.1}{Timer Driver}{section.1.5}% 12
+\BOOKMARK [3][-]{subsubsection.1.5.1.1}{Timestamps}{subsection.1.5.1}% 13
+\BOOKMARK [3][-]{subsubsection.1.5.1.2}{Tick-less design}{subsection.1.5.1}% 14
+\BOOKMARK [3][-]{subsubsection.1.5.1.3}{Data Structures to Handle Events}{subsection.1.5.1}% 15
+\BOOKMARK [2][-]{subsection.1.5.2}{Better Solutions}{section.1.5}% 16
+\BOOKMARK [2][-]{subsection.1.5.3}{Frametable}{section.1.5}% 17
+\BOOKMARK [3][-]{subsubsection.1.5.3.1}{Data Structure to Hold Frames}{subsection.1.5.3}% 18
+\BOOKMARK [3][-]{subsubsection.1.5.3.2}{Frame Entry}{subsection.1.5.3}% 19
+\BOOKMARK [3][-]{subsubsection.1.5.3.3}{High and Low Frame Watermarking}{subsection.1.5.3}% 20
+\BOOKMARK [3][-]{subsubsection.1.5.3.4}{Better Solutions}{subsection.1.5.3}% 21
+\BOOKMARK [2][-]{subsection.1.5.4}{Address Space}{section.1.5}% 22
+\BOOKMARK [3][-]{subsubsection.1.5.4.1}{Regions}{subsection.1.5.4}% 23
+\BOOKMARK [3][-]{subsubsection.1.5.4.2}{Page Table}{subsection.1.5.4}% 24
+\BOOKMARK [3][-]{subsubsection.1.5.4.3}{Kernel Cap Table}{subsection.1.5.4}% 25
+\BOOKMARK [3][-]{subsubsection.1.5.4.4}{Better Solutions}{subsection.1.5.4}% 26
+\BOOKMARK [2][-]{subsection.1.5.5}{VM Fault}{section.1.5}% 27
+\BOOKMARK [3][-]{subsubsection.1.5.5.1}{Permissions Fault}{subsection.1.5.5}% 28
+\BOOKMARK [3][-]{subsubsection.1.5.5.2}{Translation Fault}{subsection.1.5.5}% 29
+\BOOKMARK [2][-]{subsection.1.5.6}{Paging}{section.1.5}% 30
+\BOOKMARK [3][-]{subsubsection.1.5.6.1}{Pagefile Metadata}{subsection.1.5.6}% 31
+\BOOKMARK [3][-]{subsubsection.1.5.6.2}{Paging Race Conditions}{subsection.1.5.6}% 32
+\BOOKMARK [3][-]{subsubsection.1.5.6.3}{Better Solutions}{subsection.1.5.6}% 33
+\BOOKMARK [2][-]{subsection.1.5.7}{Syscalls}{section.1.5}% 34
+\BOOKMARK [3][-]{subsubsection.1.5.7.1}{Syscall Argument Conventions}{subsection.1.5.7}% 35
+\BOOKMARK [3][-]{subsubsection.1.5.7.2}{Framework for blocking}{subsection.1.5.7}% 36
+\BOOKMARK [3][-]{subsubsection.1.5.7.3}{One syscall for buffer transfers}{subsection.1.5.7}% 37
+\BOOKMARK [3][-]{subsubsection.1.5.7.4}{Write Implementation Decision}{subsection.1.5.7}% 38
+\BOOKMARK [3][-]{subsubsection.1.5.7.5}{List Dir Implementation Decision}{subsection.1.5.7}% 39
+\BOOKMARK [3][-]{subsubsection.1.5.7.6}{Better Solutions}{subsection.1.5.7}% 40
+\BOOKMARK [2][-]{subsection.1.5.8}{Virtual File System}{section.1.5}% 41
+\BOOKMARK [3][-]{subsubsection.1.5.8.1}{File Table}{subsection.1.5.8}% 42
+\BOOKMARK [3][-]{subsubsection.1.5.8.3}{Name Resolution}{subsection.1.5.8}% 43
+\BOOKMARK [3][-]{subsubsection.1.5.8.4}{Devices}{subsection.1.5.8}% 44
+\BOOKMARK [3][-]{subsubsection.1.5.8.5}{NFS}{subsection.1.5.8}% 45
+\BOOKMARK [2][-]{subsection.1.5.9}{Overlap current requests}{section.1.5}% 46
+\BOOKMARK [2][-]{subsection.1.5.10}{Only pin active pages}{section.1.5}% 47
+\BOOKMARK [2][-]{subsection.1.5.11}{We don't double buffer}{section.1.5}% 48
+\BOOKMARK [2][-]{subsection.1.5.12}{Devices}{section.1.5}% 49
+\BOOKMARK [1][-]{section.1.6}{Processes}{chapter.1}% 50
+\BOOKMARK [2][-]{subsection.1.6.1}{Concurrent Execution Model}{section.1.6}% 51
+\BOOKMARK [2][-]{subsection.1.6.2}{Pid Allocation}{section.1.6}% 52
+\BOOKMARK [2][-]{subsection.1.6.3}{How delete and wait works}{section.1.6}% 53
+\BOOKMARK [2][-]{subsection.1.6.4}{Re-parenting and SOS cleans up orphaned children}{section.1.6}% 54

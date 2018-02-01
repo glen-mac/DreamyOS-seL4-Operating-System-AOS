@@ -1,0 +1,640 @@
+%%%%%%%%%%%%%%%%%%%%%%% file typeinst.tex %%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% This is the LaTeX source for the instructions to authors using
+% the LaTeX document class 'llncs.cls' for contributions to
+% the Lecture Notes in Computer Sciences series.
+% http://www.springer.com/lncs       Springer Heidelberg 2006/05/04
+%
+% It may be used as a template for your own input - copy it
+% to a new file with a new name and use it as the basis
+% for your article.
+%
+% NB: the document class 'llncs' has its own and detailed documentation, see
+% ftp://ftp.springer.de/data/pubftp/pub/tex/latex/llncs/latex2e/llncsdoc.pdf
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[runningheads,a4paper]{llncs}
+
+\usepackage[utf8]{inputenc}
+
+\usepackage{natbib}
+%\bibliographystyle{apalike-fr}
+
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\usepackage{amssymb}
+\setcounter{tocdepth}{3}
+
+\usepackage{amssymb}% http://ctan.org/pkg/amssymb
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+\newcommand{\xmark}{\ding{55}}%
+
+
+\usepackage[parfill]{parskip}
+
+\usepackage{graphicx}
+\usepackage{epstopdf}
+
+%\usepackage[french]{babel} % Pour adopter les règles de typographie française
+\usepackage[T1]{fontenc} % Pour que les lettres accentuées soient reconnues
+
+%\usepackage{url}
+%\urldef{\mailsa}\path|{alfred.hofmann, ursula.barth, ingrid.haas, frank.holzwarth,|
+%\urldef{\mailsb}\path|anna.kramer, leonie.kunz, christine.reiss, nicole.sator,|
+%\urldef{\mailsc}\path|erika.siebert-cole, peter.strasser, lncs}@springer.com|    
+%\newcommand{\keywords}[1]{\par\addvspace\baselineskip
+%\noindent\keywordname\enspace\ignorespaces#1}
+
+% C code styling --------------------------------------------
+% lol feel free to change the colors
+\usepackage{xcolor}
+\usepackage{listings}
+
+
+\definecolor{mGreen}{rgb}{0,0.6,0}
+\definecolor{mGray}{rgb}{0.5,0.5,0.5}
+\definecolor{mPurple}{rgb}{0.58,0,0.82}
+\definecolor{backgroundColour}{rgb}{0.95,0.95,0.92}
+\lstdefinestyle{CStyle}{
+    backgroundcolor=\color{backgroundColour},   
+    commentstyle=\color{mGreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{mGray},
+    stringstyle=\color{mPurple},
+    basicstyle=\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+    language=C
+}
+% C code styling --------------------------------------------
+\begin{document}
+\begin{minipage}{\textwidth}
+
+\begin{center}
+\includegraphics[scale=1]{crest}
+\end{center}
+
+\medskip
+\medskip
+
+%\mainmatter 
+\title{DreamyOS}
+%\titlerunning{Gabarit : article français}
+\author{Glenn McGuire,\\ William Lonsdale}
+\institute{University of New South Wales}
+%\authorrunning{Nom de l'auteur}
+%\toctitle{Résumé}
+\tocauthor{{}}
+\maketitle
+
+\begin{abstract}
+The purpose of this document is to outline the design decisions and trade-offs made within the development of DreamyOS on the seL4 microkernel. 
+% The \textit{better design} decisions are discussed within each sub system overview.
+\end{abstract}
+
+\end{minipage}
+
+
+ \pagenumbering{gobble} 
+ 
+\setcounter{secnumdepth}{6}
+ 
+ %%%%% EVERYTHING THAT ISNT THE TITLE PAGE BELOW THIS LINE!!! %%%%%%%%%%
+\newpage
+\pagenumbering{arabic}  
+
+\medskip
+
+% change to self generating TOC lol
+\begingroup
+\let\clearpage\relax
+\tableofcontents
+\endgroup
+
+\medskip
+\medskip
+
+\newpage
+
+\section{Executive Summary}
+DreamyOS was designed with simplicity in mind, rather than bare raw performance. This has made for a Simple Operating System, that is trivial to modify and improve - but still with considerable performance. This being said, the majority of the \textit{better solutions} were adopted during development which has made for a lean, extensible Operating System.
+
+\section{Third Party Content}
+Several third party libraries were used to aid in the development of Dreamy OS. These included a coroutine library, and a ring buffer library.
+
+\subsection{Picoro}
+Picoro is a coroutine library written by Tony Finch (http://dotat.at/cgi/git/picoro.git/). It provides the functionality to resume and yield from coroutines. The coroutines are also scheduled by a minimalistic scheduler. We used, and modified, Picoro to implement our multitasking model. The picoro implementation can be found in the files \path{apps/sos/src/coro/coro/picoro.*}
+
+\subsection{Ringbuf}
+The ring buffer library by AndersKaloer (https://github.com/AndersKaloer/Ring-Buffer) was used to implement the input buffer for the serial device. The library can be found in \path{libs/libutils/src/ringbuf.c}
+
+\section{Multitasking Model}
+The multitasking model of coroutines was adopted within DreamyOS for managing multiple tasks at once. This design decision was made due to the simplicity of how coroutines operate, which helped scale the maximum load of the OperatingSystem.
+
+\section{Testing}
+The following limits have been provided to assist in testing Dreamy OS. These can be modified to test the system under different conditions.
+
+\subsection{Pagefile Limit}
+To limit the number of pages the pagefile may contain, access \path{apps/sos/src/vm/pager.c} and modify the C definition:
+\begin{verbatim}
+PAGEFILE_MAX_PAGES
+\end{verbatim}
+
+\subsection{Frametable Limit}
+To enforce an artificial limit on the number of frames the system can manage,
+access \path{apps/sos/src/vm/frametable.c} and modify the C definition:
+\begin{verbatim}
+ARTIFICIAL_FRAME_LIMIT
+\end{verbatim}
+
+\subsection{Maximum number of Processes}
+To modify the maximum number of processes that the system supports, access \path{apps/sos/src/proc/proc.h}, and modify the C definition:
+\begin{verbatim}
+MAX_PROCS
+\end{verbatim}
+
+% ----------------------------------------------------------------------------------------
+\medskip
+\medskip
+
+\section{Subsystems}
+
+\subsection{Timer Driver}
+The timer driver \path{libs/llibclock/src/clock.c} is single threaded, and uses the General Purpose Timer (GPT) as an up-counter, configured with a prescale value of 66. This results in an uptick of the timer every microsecond, meaning the counter register can be used as an accurate timestamp of the OS boot duration.
+
+\subsubsection{Timestamps}
+To support 64 bit timestamps, on the counter register overflow (which occurs approximately every 1.2 hours), an unused register in the GPT is incremented. This register is used as the upper 32 bits of the 64 bit timestamp. We do not support overflow of the upper 32 bits of the timestamp, however this is unnecessary as a 64 bit overflow occurs approximately every 584,554 years.
+
+There is a race condition in constructing the 64 bit timestamp, given that the upper and lower 32 bits are read seperately. Our timestamp function handles these edge cases and reports the timestamp accurately.
+
+\subsubsection{Tick-less design}
+Our timer is designed tick-less, meaning the timer generates interrupts only when a registered event is required to occur. To achieve this, the compare register (the value to generate an interrupt on) is set to the timestamp value of the next upcoming event.
+
+\subsubsection{Data Structures to Handle Events}
+Timer events in Dreamy OS were chosen to be stored in a heap-based priority queue. This provides an efficient look-up of the next upcoming event in O(1) time complexity and insertions of O(log n) complexity. This resulted in excellent performance during stress testing of the system, with very little overhead (7 ms).
+
+Although small, the overhead is enough to introduce a race condition whereby a small delayed event (1 millisecond or less) could be processed and missed by the incrementing timer. To handle this case, upon event registration, we check if the event delay is less than 1 millisecond, and if so, execute the event immediately.
+
+To handle the case where multiple events are triggered within the time to process a single event, our timer looks forward one millisecond and processes all events that were to trigger within that next time slice. Without this, these events would be missed.
+
+\subsection{Better Solutions}
+
+\begin{itemize}[label={\checkmark}]
+  \item Timestamp accuracy to sub-millisecond without increasing the tick rate of the timer.
+  \item A tickless timer where interrupts are only generated when threads need waking (or due to the finite size of the timer).
+\end{itemize}
+
+%Virtual Memory
+%   Frametable
+%   Big array Allocated from stealmem
+%   What each entry has
+%   High and low watermark
+%Address space
+%   Two level page table (allocated with frames, not malloc)
+%   Dynamic stack and heap. Stack limited by hard limit
+%   (Heap is placed after the last elf region, so we assume the last region is up the top-ish
+%   Efficient probing
+%   Minimal size PTEs
+%   Permissions
+%   Region abstraction
+%Paging
+%   PTE did not increase
+%   We do page our read only pages
+%   We can in theory support large page files but cant due to implementation
+%   We do keep the entire free list in memory :/
+%   We should really improve paging
+%Syscalls
+%   Send app virtual addresses
+%   One syscall for buffer transfers
+%   Progressive paging and address translation
+%   Framework for blocking
+%Filesystem
+%   VFS
+%   NFS
+%   We do mapping in syscall path  I think
+%   Overlap concurrent requests
+%   Only pin active pages
+%   We dont double buffer
+%   Devices
+%Processes
+%   Pid allocation
+%   How delete and wait works
+%   Reparenting and SOS cleans up orphaned children
+
+% ----------------------------------------------------------------------------------------
+\medskip
+\medskip
+
+\subsection{Frametable}
+
+TODO: MAYBE DIAGRAM?
+
+The frametable is allocated by stealing memory from the UT pool at startup. The virtual address for which, like all physical addresses in Dreamy OS, are mapped into SOS in a window of addresses representing a window into physical memory. This window sits between the addresses of 0x20000000 and 0x60000000, for a total size of 1GB. 
+
+\subsubsection{Data Structure to Hold Frames}
+The frametable is an array of frame entries. The table is sized using the amount of remaning UT memory provided to SOS by seL4. Frame lookup is done in O(1) complexity through indexed access. Frame allocation is also O(1) time complexity regarding the frame table.
+
+A design decision was made to reserve $20\%$ of the remaining pool of UT memory for untyped memory, such that there was enough to support SOS retyping memory into other resources needed by processes. This left the frametable to manage $80\%$ of the remaining memory for use as frames by both SOS and it's user applications. This proportion was decided on after significant testing to ensure the maximum performance of the OS.
+
+\subsubsection{Frame Entry}
+
+The frame entries, throughout SOS development, have always maintained compact form as to ensure minimal memory footprint. Pre-paging, the frame entry only contained a capability to the retyped memory. However to support paging, this struct grew to accomate the required metadata.
+
+The frame table entry includes the following attributes:
+
+\begin{lstlisting}[style=CStyle]
+typedef struct {
+    seL4_CPtr cap;
+    enum chance_type chance;
+    seL4_Word pid;
+    seL4_Word page_id;
+} frame_entry;
+\end{lstlisting}
+
+Where \textit{cap} represents the capability for the frame allocation that was performed using \textit{ut\_alloc()}, this is saved such that the frame may be properly released.
+
+The enum \textit{chance} represents the state of the frame in reference to the second-chance page-replacement algorithm. The two main states, \textit{FIRST\_CHANCE} and \textit{SECOND\_CHANCE} specify whether a frame is eligible to be evicted. An additional state, \textit{PINNED}, marks the frame as inelligible for replacement. This is used to ensure frames related to SOS metadata management are always resident, and to synchronise state preventing race conditions.
+
+The attribute \textit{pid} represents the PID of the process which has this frame mapped into their addresspace. This is used within the paging logic to notify the process that a part of their addresspace is to be evicted, so that they may fault and remap it in later on.
+
+Simiarly, the attribute \textit{page\_id} represents the virtual address which uses this frame as physical memory. This is used in conjunction with \textit{pid} to unmap pages from a processes addresspace.
+
+\subsubsection{High and Low Frame Watermarking}
+
+TODO: DIAGRAM WOULD BE GOOD HERE
+
+For a performance enhancement, Dreamy OS free's frames according to a high watermark of 64. As frames are free'd, they are initially stored in a stack of recently released frames. This allows for quick reuse by another requesting process. When the number of frames in the stack reaches the high watermark, all frames between the high and low watermark and umapped, and their memory released back to the Untyped pool.
+
+This design decision has led to a dramatic performance advantage in managing memory within the operating system, as the overhead of de-allocations is reduced by releasing memory in bulk.
+
+\subsubsection{Better Solutions}
+
+\begin{itemize}[label={\checkmark}]
+  \item Designs that can easily be extended to support a second-chance clock replacement policy later in the semester.
+  \item The frame table is not allocated using malloc.
+  \item Frame table entries are compact.
+  \item Designs that avoid deleting and retyping a frame object for every frame free and frame alloc request.
+\end{itemize}
+
+% ----------------------------------------------------------------------------------------
+\medskip
+\medskip
+
+\subsection{Address Space}
+
+TODO: DIAGRAM OF THE ADDRESS SPACE
+
+An Address Space is our abstraction to represent the virtual address space of a process. Inside an address space is the hardware page table, a per process SOS page table, and a list of memory regions present in the process.
+
+\begin{lstlisting}[style=CStyle]
+typedef struct {
+    region *region_list;
+    region *region_stack;
+    region *region_heap;
+
+    /* Hardware page table */
+    seL4_Word vspace_addr;
+    seL4_ARM_PageDirectory vspace;
+
+    /* SOS supplied page table */
+    page_directory *directory;
+} addrspace;
+\end{lstlisting}
+
+All regions in an address space are stored in a linked list. This decision was made for simplicity rather than performance. However, on average only a low amount of regions would exist per process, therefore traversing the liniked list would introduce a very minimal amount of overhead.
+
+As a time / space complexity trade-off, we decided to include a pointer to the heap and stack within the address space for faster lookup, given the frequency of memory accesses in these regions. 
+
+
+A pointer to the SOS page table for this process is included as an attribute, \textit{directory}, within the address space structure. The components required to manage the hardware page table, \textit{vspace\_addr} and \textit{vspace}, are also included, as they are needed for various functions across SOS, in particular for process destruction.
+
+\subsubsection{Regions}
+
+Regions represent a contigous area of virtual memory. In addition to a start and end address, a region has a set of access permission, used to restrict modes of access. A common example of this is read only access. Each process is created with a set of existing regions from the provided ELF Binary. SOS additionally provides two regions for memory access.
+
+\paragraph{Dynamic Stack}
+
+Initially, a processes stack starts at address 0x90000000 and has a size of 0 bytes. As the process faults on memory locations, the stack is dynamically expanded to accomodate the memory use patterns of the process. The stack grows upwards by moving the starting address  lower in the address space. In addition to collision checking (\textit{as\_region\_collision\_check}), the stack is limited in its expansion by the constant 
+\textit{RLIMIT\_STACK\_SZ}, which is by default 16MB. The default permissions on the stack are read and write.
+
+\paragraph{Dynamic Heap}
+
+The heap is initialised starting a page after the last defined section from the ELF Binary. This was chosen in  order to maximum the amount of memory the heap could grow in the address space. Similar to Linux, the initial size of the heap is 0 bytes. The \textit{brk} syscall can be used to set the end address of the region. Although extensions are restricted by collision checks with other regions, the heap has no internal limit, meaning it can be extending as much as possible, until it collides with another region in the address space.
+
+\subsubsection{Page Table}
+
+To represent the state of the virtual memory of a process, we use a two level page table to store the capabilities for pages mapped into a processes address space. For a 32 bit virtual address, the highest 20 bits are used as the page id. This means that every page in SOS is 4096 bytes. To index into the two level page table, the top 10 bits of the 20 bit value is used to index into the top most level of the page table, and the remaining bottom 10 bits are used to index into the second level.
+
+Using a two level page table provides the benefit that, the second level of the page table need not to be created if no mapping exist. Therefore on startup, the page table is quite compact, and only grows to accomade the program as it needs to.
+
+\paragraph{Page Table Entry}
+
+\begin{lstlisting}[style=CStyle]
+typedef struct {
+    seL4_CPtr page; 
+} page_table_entry;
+\end{lstlisting}
+
+Each page table entry only contains 4 bytes, and holds the capability id for the currently mapped in frame. Because of this compact design, the top and second levels of our page table are exactly 4096 bytes, and therefore can be managed trivially by our frame table. Therefore memory for the page table is self contained within Dreamy OS.
+
+To support paging, which is described in a later section, the leftmost bit of \textit{page} cap value is used to indicate whether a page is resident in memory (0), or currently swapped out to disk (1).
+
+\subsubsection{Kernel Cap Table}
+During mapping of pages into the virtual address space of processes, all kernel capabilities which are created for the purpose of mapping into the hardware page table, are stored in a single table per-process. The design decision for this was to ensure minimal memory footprint, by storing one per page that is mapped into the process, but also to release when the process ends to ensure no memory leakage.
+
+WHAT IS THE NAME OF THE TABLE THESE CAPS ARE MAPPED INTO?
+
+\subsubsection{Better Solutions}
+
+\begin{itemize}[label={\checkmark}]
+  \item As much heap and stack as the address space can provide
+  \item Designs that probe page table efficiently - minimal control flow checks in the critical path, and minimal levels traversed.
+  \item Designs that don't use SOS's malloc to allocate SOS's page tables (to avoid hitting the fixed size of the memory pool).
+  \item Designs that have a clear SOS-internal abstraction for tracking ranges of virtual memory for applications.
+  \item Solutions that minimise the size of page table entries (e.g. only contain the equivalent of a PTE and a cptr).
+  \item  Enforcing read-only permissions as specified in the ELF file or API calls.
+\end{itemize}
+
+
+\subsection{VM Fault}
+
+A process can trigger a VM fault for several reasons; Dreamy OS handles several cases. The execution path for this logic starts in the vm\_fault function in \path{apps/sos/src/vm/vm.c}
+
+\subsubsection{Permissions Fault}
+
+Regions of memory are mapped into an address space with certain permissions. For example, the code segment has read only access. Trying to write to these memory addresses would trigger a permissions fault.
+
+Upon triggering a permissions fault, a process is terminated for behaving erroneously.
+
+\subsubsection{Translation Fault}
+
+The majority of faults are translation faults, accesses to memory that is not currently mapped into the address space. As Dreamy OS supports paging, translation faults can be handled in two distinct ways.
+
+\pargraph{Page in on fault}
+
+The page the process is trying to access might have been paged out to disk; This can be check by testing the left most bit of the cap in the page table entry. If the page has been pushed to disk, the pager pages back in memory and mapps it into the processes address space. Permissions checking is also enforced, to ensure that incorrect access is not granted.
+
+\pargraph{Map memory on fault}
+
+Dreamy OS supports on demand memory mapping. Upon receiving this fault, stack expansion is checked to see if it can support this out of region memory address. If yes, then the stack is expanded to accomade this address. Otherwise, the memory address is associated with a region and the permissions of that region checked with the access permissions of the fault. If the checks have succesfully passed, the memory is created and mapped into the process.
+
+% -------------------------------------------------------------------------------------
+\medskip
+\medskip
+
+\subsection{Paging}
+
+Demand Paging was designed for simplicity, not efficiency; As such, this resulted in several trade offs on our design.
+
+\subsubsection{Pagefile Metadata}
+
+TODO DIAGRAM
+
+Whilst inefficent, the entire pagefile is represented in memory by a bit array. A 0 in an entry represents the page at that position in the file as free, whilst a 1 notes a page is currently occupying this position in the pagefile. While not being the best solution, our decision to use a bit array meant that the memory footprint is as minimal as possible, a 2 Gigabyte pagefile size is managed by a 65 Kilobyte bit array.
+
+TODO TALK ABOUT FINDING A FREE SPOT IN THE PAGE FILE O(N) :(
+
+\pargraph{PTE Size}
+
+As mentioned in the page table section, our page table entries are compact, and this allows us to manage our page table efficiently through frames. Because we wanted to keep this property, we decided to integrate pageing metadata into the page table entry. The left most bit of the cap value is used to represent if this page is currently paged to disk. If the value is 0, then the memory is resident and the cap value corresponds to a seL4 mapped frame capability. If the value is 1, then the memory has been paged to disk, and the cap value corresponds to the index into the pagefile where the page is stored.
+
+Because we reserve the left most bit for metadata, this restricts our maximum pagefile size to 2 GB. Because this is the maximum that was required by the specification, we decided this would be an acceptable tradeoff.
+
+\subsubsection{Paging Race Conditions}
+
+TODO DIAGRAM WOULD BE HELPFUL HERE
+
+With multiple processes, several race conditions exist with demand paging. In particular, faults may be triggered on memory that has not yet completely a previous paging operation due the asynchronous behaviour of NFS operations. Therefore, to solve this and other race conditions, we implemented a lock around the pager, such that only 1 operation can be done at a time.
+
+As paging operations are triggered, they go through the \textit{page\_gate\_open} function, which forces the coroutine to yield if a paging operation is already taking place. The coroutine is placed on a waiting queue to be resumed later. When a paging operation has been completed, it exits through \textit{page\_gate\_close} where it checks to see if there are any waiting coroutines in the queue, and resumes them if so.
+
+This behaviour is not always desired, for example, a page in that also triggers a page out would prefer the page out return immediately instead of resuming other waiting coroutines, therefore we provide avenues to exempt certain coroutines from passing through the locking gate.
+
+\subsubsection{Better Solutions}
+
+\begin{itemize}[label={\checkmark}]
+  \item Solutions that do not increase the page table entry size when implementing demand paging.
+  \item In theory, support large page files (e.g. 2-4 GB)
+\end{itemize}
+
+\begin{itemize}[label={\xmark}]
+  \item Avoid paging out read-only pages that are already in the page file.
+  \item Solutions that avoid keeping the entire free list of free page-file space in memory.
+\end{itemize}
+
+% ----------------------------------------------------------------------------------------
+\medskip
+\medskip
+
+\subsection{Syscalls}
+
+System calls are handled initially by a seperate coroutine, where the syscall number is checked. Given a valid syscall, the corresponding handler is dispatched via a jump table to complete the main work related to the system call. The use of the jump table reduces look-up time to O(1). Since syscalls are made frequently, it was important to us to reduce the code path before the sycall code could be run.
+
+Every syscall receives the calling process as a paramter, and returns the number of words in the reply message back to the user process. As every syscall accepts and delivers data back differently, setting and receiving from the message buffer is done within each system call handler.
+
+\subsubsection{Syscall Argument Conventions}
+
+Copying data from and into userland processes is done through sending over the processes virtual address. Dreamy OS will translate this virtual address into an OS virtual address, handling memory mapping, permissions and paging issues during the translation.
+
+Buffers larger than 4096 bytes are handled through progressive translations in the syscalls that require handling large regions of memory. On a page by page basis, these addresses are translated and processed by the system call. For the read and write system calls, the addresses are translated and manipulated directly, without any double buffering. For data related to file names, for example, are copied into a local buffer, because the entire data needs to be contigous in order to be processed.
+
+\subsubsection{Framework for blocking}
+
+Every time a syscall is made, and received by SOS; a new co-routine is spawned. Any time a blocking operation can occur, the coroutine is saved by the asynchronous handler, to be resumed when the data is available for processing. Every syscall then yields back to the event loop to process further events. When the corresponding interrupt occurs, the coroutine for the syscall is resumed. This consistent behaviour provides a clear framework for handling blocking operations such that SOS is never stuck waiting and is always able to process incoming requests.
+
+\subsubsection{One syscall for buffer transfers}
+
+Passing virtual addresses as syscall arguments means that SOS has to do more work in order to access and manipulate the memory provided by the user. However, this has the added benefit that only a single syscall is needed to handle large buffers. 
+
+\subsubsection{Write Implementation Decision}
+
+As memory address translation is done progressively, we made the decision to perform writes (and reads) progressively as memory is translated. This means that for a large buffer that extends into an invalid region, the memory that is valid is procesed and written into, but once an invalid address is translated, the system call returns error to the user process. Therefore part of the requested will be in the memory location, but it will not be complete, which is acceptable given we notify the user that the system call did not complete succesfully. 
+
+\subsubsection{List Dir Implementation Decision}
+
+For completeness, we decided to include the console device as a listing in the results returned from the sos\_getdirent syscall.
+
+\subsubsection{Better Solutions}
+
+\begin{itemize}[label={\checkmark}]
+  \item Have a clear framework for handling all blocking within SOS in a consistent way.
+  \item Only make one system call (between sos and user-level) for large buffers.
+  \item Be able to handle user buffers that are larger than the physical memory size.
+\end{itemize}
+
+
+% ----------------------------------------------------------------------------------------
+\medskip
+\medskip
+
+\subsection{Virtual File System}
+
+Access to files and devices are managed by the same virtual interface, the VFS. This design allowed us to treat devices and files as the same, and provides methods to easily mount other file systems and devices.
+
+\subsubsection{File Table}
+
+
+
+TODO DIAGRAM
+
+Per process, there is a file table which represents the files currently opened by the process. By default processes can support a maximum of 16 open files. Inside each slot in the file table is a pointer to a file struct.
+
+\begin{lstlisting}[style=CStyle]
+typedef struct {
+    off_t fp;  /* file pointer, current location in the file */
+    vnode *vn; /* Vnode attached to this file */
+    int mode;  /* Mode of access */
+} file;
+\end{lstlisting}
+
+Each file has associated with it, a file pointer that represents the current offset in the file; The mode the file is currently opened with (for example, read only). And finally a pointer to a vnode, which provides the implementation abstraction.
+
+Open, write, read, close, and other operations are all contained inside a vnode as vnode operations. This abstracts away the concrete implementation and allows processes to treat all open files the same.
+
+\subsubsection{Vnode}
+
+\begin{lstlisting}[style=CStyle]
+typedef struct _vnode {
+    void *vn_data; /* Implementation specific data */
+    const vnode_ops *vn_ops; /* Operations on a vnode */
+    seL4_Word readcount; /* Number of read references on this node */
+    seL4_Word writecount; /* Number of read references on this node */
+} vnode;
+\end{lstlisting}
+
+\subsubsection{Name Resolution}
+
+Our VFS supports a single namespace, and thus names must be resolved consistently. Namespaces can be mounted onto the VFS and included into the name resolution path. Similar to linux, Dreamy OS has the concept of mount points, which represent a concrete implementation of a file system.
+
+\begin{lstlisting}[style=CStyle]
+/*
+ * Linked list of mount points on the VFS
+ * Each mount point is a VFS with vop_lookup defined.
+ */
+typedef struct mnt {
+    vnode *node;
+    struct mnt *next;
+} mount;
+\end{lstlisting}
+
+Mount points are stored as a linked list. While not advantageous for efficiency, it does provide an easy name resolution strategy. We implemented a first come first serve strategy where by the first mount point to resolve the name succesfully is where the file comes from. Mount points are appending to the end of the list, so priority is given to mount points at the start of the list. For namespaces that has special reserved names, like devices for instance, this is mounted first to ensure that resolution of these names is not confused with files on the file system. This does however restrict the naming of files on any file systems mounted after another that has a file of the same name, however with the given specification we felt it was an acceptable trade off.
+
+Each mount point is a vnode with the list and lookup fuctions defined, it's at this stage that control is passed over to the concrete implementations.
+
+\subsubsection{Devices}
+
+TODO DIAGRAM
+
+The device namespace has a linked list of known devices. Devices can be added to this list by registering a device with a name, and a corresponding vnode. A linked list is not ideal for name resolution inside of the device namespace, it was chosen for simplicity over efficiency.
+
+\paragraph{Serial Device}
+
+Serial is a device registered in the device namespace under the name "console". This device enforces a single reader policy; upon opening the device vnode, the reader reference count is checked to ensure that the device is not currently in use. If so, the open fails.
+
+Receiving data from the serial is done through an aysnchronous handler which is called every time a byte is available. If a process has requested data from the serial device, this character is written directly into the memory address for the user process. Otherwise, if data arrives and no process has requested any, it is cached in an input ring buffer, to be read from the next time a process requests data from the console. Similar to system calls, if a process requests data that has not yet arrived, the coroutine will be saved and yiled back to the event loop to process more events. It will be resumed (and the process replied to) when data arrives.
+
+\subsubsection{NFS}
+ 
+The Network File System is the second mounted namespace in the VFS. All operations are delegated to the NFS library. The method for handling blocking reqeusts is consistent to the rest of the Operating System. 
+
+
+The device namespace has a linked list of known devices. Devices can be added to this list by registering a device with a name, and a corresponding vnode. A linked list is not ideal for name resolution inside of the device namespace, it was chosen for simplicity over efficiency.
+
+\paragraph{Serial Device}
+
+Serial is a device registered in the device namespace under the name "console". This device enforces a single reader policy; upon opening the device vnode, the reader reference count is checked to ensure that the device is not currently in use. If so, the open fails.
+
+Receiving data from the serial is done through an aysnchronous handler which is called every time a byte is available. If a process has requested data from the serial device, this character is written directly into the memory address for the user process. Otherwise, if data arrives and no process has requested any, it is cached in an input ring buffer, to be read from the next time a process requests data from the console. Similar to system calls, if a process requests data that has not yet arrived, the coroutine will be saved and yiled back to the event loop to process more events. It will be resumed (and the process replied to) when data arrives.
+
+\subsection{Overlap current requests}
+% -----------------------------------
+% needs things
+% -----------------------------------
+
+\subsection{Only pin active pages}
+% -----------------------------------
+% needs things
+% -----------------------------------
+
+\subsection{We don't double buffer}
+% -----------------------------------
+% needs things
+% -----------------------------------
+
+\subsection{Devices}
+% -----------------------------------
+% needs things
+% -----------------------------------
+
+% ----------------------------------------------------------------------------------------
+\medskip
+\medskip
+
+\section{Processes}
+Processes within SOS have been designed to be as slim in size as possible, as to reduce complexity and the number the operating system may support. Many significant design choices were made to ensure timely multi processing could be performed on the OS.
+
+\begin{lstlisting}[style=CStyle]
+typedef struct \_proc {
+    seL4_Word tcb_addr;             /* Physical address of the TCB */
+    seL4_TCB tcb_cap;               /* TCB Capability */
+    seL4_CPtr ipc_buffer_cap;       /* IPC buffer cap */
+    cspace_t *croot;                /* cspace root pointer */
+
+    addrspace *p_addrspace;         /* Process address space */
+    fdtable *file_table;            /* File table */
+    list_t *children;               /* Linked list of children */
+  
+    pid_t waiting_on;               /* Pid of the child proc is waiting on */
+    coro waiting_coro;              /* Coroutine to resume when the wait is satisfied */
+
+    pid_t ppid;                     /* Parent pid */
+    pid_t pid;                      /* Pid of process */
+    char *proc_name;                /* Process name */
+    int64_t stime;                  /* Process start time */
+    proc_states p_state;            /* Enum of the process state */
+
+    size_t blocked_ref;             /* Number of blocks on this process */
+    bool kill_flag;                 /* Flag to specify if this process has received a kill signal */
+    bool protected;                 /* Flag to specify if the process can be killed */
+} proc;
+\end{lstlisting}
+
+\subsection{Concurrent Execution Model}
+The design decision to utilize the co-routine concurrent execution model was used, predominantly due to simplicity of concept. Concurrent execution is a difficult concept, and the co-routine implementation made the most logical sense, and was very efficient in space complexity for state storage and also offered very good performance.
+
+The picoro co-routine library was utilized to assist in implementing concurrent execution into SOS. Although small modifications to the library were made when needed for basic operations, such as returning the current executing routine.
+
+\subsection{Pid Allocation}
+PID allocation was performed using a ring-array, such that allocations are made starting from index 0 upwards to MAX\_PID, resuming from the last allocation on each new allocation; wrapping around to the start of the array once MAX\_PID has been allocated or deemed occupied. Each index within the array contained a pointer to a process struct.
+
+This design choice was made, as it allowed for O(1) look-up, and O(n) insert. This was a desirable trade-off as it was deemed that look-ups are made more often than insertions during normal OS operation - and thus for performance was the better option.
+
+\subsection{How delete and wait works}
+% -----------------------------------
+% needs things - cam this is your jam
+% -----------------------------------
+
+\subsection{Re-parenting and SOS cleans up orphaned children}
+% -----------------------------------
+% needs things - cam this is your jam
+% -----------------------------------
+
+% ----------------------------------------------------------------------------------------
+\medskip
+\medskip
+
+\bibliography{references}
+\nocite{*} 
+
+\end{document}

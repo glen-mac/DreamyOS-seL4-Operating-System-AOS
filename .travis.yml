@@ -1,0 +1,8 @@
+language: c
+script: make
+before_install:
+    - sudo apt-get update -qq
+    - sudo apt-get install -qq gcc-arm-linux-gnueabi libxml2-utils python-tempita
+before_script:
+    - sudo mkdir -p /var/tftpboot/travis
+    - sudo chown travis:travis /var/tftpboot/travis
