@@ -2,4 +2,4 @@
 
 # DreamyOS - A Simple Operating System for the seL4 Micro Kernel
 
-_Please look at `dreamy.pdf` for the full documentation of the system_
+_Please look at `dreamy.pdf` for the full documentation of the system._
